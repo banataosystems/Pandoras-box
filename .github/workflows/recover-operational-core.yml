@@ -3,6 +3,7 @@ name: Recover MCPMaster operational core
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened]
     paths:
       - 'recovery/core-transport/**'
       - '.github/workflows/recover-operational-core.yml'
