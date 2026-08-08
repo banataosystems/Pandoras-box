@@ -1,0 +1,84 @@
+--- mcp_orig/mcpmaster-main/public/oauth/consent.browser.js.txt	2026-08-06 15:26:48.000000000 +0000
++++ public/oauth/consent.browser.js.txt	2026-08-08 16:00:27.357689854 +0000
+@@ -14,6 +14,7 @@
+ const mfaQr = document.querySelector('#mfa-qr');
+ const mfaSecretWrap = document.querySelector('#mfa-secret-wrap');
+ const mfaSecret = document.querySelector('#mfa-secret');
++const mfaAccount = document.querySelector('#mfa-account');
+ 
+ const GITHUB_VERIFIER_KEY = 'pandoras-box-consent-github-verifier';
+ const GITHUB_COOKIE_NAME = 'pandoras_box_consent_pkce';
+@@ -215,6 +216,27 @@
+ }
+ 
+ async function prepareMfa() {
++  const membership = await verifyMembership();
++  const expectedOwnerEmail = String(authConfig?.ownerEmail || '').trim().toLowerCase();
++  const signedInEmail = String(membership?.user?.email || '').trim().toLowerCase();
++  const signedInRole = String(membership?.user?.role || '').trim().toLowerCase();
++
++  if (mfaAccount) {
++    mfaAccount.textContent = signedInEmail
++      ? `Signed in as ${signedInEmail}`
++      : 'Signed-in account could not be identified';
++  }
++
++  if (!signedInEmail || signedInRole !== 'owner') {
++    await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
++    throw new Error('Pandoras-Box owner authorization requires the configured owner account. Sign in with the owner account and try again.');
++  }
++
++  if (expectedOwnerEmail && signedInEmail !== expectedOwnerEmail) {
++    await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
++    throw new Error(`Wrong Pandoras-Box account. Signed in as ${signedInEmail}; owner approval requires ${expectedOwnerEmail}.`);
++  }
++
+   const { data: level, error: levelError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+   if (levelError) throw levelError;
+   if (level.currentLevel === 'aal2') {
+--- mcp_orig/mcpmaster-main/public/oauth/consent.html	2026-08-06 15:26:48.000000000 +0000
++++ public/oauth/consent.html	2026-08-08 16:00:27.357865196 +0000
+@@ -62,6 +62,7 @@
+ 
+           <form id="mfa" hidden>
+             <h2>Verify owner approval</h2>
++            <p id="mfa-account" class="notice">Checking signed-in account…</p>
+             <p id="mfa-copy">Enter the six-digit code from your authenticator app.</p>
+             <img id="mfa-qr" class="qr" alt="Authenticator enrollment QR code" hidden />
+             <div id="mfa-secret-wrap" class="notice" hidden>Manual setup key: <code id="mfa-secret"></code></div>
+@@ -84,6 +85,6 @@
+       </section>
+       <footer>OAuth 2.1 + PKCE · GitHub via Supabase Auth · Pandoras-Box governed execution</footer>
+     </main>
+-    <script type="module" src="/oauth/consent.js?v=github-pkce-1"></script>
++    <script type="module" src="/oauth/consent.js?v=owner-bind-1"></script>
+   </body>
+ </html>
+--- mcp_orig/mcpmaster-main/apps/meta-business-mcp/src/operator/api.ts	2026-08-06 15:26:48.000000000 +0000
++++ apps/meta-business-mcp/src/operator/api.ts	2026-08-08 16:00:27.357938775 +0000
+@@ -224,6 +224,7 @@
+       supabaseUrl: options.supabaseUrl,
+       supabasePublishableKey: options.supabasePublishableKey,
+       organizationId: options.organizationId,
++      ownerEmail: (process.env.PANDORA_OWNER_EMAIL || 'markjohnsonbanatao888@gmail.com').trim().toLowerCase(),
+       sessionStorage: 'memory-only',
+       mfaRequiredForApproval: true,
+     });
+--- mcp_orig/mcpmaster-main/test/claude-github-consent.test.js	2026-08-06 15:26:48.000000000 +0000
++++ test/claude-github-consent.test.js	2026-08-08 16:00:46.105663036 +0000
+@@ -19,6 +19,16 @@
+   assert.match(consentJs, /supabase\.auth\.setSession/);
+ });
+ 
++test('owner identity is bound before MFA challenge', () => {
++  assert.match(consentHtml, /id="mfa-account"/);
++  assert.match(consentJs, /await verifyMembership\(\)/);
++  assert.match(consentJs, /signedInRole !== 'owner'/);
++  assert.match(consentJs, /signedInEmail !== expectedOwnerEmail/);
++  assert.match(consentJs, /Wrong Pandoras-Box account/);
++  assert.ok(consentJs.indexOf('await verifyMembership()') < consentJs.indexOf('getAuthenticatorAssuranceLevel()'));
++});
++
+ test('mobile PKCE state is short-lived and never stored in localStorage', () => {
+   assert.match(consentJs, /Max-Age=600/);
+   assert.match(consentJs, /sessionStorage/);
