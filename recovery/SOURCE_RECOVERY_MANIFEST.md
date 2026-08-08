@@ -28,3 +28,5 @@ A bounded pre-push scan was performed against the recovered archive. Token-like 
 - Build/test: not established by this recovery operation.
 - Vercel deployment: not changed by this recovery operation.
 - Production verification: not claimed.
+
+Recovery trigger: Contents API push on 2026-08-09 Asia/Manila.
