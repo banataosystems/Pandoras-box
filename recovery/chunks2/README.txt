@@ -1,0 +1,1 @@
+Temporary checksum-safe recovery transport chunks. These are not application source and will be removed after reconstruction.
