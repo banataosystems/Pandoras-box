@@ -7,6 +7,12 @@ on:
       - 'recovery/mcpmaster-source.part-*'
       - 'recovery/SOURCE_RECOVERY_MANIFEST.md'
       - '.github/workflows/recover-canonical-source.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'recovery/**'
+      - '.github/workflows/recover-canonical-source.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,6 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
       - name: Reassemble and verify recovery snapshot
         shell: bash
