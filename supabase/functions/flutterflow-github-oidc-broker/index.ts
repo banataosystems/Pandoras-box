@@ -316,6 +316,18 @@ Deno.serve(async (request: Request) => {
     const rows = await grantResponse.json();
     const grant = Array.isArray(rows) ? rows[0] : undefined;
     if (!grant?.token || grant.project_id !== expectedProjectId) {
+      console.info(
+        "flutterflow_oidc_grant_miss",
+        JSON.stringify({
+          repository,
+          ref,
+          sha: commitSha,
+          workflow_ref: workflowRef,
+          actor_id: actorId,
+          run_id: runId,
+          run_attempt: runAttempt,
+        }),
+      );
       return response(
         403,
         "GRANT_NOT_AVAILABLE",
