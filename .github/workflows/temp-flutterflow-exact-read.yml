@@ -1,4 +1,4 @@
-name: Temporary FlutterFlow Context Locator
+name: Temporary FlutterFlow Exact Widget Write
 
 on:
   pull_request:
@@ -14,9 +14,9 @@ jobs:
   invoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Locate FlutterFlow text widget from page context
+      - name: Test exact FlutterFlow widget partition write
         run: |
           set -euo pipefail
           curl --silent --show-error --get \
-            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-context-locator' \
+            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-leaf-write-diagnostic' \
             --data-urlencode 'code=APAmC1D5W3B8ZZu68Tea5XnBBsXs4_HXfxerweXrccU'
