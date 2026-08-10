@@ -1,6 +1,6 @@
 {
-  "schemaVersion": "1.0.0",
-  "projectKey": "mcpmaster-pandoras-box",
+  "schemaVersion": "1.1.0",
+  "projectKey": "mcpmaster",
   "artifact": "pandora-mobile-flutterflow-v1",
   "canonicalRepository": "banataosystems/Pandoras-box",
   "branch": "feature/flutterflow-pandora-mobile-v1",
@@ -9,12 +9,33 @@
   "state": {
     "documented": true,
     "implementationPrepared": true,
+    "flutterFlowApiClientOverlayImplemented": true,
+    "flutterFlowApiClientTypeChecked": true,
+    "flutterFlowApiClientRuntimeTestsPassed": 5,
     "flutterFlowProjectCreated": false,
     "implementedInFlutterFlow": false,
     "validatedInFlutterFlow": false,
-    "tested": false,
+    "appTested": false,
     "deployed": false,
     "productionVerified": false
+  },
+  "provider": {
+    "officialProjectApiBaseUrl": "https://api.flutterflow.io/v2",
+    "credentialRequired": "FlutterFlow bearer API token",
+    "credentialPresentInPandora": false,
+    "credentialPresentInMcpMasterMetaStaging": false,
+    "supabaseOAuthApplicationAuthorized": true,
+    "supabaseOAuthEvidenceDate": "2026-08-06",
+    "registeredGatewayCapabilities": [
+      "project.list",
+      "yaml.files.list",
+      "yaml.read",
+      "yaml.validate",
+      "yaml.update",
+      "code.export"
+    ],
+    "gatewayCapabilitiesEnabled": false,
+    "providerStatus": "planned"
   },
   "requirements": {
     "plainLanguageFirst": true,
@@ -29,16 +50,36 @@
       "production-verified"
     ],
     "aal2ForProtectedApprovals": true,
+    "validateBeforeFlutterFlowWrites": true,
+    "explicitApprovalBeforeFlutterFlowWrites": true,
     "failClosedWhenStateUnverified": true,
     "noClientProviderSecrets": true
   },
-  "currentBlocker": {
-    "id": "MCP-PANDORA-CONNECTION-001",
-    "type": "access",
-    "summary": "Pandoras-box MCP endpoint is intercepted by Vercel Deployment Protection and returns HTTP 401 before application authentication; this session also has no direct FlutterFlow connector.",
-    "safeRepair": "Provide machine automation access through Vercel Deployment Protection while retaining application-level MCP/OAuth authentication, then use the governed FlutterFlow adapter or FlutterFlow MCP workspace.",
-    "doNot": "Do not make the entire MCPMaster application public merely to bypass the 401."
+  "sourceEvidence": {
+    "adapter": "recovery/overlay/flutterflow-project-api-client.ts",
+    "tests": "recovery/overlay/flutterflow-project-api-client.test.ts",
+    "adapterCommit": "c2b1d7e701a37fa0f8a4fca513234a70d636a9cb",
+    "testCommit": "a34e57d60b393491d86dd96cbef25564b176dc34",
+    "runtimeTestResult": "5/5 passed",
+    "typeCheck": "client overlay passed TypeScript strict noEmit check"
   },
-  "nextAutonomousAction": "Restore canonical MCPMaster operational source and repair machine MCP connectivity; then initialize or bind the FlutterFlow AI workspace, validate the documented app prompt, create the real FlutterFlow project, and record project/version/rollback evidence.",
+  "currentBlockers": [
+    {
+      "id": "MCP-PANDORA-CONNECTION-001",
+      "type": "access",
+      "summary": "The ChatGPT Pandoras-box MCP facade is still intercepted by Vercel Deployment Protection before application authentication. The authoritative Memory backing database is reachable and has been reconciled directly through Supabase, but the MCP facade itself is not repaired."
+    },
+    {
+      "id": "FLUTTERFLOW-CREDENTIAL-001",
+      "type": "credential",
+      "summary": "No FlutterFlow Project API bearer token is available to Pandora, MCPMaster Meta staging, or this ChatGPT session. FlutterFlow's official Project API and AI/Codex workflow require that token. It must not be pasted into chat or committed to source."
+    },
+    {
+      "id": "FLUTTERFLOW-PROJECT-001",
+      "type": "provider",
+      "summary": "No real FlutterFlow project ID/version has been created or bound for Pandora Mobile v1, so FlutterFlow validation, update, test, and rollback proof cannot yet run."
+    }
+  ],
+  "nextAutonomousAction": "When a supported secure FlutterFlow credential handoff becomes available, list projects first; if no Pandora app exists, create it through FlutterFlow's supported AI/CLI flow, capture project ID/version, inspect project YAML, validate all planned YAML, apply only approval-gated updates, then record tests and rollback evidence in Pandora before release.",
   "productionReleaseAuthorized": false
 }
