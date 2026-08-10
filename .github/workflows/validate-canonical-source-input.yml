@@ -30,24 +30,44 @@ jobs:
 
           python - <<'PY'
           import hashlib
+          import io
           import itertools
+          import zipfile
           from pathlib import Path
 
           expected = "dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83"
+          required = {
+              "source/package.json",
+              "source/src/http-server.ts",
+              "source/SOURCE_AUTHORITY_POLICY.json",
+          }
           parts = {
               name: Path(f"recovery/mcpmaster-source.part-{name}").read_bytes()
               for name in ("00", "01", "02", "03")
           }
-          matches = []
+          exact_matches = []
+          valid_zips = []
           for order in itertools.permutations(parts):
               payload = b"".join(parts[name] for name in order)
               digest = hashlib.sha256(payload).hexdigest()
-              print(f"order={','.join(order)} sha256={digest}")
+              is_zip = zipfile.is_zipfile(io.BytesIO(payload))
+              detail = ""
+              if is_zip:
+                  with zipfile.ZipFile(io.BytesIO(payload)) as zf:
+                      names = set(zf.namelist())
+                      detail = f" entries={len(names)} required_present={required.issubset(names)}"
+                  valid_zips.append((order, digest, payload, detail))
+              print(f"order={','.join(order)} sha256={digest} valid_zip={is_zip}{detail}")
               if digest == expected:
-                  matches.append((order, payload))
-          if len(matches) != 1:
-              raise SystemExit(f"expected exactly one matching order, found {len(matches)}")
-          order, payload = matches[0]
+                  exact_matches.append((order, payload))
+
+          print(f"valid_zip_permutations={len(valid_zips)}")
+          print(f"exact_hash_matches={len(exact_matches)}")
+          if len(exact_matches) != 1:
+              raise SystemExit(
+                  f"content-addressed recovery blocked: expected one exact archive, found {len(exact_matches)}; valid zip permutations={len(valid_zips)}"
+              )
+          order, payload = exact_matches[0]
           Path("/tmp/mcpmaster-recovery-source.zip").write_bytes(payload)
           print(f"verified_part_order={','.join(order)}")
           PY
