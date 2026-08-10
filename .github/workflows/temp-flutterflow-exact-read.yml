@@ -1,4 +1,4 @@
-name: Temporary FlutterFlow Leaf Write Diagnostic
+name: Temporary FlutterFlow Leaf Locator
 
 on:
   pull_request:
@@ -14,9 +14,9 @@ jobs:
   invoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Test FlutterFlow leaf partition write
+      - name: Locate deepest FlutterFlow text partition
         run: |
           set -euo pipefail
           curl --silent --show-error --get \
-            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-leaf-write-diagnostic' \
+            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-leaf-locator' \
             --data-urlencode 'code=APAmC1D5W3B8ZZu68Tea5XnBBsXs4_HXfxerweXrccU'
