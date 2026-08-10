@@ -188,7 +188,10 @@ jobs:
 
           payload = json.loads(pathlib.Path(sys.argv[1]).read_text())
           value = payload.get("value")
-          if not isinstance(value, str) or len(value) < 100:
+          encoded = value.get("project_yaml_bytes") if isinstance(value, dict) else None
+          if not isinstance(encoded, str):
+              encoded = value.get("projectYamlBytes") if isinstance(value, dict) else None
+          if not isinstance(encoded, str) or len(encoded) < 100:
               raise SystemExit("Pre-change FlutterFlow YAML snapshot is missing")
           PY
                 FF_API_KEY="${ff_token}" flutterflow ai validate \
@@ -228,7 +231,10 @@ jobs:
 
           payload = json.loads(pathlib.Path(sys.argv[1]).read_text())
           value = payload.get("value")
-          if not isinstance(value, str) or len(value) < 100:
+          encoded = value.get("project_yaml_bytes") if isinstance(value, dict) else None
+          if not isinstance(encoded, str):
+              encoded = value.get("projectYamlBytes") if isinstance(value, dict) else None
+          if not isinstance(encoded, str) or len(encoded) < 100:
               raise SystemExit("Pre-change FlutterFlow YAML snapshot is missing")
           PY
                 FF_PANDORA_INSTALL_GLOBAL_NAV=true FF_API_KEY="${ff_token}" \
