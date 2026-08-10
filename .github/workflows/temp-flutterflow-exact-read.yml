@@ -14,9 +14,9 @@ jobs:
   invoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger validate-first FlutterFlow wording repair
+      - name: Inspect FlutterFlow repair gate response
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --get \
+          curl --silent --show-error --get \
             'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-plain-language-repair' \
             --data-urlencode 'code=pgQ7TPl3ar8oOT9FcjVNhB2tra5qf96xJqmRnVSWZxY'
