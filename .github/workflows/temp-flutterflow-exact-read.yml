@@ -1,4 +1,4 @@
-name: Temporary FlutterFlow Write Diagnostic
+name: Temporary FlutterFlow Leaf Write Diagnostic
 
 on:
   pull_request:
@@ -14,9 +14,9 @@ jobs:
   invoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Diagnose exact FlutterFlow write behavior
+      - name: Test FlutterFlow leaf partition write
         run: |
           set -euo pipefail
           curl --silent --show-error --get \
-            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-write-diagnostic' \
-            --data-urlencode 'code=liFd_f2qELhrVeCaczF9p7iOkBczrp2r2WMsr7_GwmY'
+            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-leaf-write-diagnostic' \
+            --data-urlencode 'code=APAmC1D5W3B8ZZu68Tea5XnBBsXs4_HXfxerweXrccU'
