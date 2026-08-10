@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "mode": "inspect",
+  "mode": "validate-auth",
   "projectId": "pandoras-box-gj9hnb",
-  "purpose": "Generate a non-secret typed map of the existing FlutterFlow project before implementation."
+  "purpose": "Compile and remotely dry-run the guarded Supabase auth and route pass without mutating the project."
 }

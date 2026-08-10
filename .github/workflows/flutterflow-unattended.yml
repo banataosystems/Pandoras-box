@@ -1,4 +1,4 @@
-name: FlutterFlow unattended project inspection
+name: FlutterFlow unattended project operation
 
 on:
   push:
@@ -11,11 +11,11 @@ on:
 permissions: {}
 
 concurrency:
-  group: flutterflow-unattended-project-inspection
+  group: flutterflow-unattended-project-operation
   cancel-in-progress: false
 
 jobs:
-  inspect-project:
+  operate-project:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -41,7 +41,7 @@ jobs:
           dart pub global activate flutterflow_cli 0.0.39
           printf '%s\n' "${HOME}/.pub-cache/bin" >> "${GITHUB_PATH}"
 
-      - name: Inspect exact FlutterFlow project through one-time OIDC grant
+      - name: Operate exact FlutterFlow project through one-time OIDC grant
         shell: bash
         env:
           BROKER_URL: https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-github-oidc-broker
@@ -55,6 +55,9 @@ jobs:
           cleanup() {
             if [[ -n "${workspace:-}" && "${workspace}" == "${RUNNER_TEMP}/"* ]]; then
               rm -f "${workspace}/.flutterflow/.env"
+            fi
+            if [[ -n "${rollback_snapshot:-}" && "${rollback_snapshot}" == "${RUNNER_TEMP}/"* ]]; then
+              rm -f "${rollback_snapshot}"
             fi
             unset oidc_json oidc_token broker_json ff_token broker_project_id
           }
@@ -98,10 +101,16 @@ jobs:
           mode="$(
             python3 -c 'import json; print(json.load(open("automation/flutterflow/run.json"))["mode"],end="")'
           )"
-          test "${mode}" = 'inspect'
+          case "${mode}" in
+            inspect|validate-auth|apply-auth|validate-owner|apply-owner) ;;
+            *)
+              printf 'Unsupported unattended FlutterFlow mode: %s\n' "${mode}" >&2
+              exit 64
+              ;;
+          esac
 
           workspace="${RUNNER_TEMP}/pandora-flutterflow-ai"
-          output="${RUNNER_TEMP}/pandora-flutterflow-inspection"
+          output="${RUNNER_TEMP}/pandora-flutterflow-result"
           mkdir -p "${output}/pages"
 
           FF_API_KEY="${ff_token}" flutterflow ai init "${workspace}" \
@@ -109,6 +118,9 @@ jobs:
             --no-save \
             --yes
           rm -f "${workspace}/.flutterflow/.env"
+
+          mkdir -p "${workspace}/dsl"
+          cp automation/flutterflow/dsl/*.dart "${workspace}/dsl/"
 
           FF_SECRET="${ff_token}" python3 - "${workspace}" <<'PY'
           import os
@@ -122,38 +134,125 @@ jobs:
                   raise SystemExit("FlutterFlow credential persisted outside the deleted workspace .env")
           PY
 
-          (
+          operate() {
             cd "${workspace}"
-            FF_API_KEY="${ff_token}" flutterflow ai status "${FLUTTERFLOW_PROJECT_ID}" \
-              > "${output}/status.txt"
-            FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
-              > "${output}/project-summary.txt"
-            FF_API_KEY="${ff_token}" flutterflow ai resources "${FLUTTERFLOW_PROJECT_ID}" \
-              > "${output}/resources.json"
+            case "${mode}" in
+              inspect)
+                FF_API_KEY="${ff_token}" flutterflow ai status "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/status.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/project-summary.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai resources "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/resources.json"
 
-            pages=(
-              SplashConnection
-              SignIn
-              CommandCenter
-              ActionsCatalog
-              ActionBuilder
-              ApprovalCenter
-              ActivityAuditTrail
-              SecurityOperations
-              ProjectDetails
-              PlansExecution
-            )
-            for page in "${pages[@]}"; do
-              FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
-                --page "${page}" \
-                --dsl-json \
-                --output "${output}/pages/${page}.json"
-              FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
-                --page "${page}" \
-                --outline \
-                > "${output}/pages/${page}.outline.txt"
-            done
-          )
+                pages=(
+                  SplashConnection
+                  SignIn
+                  CommandCenter
+                  ActionsCatalog
+                  ActionBuilder
+                  ApprovalCenter
+                  ActivityAuditTrail
+                  SecurityOperations
+                  ProjectDetails
+                  PlansExecution
+                )
+                for page in "${pages[@]}"; do
+                  FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
+                    --page "${page}" \
+                    --dsl-json \
+                    --output "${output}/pages/${page}.json"
+                  FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
+                    --page "${page}" \
+                    --outline \
+                    > "${output}/pages/${page}.outline.txt"
+                done
+                ;;
+              validate-auth)
+                FF_API_KEY="${ff_token}" flutterflow ai validate \
+                  dsl/00_auth_route_guards.dart \
+                  --project-id "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/validate-auth.txt"
+                ;;
+              apply-auth)
+                rollback_snapshot="${RUNNER_TEMP}/pandora-pre-auth-project-yamls.json"
+                curl --proto '=https' --tlsv1.2 \
+                  --fail --silent --show-error --max-time 120 \
+                  -H "Authorization: Bearer ${ff_token}" \
+                  "https://api.flutterflow.io/v2/projectYamls?projectId=${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${rollback_snapshot}"
+                python3 - "${rollback_snapshot}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          payload = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          value = payload.get("value")
+          if not isinstance(value, str) or len(value) < 100:
+              raise SystemExit("Pre-change FlutterFlow YAML snapshot is missing")
+          PY
+                FF_API_KEY="${ff_token}" flutterflow ai validate \
+                  dsl/00_auth_route_guards.dart \
+                  --project-id "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/validate-auth.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai run \
+                  dsl/00_auth_route_guards.dart \
+                  --project-id "${FLUTTERFLOW_PROJECT_ID}" \
+                  --commit-message 'Configure Pandora Supabase auth and route guards' \
+                  > "${output}/apply-auth.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai refresh-context \
+                  "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/refresh-auth-context.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai context-check \
+                  > "${output}/context-check-auth.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/post-auth-summary.txt"
+                ;;
+              validate-owner)
+                FF_PANDORA_INSTALL_GLOBAL_NAV=true FF_API_KEY="${ff_token}" \
+                  flutterflow ai validate dsl/10_owner_api_state_navigation.dart \
+                  --project-id "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/validate-owner.txt"
+                ;;
+              apply-owner)
+                rollback_snapshot="${RUNNER_TEMP}/pandora-pre-owner-project-yamls.json"
+                curl --proto '=https' --tlsv1.2 \
+                  --fail --silent --show-error --max-time 120 \
+                  -H "Authorization: Bearer ${ff_token}" \
+                  "https://api.flutterflow.io/v2/projectYamls?projectId=${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${rollback_snapshot}"
+                python3 - "${rollback_snapshot}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          payload = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          value = payload.get("value")
+          if not isinstance(value, str) or len(value) < 100:
+              raise SystemExit("Pre-change FlutterFlow YAML snapshot is missing")
+          PY
+                FF_PANDORA_INSTALL_GLOBAL_NAV=true FF_API_KEY="${ff_token}" \
+                  flutterflow ai validate dsl/10_owner_api_state_navigation.dart \
+                  --project-id "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/validate-owner.txt"
+                FF_PANDORA_INSTALL_GLOBAL_NAV=true FF_API_KEY="${ff_token}" \
+                  flutterflow ai run dsl/10_owner_api_state_navigation.dart \
+                  --project-id "${FLUTTERFLOW_PROJECT_ID}" \
+                  --commit-message 'Wire Pandora owner app to governed live services' \
+                  > "${output}/apply-owner.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai refresh-context \
+                  "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/refresh-owner-context.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai context-check \
+                  > "${output}/context-check-owner.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai codegen status \
+                  > "${output}/codegen-status-owner.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/post-owner-summary.txt"
+                ;;
+            esac
+          }
+          operate
 
           cp "${workspace}/lib/flutterflow_project.dart" \
             "${output}/flutterflow_project.dart"
@@ -177,10 +276,10 @@ jobs:
           PY
           unset ff_token broker_project_id
 
-      - name: Upload non-secret typed project inspection
+      - name: Upload non-secret operation evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: pandora-flutterflow-inspection-${{ github.sha }}
-          path: ${{ runner.temp }}/pandora-flutterflow-inspection
+          name: pandora-flutterflow-operation-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pandora-flutterflow-result
           if-no-files-found: error
           retention-days: 1
