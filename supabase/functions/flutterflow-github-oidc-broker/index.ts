@@ -316,6 +316,31 @@ Deno.serve(async (request: Request) => {
     const rows = await grantResponse.json();
     const grant = Array.isArray(rows) ? rows[0] : undefined;
     if (!grant?.token || grant.project_id !== expectedProjectId) {
+      try {
+        await fetch(
+          `${supabaseUrl}/rest/v1/rpc/record_flutterflow_github_oidc_attempt`,
+          {
+            method: "POST",
+            headers: {
+              apikey: serviceRoleKey,
+              authorization: `Bearer ${serviceRoleKey}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              p_repository: repository,
+              p_ref: ref,
+              p_sha: commitSha,
+              p_workflow_ref: workflowRef,
+              p_actor_id: actorId,
+              p_run_id: runId,
+              p_run_attempt: runAttempt,
+              p_outcome: "grant_miss",
+            }),
+          },
+        );
+      } catch {
+        // The denied workload remains denied even if audit persistence fails.
+      }
       console.info(
         "flutterflow_oidc_grant_miss",
         JSON.stringify({
