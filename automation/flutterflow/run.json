@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1.0.0",
+  "mode": "inspect",
+  "projectId": "pandoras-box-gj9hnb",
+  "purpose": "Generate a non-secret typed map of the existing FlutterFlow project before implementation."
+}

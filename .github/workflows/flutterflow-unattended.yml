@@ -1,0 +1,128 @@
+name: FlutterFlow unattended project inspection
+
+on:
+  push:
+    branches:
+      - feature/flutterflow-pandora-mobile-v1
+    paths:
+      - .github/workflows/flutterflow-unattended.yml
+      - automation/flutterflow/run.json
+
+permissions: {}
+
+concurrency:
+  group: flutterflow-unattended-project-inspection
+  cancel-in-progress: false
+
+jobs:
+  inspect-project:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install pinned Dart SDK
+        uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260
+        with:
+          sdk: "3.12.2"
+
+      - name: Install pinned FlutterFlow CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          dart pub global activate flutterflow_cli 0.0.39
+          printf '%s\n' "${HOME}/.pub-cache/bin" >> "${GITHUB_PATH}"
+
+      - name: Inspect exact FlutterFlow project through one-time OIDC grant
+        shell: bash
+        env:
+          BROKER_URL: https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-github-oidc-broker
+          OIDC_AUDIENCE: pandora-flutterflow-project-api
+          FLUTTERFLOW_PROJECT_ID: pandoras-box-gj9hnb
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          ulimit -c 0 || true
+          trap 'unset oidc_json oidc_token broker_json ff_token broker_project_id' EXIT
+
+          oidc_json="$(
+            curl --proto '=https' --tlsv1.2 \
+              --fail --silent --show-error --max-time 15 \
+              -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${OIDC_AUDIENCE}"
+          )"
+          oidc_token="$(
+            python3 -c 'import json,sys; print(json.load(sys.stdin)["value"], end="")' \
+              <<<"${oidc_json}"
+          )"
+          printf '::add-mask::%s\n' "${oidc_token}"
+
+          broker_json="$(
+            curl --proto '=https' --tlsv1.2 \
+              --fail --silent --show-error --max-time 20 \
+              -X POST \
+              -H "Authorization: Bearer ${oidc_token}" \
+              -H 'Content-Type: application/json' \
+              --data "{\"project_id\":\"${FLUTTERFLOW_PROJECT_ID}\"}" \
+              "${BROKER_URL}"
+          )"
+          unset oidc_json oidc_token
+
+          ff_token="$(
+            python3 -c 'import json,sys; data=json.load(sys.stdin); token=data["token"]; assert isinstance(token,str) and len(token)>=20; print(token,end="")' \
+              <<<"${broker_json}"
+          )"
+          broker_project_id="$(
+            python3 -c 'import json,sys; print(json.load(sys.stdin)["project_id"],end="")' \
+              <<<"${broker_json}"
+          )"
+          printf '::add-mask::%s\n' "${ff_token}"
+          unset broker_json
+          test "${broker_project_id}" = "${FLUTTERFLOW_PROJECT_ID}"
+
+          mode="$(
+            python3 -c 'import json; print(json.load(open("automation/flutterflow/run.json"))["mode"],end="")'
+          )"
+          test "${mode}" = 'inspect'
+
+          workspace="${RUNNER_TEMP}/pandora-flutterflow-ai"
+          output="${RUNNER_TEMP}/pandora-flutterflow-inspection"
+          mkdir -p "${output}"
+
+          FF_API_KEY="${ff_token}" flutterflow ai init "${workspace}" \
+            --project "${FLUTTERFLOW_PROJECT_ID}" \
+            --no-save \
+            --yes
+
+          (
+            cd "${workspace}"
+            FF_API_KEY="${ff_token}" flutterflow ai status "${FLUTTERFLOW_PROJECT_ID}" \
+              > "${output}/status.txt"
+            FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
+              > "${output}/project-summary.txt"
+            FF_API_KEY="${ff_token}" flutterflow ai resources "${FLUTTERFLOW_PROJECT_ID}" \
+              > "${output}/resources.json"
+          )
+
+          cp "${workspace}/lib/flutterflow_project.dart" \
+            "${output}/flutterflow_project.dart"
+          cp "${workspace}/PROJECT_CONTEXT.md" \
+            "${output}/PROJECT_CONTEXT.md"
+          unset ff_token broker_project_id
+
+      - name: Upload non-secret typed project inspection
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pandora-flutterflow-inspection-${{ github.sha }}
+          path: ${{ runner.temp }}/pandora-flutterflow-inspection
+          if-no-files-found: error
+          retention-days: 1
