@@ -1,0 +1,38 @@
+name: Validate canonical MCPMaster recovery input
+
+on:
+  pull_request:
+    paths:
+      - 'recovery/mcpmaster-source.part-*'
+      - 'recovery/SOURCE_RECOVERY_MANIFEST.md'
+      - '.github/workflows/recover-canonical-source.yml'
+      - '.github/workflows/validate-canonical-source-input.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact recovery archive and required source
+        shell: bash
+        run: |
+          set -euo pipefail
+          for part in 00 01 02 03; do
+            test -s "recovery/mcpmaster-source.part-${part}"
+          done
+          cat recovery/mcpmaster-source.part-* > /tmp/mcpmaster-recovery-source.zip
+          echo "dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83  /tmp/mcpmaster-recovery-source.zip" | sha256sum -c -
+          rm -rf /tmp/mcpmaster-recovery
+          mkdir -p /tmp/mcpmaster-recovery
+          unzip -q /tmp/mcpmaster-recovery-source.zip -d /tmp/mcpmaster-recovery
+          test -f /tmp/mcpmaster-recovery/source/package.json
+          test -f /tmp/mcpmaster-recovery/source/src/http-server.ts
+          test -f /tmp/mcpmaster-recovery/source/SOURCE_AUTHORITY_POLICY.json
+          file_count="$(find /tmp/mcpmaster-recovery/source -type f | wc -l | tr -d ' ')"
+          test "$file_count" -ge 500
+          echo "recovered_source_files=${file_count}"
+          echo "archive_sha256=dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83"
