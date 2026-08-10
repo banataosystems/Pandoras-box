@@ -5,7 +5,7 @@ on:
     branches:
       - feature/flutterflow-pandora-mobile-v1
     paths:
-      - .github/flutterflow-read-trigger.txt
+      - .github/flutterflow-serial-trigger.txt
 
 permissions:
   contents: read
