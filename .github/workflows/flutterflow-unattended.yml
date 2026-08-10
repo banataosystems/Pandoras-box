@@ -1,4 +1,4 @@
-name: FlutterFlow unattended project operation
+name: FlutterFlow unattended project inspection
 
 on:
   push:
