@@ -26,11 +26,11 @@
     "ownerApiEdgeFunctionVersion": 2,
     "ownerApiJwtRequired": true,
     "databaseAal2ApprovalBoundaryVerified": true,
-    "preExistingFlutterFlowIssuesRepaired": false,
+    "preExistingFlutterFlowIssuesRepaired": true,
     "liveMcpMasterOwnerApiWired": false,
     "androidVisualNavigationTested": false,
     "aal2ApprovalFlowVerifiedInApp": false,
-    "temporaryRepairToolingCleaned": false,
+    "temporaryRepairToolingCleaned": true,
     "appTested": false,
     "deployed": false,
     "productionVerified": false
@@ -79,13 +79,27 @@
     "goal": "FlutterFlow talks to one governed Pandora owner API. The backend routes to connected MCPs/services; Simple mode does not expose raw MCP/provider jargon or client-side provider secrets."
   },
   "remainingV1Work": [
-    "Repair and verify the three pre-existing FlutterFlow issues: two invalid navigation targets and one property-override type mismatch.",
     "Wire the owner API bridge to live governed MCPMaster endpoints for Home, projects, connections, approvals, activity, safety, and Ask Pandora.",
     "Replace remaining static/mock values with truthful canonical backend data.",
     "Run Android-first visual, navigation, loading, empty, error, offline, and responsive tests.",
     "Verify protected approval plus extra identity check/AAL2 flow from the app.",
-    "Retire temporary repair Edge Functions/workflows/PRs and preserve rollback evidence.",
     "Keep deployment and production verification as separate owner-authorized gates."
   ],
-  "productionReleaseAuthorized": false
+  "productionReleaseAuthorized": false,
+  "issueRepair": {
+    "status": "provider_readback_verified",
+    "repairedAt": "2026-08-10T09:02:24Z",
+    "preSnapshotId": "768a7e28-11fc-44f0-98aa-30ad4783da6e",
+    "postSnapshotId": "15e6d5e8-bbcb-4812-b507-f20fbed88ef8",
+    "exactPostHashes": {
+      "page/id-Scaffold_scaffold5_230/page-widget-tree-outline/node/id-ComponentInstance_stdbutton11_257.yaml": "c3ec9bd12474799c4c01b6814d672e7f0b743a9daba51e1a8f0cccab160cbdb5",
+      "page/id-Scaffold_scaffold9_664/page-widget-tree-outline/node/id-ComponentInstance_stdbutton14_745.yaml": "72beca0701fca61b35245ec311c2f9515f8d04c25f7a08dfb00859df462e64d3",
+      "component/id-ComponentRoot_node_840.yaml": "d3bf177052ae6069b8f9a8f00920e8721b71808403d8ad757dd1af6c13ad644e"
+    },
+    "unchangedActionTargets": [
+      "q2dz28dd",
+      "f1y48rlo"
+    ],
+    "retiredWorkersJwtRequired": true
+  }
 }
