@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.4.0",
+  "schemaVersion": "1.5.0",
   "projectKey": "mcpmaster",
   "artifact": "pandora-mobile-flutterflow-v1",
   "canonicalRepository": "banataosystems/Pandoras-box",
@@ -12,74 +12,73 @@
     "flutterFlowApiClientOverlayImplemented": true,
     "flutterFlowApiClientTypeChecked": true,
     "flutterFlowApiClientRuntimeTestsPassed": 5,
-    "secureCredentialHandoffImplemented": true,
-    "secureCredentialHandoffDeployed": true,
-    "secureCredentialHandoffLiveVerified": false,
     "flutterFlowTokenLiveAccepted": true,
-    "existingFlutterFlowProjectVisuallyEvidenced": true,
-    "exactFlutterFlowProjectIdVerified": false,
-    "implementedInFlutterFlow": false,
-    "validatedInFlutterFlow": false,
+    "exactFlutterFlowProjectIdVerified": true,
+    "exactFlutterFlowProjectId": "pandoras-box-gj9hnb",
+    "partitionerVersion": 9,
+    "projectSchemaFingerprint": "f237da5d53110b3aa14501753ed13f6687ce0033",
+    "plainLanguageScreensVerified": 10,
+    "plainLanguageScreensTotal": 10,
+    "plainLanguageRepairComplete": true,
+    "ownerApiBridgeImplemented": true,
+    "ownerApiBridgeTestsPassed": 6,
+    "preExistingFlutterFlowIssuesRepaired": false,
+    "liveMcpMasterOwnerApiWired": false,
+    "androidVisualNavigationTested": false,
+    "aal2ApprovalFlowVerifiedInApp": false,
+    "temporaryRepairToolingCleaned": false,
     "appTested": false,
     "deployed": false,
     "productionVerified": false
   },
   "provider": {
     "officialProjectApiBaseUrl": "https://api.flutterflow.io/v2",
-    "credentialRequired": "FlutterFlow bearer API token",
-    "credentialPresentInPandora": false,
-    "supabaseOAuthApplicationAuthorized": true,
-    "existingProjectEvidence": {
-      "displayNameObserved": "Pandoras Box Synced",
-      "connectedSupabaseLabel": "MCPMaster Meta",
-      "exactProjectId": null,
-      "observedIssues": [
-        "two navigation actions target pages that do not exist",
-        "one property-override return-type mismatch"
-      ]
-    }
+    "projectId": "pandoras-box-gj9hnb",
+    "displayName": "Pandoras Box",
+    "schemaFingerprint": "f237da5d53110b3aa14501753ed13f6687ce0033",
+    "partitionerVersion": 9,
+    "vaultSecretName": "pandora_flutterflow_project_api"
   },
-  "credentialHandoff": {
-    "mode": "one-time local HTML form posting directly to Supabase Edge Function",
-    "tokenStoredInChat": false,
-    "tokenStoredInGitHub": false,
-    "tokenStoredInPandoraSemanticMemory": false,
-    "storage": "Supabase Vault only after project match succeeds",
-    "liveTokenValidation": "passed",
-    "firstProjectMatch": "failed because backend required exact Pandoras Box while provider project evidence includes Pandoras Box Synced",
-    "matcherRepair": "require exactly one project whose normalized name contains both pandora and box",
-    "edgeFunctionVersion": 4,
-    "edgeFunctionSha256": "e1eb479b0590f229ca4c01bb6096a0ccbabdf628a435b521b969812e802cbfea",
-    "handoffWindowExtendedTo": "2026-08-10T13:12:46+08:00",
-    "sourceRepairCommit": "0c9c8de8bf2d24d3c3e7a68f9fbbef3fbba4c8cf"
+  "plainLanguageRepair": {
+    "verifiedPages": [
+      "SplashConnection",
+      "SignIn",
+      "CommandCenter",
+      "ProjectDetails",
+      "ActionsCatalog",
+      "ActionBuilder",
+      "ApprovalCenter",
+      "PlansExecution",
+      "ActivityAuditTrail",
+      "SecurityOperations"
+    ],
+    "verificationRule": "Every changed widget/component leaf partition validates before write; aggregate page read-back must show required simple-language terms and zero forbidden old/demo terms.",
+    "finalSerializedWorkflowRun": 31361615229,
+    "workflowConclusion": "success",
+    "pages4to10PostSnapshots": [
+      "8099a443-0e6e-40b9-839d-bd1bdc9c2263",
+      "52236ae4-520a-4326-875e-b2f2180aa747",
+      "3bdaedec-42c5-4aa9-af17-311a1d5215c7",
+      "44002f78-0c9b-4054-9902-77e74be42bf4",
+      "b88de19c-5bd5-42cc-9c98-ebb120346374",
+      "db3f41f5-1714-4321-beaa-1bf7f2e279a1",
+      "4a443528-6077-408c-8096-589dc5070e64"
+    ]
   },
-  "visualSourceOfTruth": {
-    "name": "Pandoras-Box Dark Dashboard UI",
-    "bottomNavigation": ["Home", "Actions", "Approvals", "Activity", "Safety"],
-    "topProjectLimit": 3,
-    "neverReuseReferencePercentagesAsLiveData": true
+  "connectionsBridge": {
+    "source": "recovery/overlay/pandora-owner-api-client.ts",
+    "tests": "recovery/overlay/pandora-owner-api-client.test.ts",
+    "testsPassed": 6,
+    "goal": "FlutterFlow talks to one governed Pandora owner API. The backend routes to connected MCPs/services; Simple mode does not expose raw MCP/provider jargon or client-side provider secrets."
   },
-  "requirements": {
-    "plainLanguageFirst": true,
-    "completionPercentagesRequireCanonicalRoadmapTaskProofCalculation": true,
-    "aal2ForProtectedApprovals": true,
-    "validateBeforeFlutterFlowWrites": true,
-    "explicitApprovalBeforeFlutterFlowWrites": true,
-    "failClosedWhenStateUnverified": true,
-    "noClientProviderSecrets": true
-  },
-  "currentBlockers": [
-    {
-      "id": "FLUTTERFLOW-CREDENTIAL-HANDOFF-RETRY",
-      "type": "credential",
-      "summary": "The token was proven valid, but was not stored because the first project-name matcher was too strict. Matcher is repaired and handoff expiry extended. Owner must resubmit the same valid token through the secure form once more."
-    },
-    {
-      "id": "FLUTTERFLOW-PROJECT-ID-001",
-      "type": "provider",
-      "summary": "Exact projectId/version/schema fingerprint will be captured immediately after the repaired handoff succeeds."
-    }
+  "remainingV1Work": [
+    "Repair and verify the three pre-existing FlutterFlow issues: two invalid navigation targets and one property-override type mismatch.",
+    "Wire the owner API bridge to live governed MCPMaster endpoints for Home, projects, connections, approvals, activity, safety, and Ask Pandora.",
+    "Replace remaining static/mock values with truthful canonical backend data.",
+    "Run Android-first visual, navigation, loading, empty, error, offline, and responsive tests.",
+    "Verify protected approval plus extra identity check/AAL2 flow from the app.",
+    "Retire temporary repair Edge Functions/workflows/PRs and preserve rollback evidence.",
+    "Keep deployment and production verification as separate owner-authorized gates."
   ],
-  "nextAutonomousAction": "After the owner resubmits the same valid token through the secure form, verify the single Pandora Box project, store the token in Vault, capture exact project ID, then inspect YAML and rollback state before any write.",
   "productionReleaseAuthorized": false
 }
