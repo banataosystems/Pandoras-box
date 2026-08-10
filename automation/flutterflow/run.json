@@ -2,5 +2,5 @@
   "schemaVersion": "1.0.0",
   "mode": "validate-owner",
   "projectId": "pandoras-box-gj9hnb",
-  "purpose": "Compile and remotely dry-run the exact ten-page owner UI, live API bindings, actions, navigation, and product mark without mutating the project."
+  "purpose": "Compile and remotely dry-run the enhanced owner command, recovery, project evidence, connection checks, navigation, and product mark without mutating the project."
 }
