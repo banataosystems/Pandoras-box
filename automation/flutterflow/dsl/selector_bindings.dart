@@ -1317,7 +1317,7 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
         children: [
           _mark(48),
           Expanded(
-            child: Column(
+            Column(
               crossAxis: CrossAxis.start,
               spacing: 3,
               children: [
