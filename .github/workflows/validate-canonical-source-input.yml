@@ -29,7 +29,6 @@ jobs:
           actual="$(sha256sum /tmp/mcpmaster-recovery-source.zip | awk '{print $1}')"
           echo "expected_archive_sha256=${expected}"
           echo "actual_archive_sha256=${actual}"
-          test "$actual" = "$expected"
           rm -rf /tmp/mcpmaster-recovery
           mkdir -p /tmp/mcpmaster-recovery
           unzip -q /tmp/mcpmaster-recovery-source.zip -d /tmp/mcpmaster-recovery
@@ -37,5 +36,6 @@ jobs:
           test -f /tmp/mcpmaster-recovery/source/src/http-server.ts
           test -f /tmp/mcpmaster-recovery/source/SOURCE_AUTHORITY_POLICY.json
           file_count="$(find /tmp/mcpmaster-recovery/source -type f | wc -l | tr -d ' ')"
-          test "$file_count" -ge 500
           echo "recovered_source_files=${file_count}"
+          test "$file_count" -ge 500
+          test "$actual" = "$expected"
