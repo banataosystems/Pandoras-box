@@ -1,0 +1,52 @@
+{
+  "version": "1.0.0",
+  "rule": "Use ownerTerm in Simple mode. technicalTerm may appear only inside Advanced details or evidence.",
+  "terms": [
+    {"technicalTerm":"MCP","ownerTerm":"Connection","example":"GitHub connection"},
+    {"technicalTerm":"MCP server","ownerTerm":"Connected service","example":"Connected service is ready"},
+    {"technicalTerm":"provider","ownerTerm":"service","example":"This service needs permission"},
+    {"technicalTerm":"connector","ownerTerm":"connection","example":"Reconnect this service"},
+    {"technicalTerm":"repository","ownerTerm":"code source","example":"Open code source"},
+    {"technicalTerm":"pull request","ownerTerm":"proposed change","example":"Review proposed change"},
+    {"technicalTerm":"commit","ownerTerm":"saved code version","example":"Saved code version"},
+    {"technicalTerm":"branch","ownerTerm":"work version","example":"Current work version"},
+    {"technicalTerm":"deployment","ownerTerm":"live version","example":"Check live version"},
+    {"technicalTerm":"production","ownerTerm":"live","example":"Ready to go live"},
+    {"technicalTerm":"staging","ownerTerm":"test area","example":"Test area"},
+    {"technicalTerm":"rollback","ownerTerm":"undo to last safe version","example":"Undo to last safe version"},
+    {"technicalTerm":"CI / pipeline","ownerTerm":"automatic checks","example":"Automatic checks passed"},
+    {"technicalTerm":"build","ownerTerm":"app check","example":"App check passed"},
+    {"technicalTerm":"runtime","ownerTerm":"live system","example":"Live system is healthy"},
+    {"technicalTerm":"schema","ownerTerm":"data structure","example":"Data structure updated"},
+    {"technicalTerm":"YAML","ownerTerm":"app setup","example":"App setup validated"},
+    {"technicalTerm":"migration","ownerTerm":"database update","example":"Database update completed"},
+    {"technicalTerm":"RLS","ownerTerm":"data access rules","example":"Data access rules passed"},
+    {"technicalTerm":"webhook","ownerTerm":"automatic update","example":"Automatic update received"},
+    {"technicalTerm":"API","ownerTerm":"service link","example":"Service link is working"},
+    {"technicalTerm":"API token / key","ownerTerm":"secure connection key","example":"Secure connection key is stored safely"},
+    {"technicalTerm":"AAL2","ownerTerm":"extra identity check","example":"Extra identity check required"},
+    {"technicalTerm":"MFA / TOTP","ownerTerm":"security code","example":"Enter your security code"},
+    {"technicalTerm":"authorization","ownerTerm":"permission","example":"Permission required"},
+    {"technicalTerm":"authentication","ownerTerm":"sign-in check","example":"Sign-in check required"},
+    {"technicalTerm":"idempotency","ownerTerm":"duplicate protection","example":"Duplicate protection is on"},
+    {"technicalTerm":"audit event","ownerTerm":"activity record","example":"Activity record saved"},
+    {"technicalTerm":"artifact","ownerTerm":"proof","example":"View proof"},
+    {"technicalTerm":"evidence","ownerTerm":"proof","example":"Show proof"},
+    {"technicalTerm":"blocker","ownerTerm":"what is stopping this","example":"What is stopping this"},
+    {"technicalTerm":"dependency","ownerTerm":"waiting on","example":"Waiting on approval"},
+    {"technicalTerm":"production verified","ownerTerm":"checked live","example":"Checked live"}
+  ],
+  "statusLabels": {
+    "documented":"Planned",
+    "implemented":"Built",
+    "tested":"Checked",
+    "deployed":"Put live",
+    "production-verified":"Checked live"
+  },
+  "connectionStates": {
+    "connected":"Ready",
+    "degraded":"Problem",
+    "disconnected":"Off",
+    "needs_permission":"Needs permission"
+  }
+}
