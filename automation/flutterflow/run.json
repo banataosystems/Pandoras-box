@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "mode": "validate-owner",
+  "mode": "apply-owner",
   "projectId": "pandoras-box-gj9hnb",
-  "purpose": "Compile and remotely dry-run recovery-session handling, guarded owner commands, typed project proof, connection checks, navigation, and product mark without mutating the project."
+  "purpose": "Apply the remotely validated owner interface, guarded commands, recovery-session handling, typed project proof, connection checks, navigation, and approved product mark."
 }
