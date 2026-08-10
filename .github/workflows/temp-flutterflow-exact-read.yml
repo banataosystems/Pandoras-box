@@ -1,0 +1,21 @@
+name: Temporary FlutterFlow Exact Project Read
+
+on:
+  push:
+    branches:
+      - feature/flutterflow-pandora-mobile-v1
+    paths:
+      - .github/workflows/temp-flutterflow-exact-read.yml
+
+permissions:
+  contents: read
+
+jobs:
+  invoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sanitized FlutterFlow manifest capture
+        run: |
+          curl --fail --silent --show-error \
+            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-exact-project-read?code=XdwZFtX00C7GclUy1bKaop_LCUN8C4Vrzirpou9DUBY' \
+            >/dev/null
