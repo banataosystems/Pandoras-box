@@ -123,81 +123,101 @@ void applyPandoraExactBindings(
   _replacePageBody(
     app,
     page: ff.Pages.splashConnection,
-    bodyRoot: ff.Pages.splashConnection.widgets
-        .byKey('Stack_stack4_52')
-        .single,
+    bodyRoot: _existingWidget(
+      ff.Pages.splashConnection.widgets,
+      replacementName: 'PandoraSplashBody',
+      legacyKey: 'Stack_stack4_52',
+    ),
     body: _splashBody(),
   );
   _replacePageBody(
     app,
     page: ff.Pages.signIn,
-    bodyRoot: ff.Pages.signIn.widgets
-        .byKey('ScrollColumn_column33_129')
-        .single,
+    bodyRoot: _existingWidget(
+      ff.Pages.signIn.widgets,
+      replacementName: 'PandoraSignInBody',
+      legacyKey: 'ScrollColumn_column33_129',
+    ),
     body: _signInBody(spec),
   );
   _replacePageBody(
     app,
     page: ff.Pages.commandCenter,
-    bodyRoot: ff.Pages.commandCenter.widgets
-        .byKey('ScrollColumn_column40_229')
-        .single,
+    bodyRoot: _existingWidget(
+      ff.Pages.commandCenter.widgets,
+      replacementName: 'PandoraCommandCenterBody',
+      legacyKey: 'ScrollColumn_column40_229',
+    ),
     body: _commandCenterBody(spec),
   );
   _replacePageBody(
     app,
     page: ff.Pages.projectDetails,
-    bodyRoot: ff.Pages.projectDetails.widgets
-        .byKey('Column_column62_341')
-        .single,
+    bodyRoot: _existingWidget(
+      ff.Pages.projectDetails.widgets,
+      replacementName: 'PandoraProjectDetailsBody',
+      legacyKey: 'Column_column62_341',
+    ),
     body: _projectDetailsBody(spec),
   );
   _replacePageBody(
     app,
     page: ff.Pages.actionsCatalog,
-    bodyRoot: ff.Pages.actionsCatalog.widgets
-        .byKey('Column_column71_449')
-        .single,
+    bodyRoot: _existingWidget(
+      ff.Pages.actionsCatalog.widgets,
+      replacementName: 'PandoraActionsCatalogBody',
+      legacyKey: 'Column_column71_449',
+    ),
     body: _actionsCatalogBody(spec),
   );
   _replacePageBody(
     app,
     page: ff.Pages.actionBuilder,
-    bodyRoot: ff.Pages.actionBuilder.widgets
-        .byKey('Column_column80_546')
-        .single,
+    bodyRoot: _existingWidget(
+      ff.Pages.actionBuilder.widgets,
+      replacementName: 'PandoraActionBuilderBody',
+      legacyKey: 'Column_column80_546',
+    ),
     body: _actionBuilderBody(spec),
   );
   _replacePageBody(
     app,
     page: ff.Pages.approvalCenter,
-    bodyRoot: ff.Pages.approvalCenter.widgets
-        .byKey('Column_column89_663')
-        .single,
+    bodyRoot: _existingWidget(
+      ff.Pages.approvalCenter.widgets,
+      replacementName: 'PandoraApprovalCenterBody',
+      legacyKey: 'Column_column89_663',
+    ),
     body: _approvalCenterBody(spec),
   );
   _replacePageBody(
     app,
     page: ff.Pages.plansExecution,
-    bodyRoot: ff.Pages.plansExecution.widgets
-        .byKey('Column_column99_777')
-        .single,
+    bodyRoot: _existingWidget(
+      ff.Pages.plansExecution.widgets,
+      replacementName: 'PandoraPlansExecutionBody',
+      legacyKey: 'Column_column99_777',
+    ),
     body: _plansExecutionBody(spec),
   );
   _replacePageBody(
     app,
     page: ff.Pages.activityAuditTrail,
-    bodyRoot: ff.Pages.activityAuditTrail.widgets
-        .byKey('Column_column108_917')
-        .single,
+    bodyRoot: _existingWidget(
+      ff.Pages.activityAuditTrail.widgets,
+      replacementName: 'PandoraActivityBody',
+      legacyKey: 'Column_column108_917',
+    ),
     body: _activityBody(spec),
   );
   _replacePageBody(
     app,
     page: ff.Pages.securityOperations,
-    bodyRoot: ff.Pages.securityOperations.widgets
-        .byKey('Column_column119_1048')
-        .single,
+    bodyRoot: _existingWidget(
+      ff.Pages.securityOperations.widgets,
+      replacementName: 'PandoraSecurityBody',
+      legacyKey: 'Column_column119_1048',
+    ),
     body: _securityBody(spec),
   );
 
@@ -207,54 +227,66 @@ void applyPandoraExactBindings(
   _replaceMark(
     app,
     component: ff.Components.redAppleMark,
-    child: ff.Components.redAppleMark.widgets
-        .byKey('Container_container1_7')
-        .single,
+    child: _existingWidget(
+      ff.Components.redAppleMark.widgets,
+      replacementName: 'ApprovedPandoraSplashMark',
+      legacyKey: 'Container_container1_7',
+    ),
     size: 88,
     replacementName: 'ApprovedPandoraSplashMark',
   );
   _replaceMark(
     app,
     component: ff.Components.redAppleMark2,
-    child: ff.Components.redAppleMark2.widgets
-        .byKey('Container_container1_61')
-        .single,
+    child: _existingWidget(
+      ff.Components.redAppleMark2.widgets,
+      replacementName: 'ApprovedPandoraSignInMark',
+      legacyKey: 'Container_container1_61',
+    ),
     size: 64,
     replacementName: 'ApprovedPandoraSignInMark',
   );
   _replaceMark(
     app,
     component: ff.Components.redAppleMark3,
-    child: ff.Components.redAppleMark3.widgets
-        .byKey('Container_container5_345')
-        .single,
+    child: _existingWidget(
+      ff.Components.redAppleMark3.widgets,
+      replacementName: 'ApprovedPandoraActionsMark',
+      legacyKey: 'Container_container5_345',
+    ),
     size: 40,
     replacementName: 'ApprovedPandoraActionsMark',
   );
   _replaceMark(
     app,
     component: ff.Components.redAppleMark4,
-    child: ff.Components.redAppleMark4.widgets
-        .byKey('Container_container1_453')
-        .single,
+    child: _existingWidget(
+      ff.Components.redAppleMark4.widgets,
+      replacementName: 'ApprovedPandoraBuilderMark',
+      legacyKey: 'Container_container1_453',
+    ),
     size: 40,
     replacementName: 'ApprovedPandoraBuilderMark',
   );
   _replaceMark(
     app,
     component: ff.Components.redAppleMark5,
-    child: ff.Components.redAppleMark5.widgets
-        .byKey('Container_container7_781')
-        .single,
+    child: _existingWidget(
+      ff.Components.redAppleMark5.widgets,
+      replacementName: 'ApprovedPandoraActivityMark',
+      legacyKey: 'Container_container7_781',
+    ),
     size: 40,
     replacementName: 'ApprovedPandoraActivityMark',
   );
   _replaceMark(
     app,
     component: ff.Components.redAppleMark6,
-    child: ff.Components.redAppleMark6.widgets
-        .byKey('Container_container4_921')
-        .single,
+    child: _existingWidget(
+      ff.Components.redAppleMark6.widgets,
+      replacementName: 'ApprovedPandoraSafetyMark',
+      legacyKey: 'Container_container4_921',
+    ),
     size: 40,
     replacementName: 'ApprovedPandoraSafetyMark',
   );
@@ -269,6 +301,28 @@ void _replacePageBody(
   app.editPage(page, (editor) {
     editor.ensureReplaced(bodyRoot, body);
   });
+}
+
+ProjectWidgetHandle _existingWidget(
+  ProjectWidgetTree tree, {
+  required String replacementName,
+  required String legacyKey,
+}) {
+  final current = tree.byText(replacementName);
+  if (current.matches.length == 1) return current.single;
+  if (current.isNotEmpty) {
+    throw StateError(
+      '$replacementName must identify exactly one current widget; found '
+      '${current.matches.length}.',
+    );
+  }
+
+  final legacy = tree.byKey(legacyKey);
+  if (legacy.matches.length == 1) return legacy.single;
+  throw StateError(
+    'Neither current widget $replacementName nor legacy key $legacyKey '
+    'resolved exactly once.',
+  );
 }
 
 void _replaceMark(
