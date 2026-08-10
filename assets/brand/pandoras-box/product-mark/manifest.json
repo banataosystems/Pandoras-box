@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0.0",
+  "product_key": "mcpmaster-pandoras-box",
+  "role": "primary_product_mark",
+  "decision_id": "PB-BRAND-2026-08-10-01",
+  "approved_at": "2026-08-10T15:01:51+08:00",
+  "approved_by": "owner",
+  "source": {
+    "attachment_name": "2165.png",
+    "repository_path": "assets/brand/pandoras-box/product-mark/2165-original.jpg",
+    "sha256": "d6f055b88b962b4dbae4ac67bc30f5e31b6c3a90997dfd5fddf9a0be23aa5970",
+    "byte_size": 98032,
+    "actual_format": "JPEG",
+    "mime_type": "image/jpeg",
+    "width": 1536,
+    "height": 1536,
+    "channels": "sRGB grayscale",
+    "alpha": false,
+    "background": "#000000"
+  },
+  "observed_artwork_bounds": {
+    "x": 386,
+    "y": 268,
+    "width": 731,
+    "height": 891,
+    "method": "3-percent-fuzz trim observation; derivatives require visual verification"
+  },
+  "prohibited_changes": [
+    "redraw",
+    "trace",
+    "regenerate",
+    "recolor",
+    "invert",
+    "distort",
+    "remove_black_field",
+    "substitute_generic_apple",
+    "replace_with_ownership_mark"
+  ],
+  "derivative_policy": "Deterministic crop, encoding normalization, and resizing only; preserve full artwork and safe area; record every derivative checksum.",
+  "implementation_state": "documented",
+  "verification_state": "source_hash_verified_only"
+}
+
