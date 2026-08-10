@@ -1,4 +1,4 @@
-name: Temporary FlutterFlow Screen Repair
+name: Temporary FlutterFlow Chunked Repair
 
 on:
   pull_request:
@@ -14,15 +14,53 @@ jobs:
   invoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Repair remaining FlutterFlow screens with validation and cooldown
+      - name: Repair remaining screens in validated chunks
         run: |
           set -euo pipefail
-          endpoint='https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-page-language-repair-v2'
-          code='VJ2GnTHMuyJKYrOCDNBFzp4BZ964mdTGTmrxpvbX2bc'
-          for page in 3 4 5 6 7 8 9 10; do
-            echo "===== PAGE ${page} ====="
-            response="$(curl --silent --show-error --get "$endpoint" --data-urlencode "code=$code" --data-urlencode "page=$page")"
-            echo "$response"
-            echo "$response" | jq -e '.ok == true' >/dev/null
+          endpoint='https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-chunked-language-repair'
+          code='fG8M-JvEMjWaRp0a9vAQCmOeExem-x2TS6u-cfLbwZs'
+          for page in 4 5 6 7 8 9 10; do
+            echo "===== PREPARE PAGE ${page} ====="
+            prep="$(curl --silent --show-error --get "$endpoint" \
+              --data-urlencode "code=$code" \
+              --data-urlencode 'action=prepare' \
+              --data-urlencode "page=$page")"
+            echo "$prep"
+            echo "$prep" | jq -e '.ok == true' >/dev/null
+            if [ "$(echo "$prep" | jq -r '.alreadyVerified // false')" = "true" ]; then
+              echo "Page ${page} already verified; skipping."
+              sleep 45
+              continue
+            fi
+            plan="$(echo "$prep" | jq -r '.planSnapshotId')"
+            pre="$(echo "$prep" | jq -r '.preSnapshotId')"
+            count="$(echo "$prep" | jq -r '.fileCount')"
+            start=0
+            while [ "$start" -lt "$count" ]; do
+              echo "===== APPLY PAGE ${page} START ${start}/${count} ====="
+              result="$(curl --silent --show-error --get "$endpoint" \
+                --data-urlencode "code=$code" \
+                --data-urlencode 'action=apply' \
+                --data-urlencode "page=$page" \
+                --data-urlencode "snapshot=$plan" \
+                --data-urlencode "start=$start" \
+                --data-urlencode 'limit=6')"
+              echo "$result"
+              if ! echo "$result" | jq -e '.ok == true' >/dev/null; then
+                echo "Chunk failed; rollback source snapshot is $pre" >&2
+                exit 1
+              fi
+              start="$(echo "$result" | jq -r '.nextStart')"
+              sleep 25
+            done
             sleep 35
+            echo "===== VERIFY PAGE ${page} ====="
+            verify="$(curl --silent --show-error --get "$endpoint" \
+              --data-urlencode "code=$code" \
+              --data-urlencode 'action=verify' \
+              --data-urlencode "page=$page" \
+              --data-urlencode "plan=$plan")"
+            echo "$verify"
+            echo "$verify" | jq -e '.ok == true' >/dev/null
+            sleep 50
           done
