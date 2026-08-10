@@ -21,10 +21,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for part in 00 01 02 03; do
-            test -s "recovery/mcpmaster-source.part-${part}"
+          parts=(
+            recovery/mcpmaster-source.part-00
+            recovery/mcpmaster-source.part-01
+            recovery/mcpmaster-source.part-02
+            recovery/mcpmaster-source.part-03
+          )
+          for file in "${parts[@]}"; do
+            test -s "$file"
+            wc -c "$file"
+            sha256sum "$file"
           done
-          cat recovery/mcpmaster-source.part-* > /tmp/mcpmaster-recovery-source.zip
+          cat "${parts[@]}" > /tmp/mcpmaster-recovery-source.zip
           expected="dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83"
           actual="$(sha256sum /tmp/mcpmaster-recovery-source.zip | awk '{print $1}')"
           echo "expected_archive_sha256=${expected}"
