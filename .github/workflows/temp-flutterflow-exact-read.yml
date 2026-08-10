@@ -14,11 +14,11 @@ jobs:
   invoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Repair FlutterFlow sign-in screen with validation
+      - name: Repair FlutterFlow sign-in screen with low-call validation path
         run: |
           set -euo pipefail
           response="$(curl --silent --show-error --get \
-            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-page-language-repair' \
+            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-page-language-repair-v2' \
             --data-urlencode 'code=VJ2GnTHMuyJKYrOCDNBFzp4BZ964mdTGTmrxpvbX2bc' \
             --data-urlencode 'page=2')"
           echo "$response"
