@@ -1,0 +1,116 @@
+{
+  "schema_version": "1.1.0",
+  "product_key": "mcpmaster-pandoras-box",
+  "role": "primary_product_mark",
+  "decision_id": "PB-BRAND-2026-08-10-01",
+  "approved_at": "2026-08-10T15:01:51+08:00",
+  "approved_by": "owner",
+  "source": {
+    "attachment_name": "2165.png",
+    "repository_path": "assets/brand/pandoras-box/product-mark/2165-original.jpg",
+    "sha256": "d6f055b88b962b4dbae4ac67bc30f5e31b6c3a90997dfd5fddf9a0be23aa5970",
+    "byte_size": 98032,
+    "actual_format": "JPEG",
+    "mime_type": "image/jpeg",
+    "width": 1536,
+    "height": 1536,
+    "alpha": false,
+    "background": "#000000"
+  },
+  "observed_artwork_bounds": {
+    "x": 386,
+    "y": 268,
+    "width": 731,
+    "height": 891,
+    "method": "3-percent-fuzz trim observation"
+  },
+  "derivation": {
+    "tool": "ImageMagick 6.9.12-98 Q16",
+    "filter": "Lanczos",
+    "color_change": false,
+    "transparency_change": false,
+    "ui_crop": {
+      "source_geometry": "1120x1120+192+154",
+      "purpose": "Remove excess outer black canvas while retaining the full mark and safe margin"
+    },
+    "launcher_crop": null
+  },
+  "derivatives": [
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/ui-mark-1024.png",
+      "purpose": "high-density in-product UI",
+      "width": 1024,
+      "height": 1024,
+      "mime_type": "image/png",
+      "sha256": "129ce23920d37db06e0cd0dd7b8847ace4796a13f243ac80cef4534cb5e1b940"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/ui-mark-512.png",
+      "purpose": "standard in-product UI",
+      "width": 512,
+      "height": 512,
+      "mime_type": "image/png",
+      "sha256": "85c6b6c04013c81faf53d44f20934cd5db87c9edf8abca1cf5f84bddf26a13f6"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/ui-mark-192.png",
+      "purpose": "sign-in and splash UI",
+      "width": 192,
+      "height": 192,
+      "mime_type": "image/png",
+      "sha256": "11c99262080c7f6ed53d6494cea636b8a8bbe84cada33fa798b33bfc7d688914"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/ui-mark-48.png",
+      "purpose": "navigation and app-bar UI",
+      "width": 48,
+      "height": 48,
+      "mime_type": "image/png",
+      "sha256": "dfd976922ad5d72e190ee414d97a24bd6b39fa1b0717567abb8ff1f94a851db9"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/favicon-32.png",
+      "purpose": "browser favicon",
+      "width": 32,
+      "height": 32,
+      "mime_type": "image/png",
+      "sha256": "8d4586d02e5d96840a00262634c4e60b8b5336e0ea7aaa8c354ece2d83d17063"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/launcher-safe-1024.png",
+      "purpose": "native launcher and adaptive icon source",
+      "width": 1024,
+      "height": 1024,
+      "mime_type": "image/png",
+      "sha256": "f6b60b0b5dd491099193df903a296a7922b5f73d05e5e022e0f2ef7011f05a9c"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/pwa-512.png",
+      "purpose": "PWA maskable icon",
+      "width": 512,
+      "height": 512,
+      "mime_type": "image/png",
+      "sha256": "d2fad16999521d9d934bcc344d6aa7e824b31bca35a56a9c5382bf232a6a07eb"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/pwa-192.png",
+      "purpose": "PWA icon",
+      "width": 192,
+      "height": 192,
+      "mime_type": "image/png",
+      "sha256": "2fe014564686eacfeb4cab5ded03e581e7c9b5840d5928f0ee4df53f229100c3"
+    }
+  ],
+  "prohibited_changes": [
+    "redraw",
+    "trace",
+    "regenerate",
+    "recolor",
+    "invert",
+    "distort",
+    "remove_black_field",
+    "substitute_generic_apple"
+  ],
+  "implementation_state": "derived_assets_verified",
+  "verification_state": "checksums_and_visual_safe_area_verified"
+}
