@@ -58,6 +58,7 @@ final class PandoraBindingSpec {
     required this.runSubmitting,
     required this.runError,
     required this.askEndpoint,
+    required this.safetyEndpoint,
     required this.connectionsEndpoint,
     required this.runEndpoint,
     required this.decideEndpoint,
@@ -106,6 +107,7 @@ final class PandoraBindingSpec {
   final ProjectStateFieldHandle runSubmitting;
   final ProjectStateFieldHandle runError;
   final Endpoint askEndpoint;
+  final Endpoint safetyEndpoint;
   final Endpoint connectionsEndpoint;
   final Endpoint runEndpoint;
   final Endpoint decideEndpoint;
@@ -781,7 +783,6 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
             Text(item['title'], style: Styles.titleSmall),
             Text(item['status'], style: Styles.labelMedium),
             Text(item['description'], style: Styles.bodySmall),
-            Text(item['result_summary'], style: Styles.bodySmall),
           ],
         ),
       ),
@@ -807,7 +808,7 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
       ),
     ),
     Button(
-      'Review approvals for this project',
+      'Review all approvals',
       name: 'PandoraProjectApprovalsButton',
       variant: ButtonVariant.outlined,
       onTap: Navigate(ff.Pages.approvalCenter),
@@ -1186,10 +1187,6 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
             style: Styles.titleLarge,
           ),
           Text(
-            State(spec.safetyData)['currentAssuranceLevel'],
-            style: Styles.bodyMedium,
-          ),
-          Text(
             'Extra identity check required for protected approvals',
             style: Styles.bodySmall,
             visible: State(spec.safetyData)['mfaRequiredForApproval'],
@@ -1199,25 +1196,40 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
     ),
     Text('Connections', style: Styles.titleLarge),
     Button(
-      'Check connections now',
+      'Refresh safety and connection status',
       name: 'PandoraRefreshConnectionsButton',
       variant: ButtonVariant.outlined,
       onTap: [
         SetState(spec.safetyLoading, true),
         SetState(spec.safetyError, ''),
         ApiCall(
-          spec.connectionsEndpoint,
-          outputAs: 'pandoraConnectionsRefreshResult',
+          spec.safetyEndpoint,
+          outputAs: 'pandoraSafetyRefreshResult',
           params: _apiParams(spec, const {}),
-          onSuccess: (result) => [
-            SetState(spec.connectionItems, result),
-            SetState(spec.safetyLoading, false),
+          onSuccess: (safetyResult) => [
+            SetState(spec.safetyData, safetyResult),
+            ApiCall(
+              spec.connectionsEndpoint,
+              outputAs: 'pandoraConnectionsRefreshResult',
+              params: _apiParams(spec, const {}),
+              onSuccess: (connectionsResult) => [
+                SetState(spec.connectionItems, connectionsResult),
+                SetState(spec.safetyLoading, false),
+              ],
+              onFailure: [
+                SetState(spec.safetyLoading, false),
+                SetState(
+                  spec.safetyError,
+                  'Pandora could not refresh connection status. Try again in a moment.',
+                ),
+              ],
+            ),
           ],
           onFailure: [
             SetState(spec.safetyLoading, false),
             SetState(
               spec.safetyError,
-              'Pandora could not check connections. Try again in a moment.',
+              'Pandora could not refresh safety status. Try again in a moment.',
             ),
           ],
         ),
@@ -1250,11 +1262,19 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
         children: [
           Text('Audit integrity', style: Styles.titleMedium),
           Text(
-            State(spec.safetyData)['state'],
+            'Audit chain verified',
             style: Styles.bodyMedium,
+            visible: State(spec.safetyData)['auditIntegrity']['valid'],
           ),
           Text(
-            'Technical proof stays behind the governed owner API.',
+            'Audit verification needs attention',
+            style: Styles.bodyMedium,
+            visible: Not(
+              State(spec.safetyData)['auditIntegrity']['valid'],
+            ),
+          ),
+          Text(
+            State(spec.safetyData)['auditIntegrity']['eventCount'],
             style: Styles.bodySmall,
           ),
         ],
@@ -1296,14 +1316,19 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
         spacing: 12,
         children: [
           _mark(48),
-          Column(
-            crossAxis: CrossAxis.start,
-            spacing: 3,
-            children: [
-              Text('Pandora\'s Box', style: Styles.titleMedium),
-              Text('Banatao Systems', style: Styles.bodySmall),
-              Text('Protected owner control center', style: Styles.bodySmall),
-            ],
+          Expanded(
+            child: Column(
+              crossAxis: CrossAxis.start,
+              spacing: 3,
+              children: [
+                Text('Pandora\'s Box', style: Styles.titleMedium),
+                Text('Banatao Systems', style: Styles.bodySmall),
+                Text(
+                  'Protected owner control center',
+                  style: Styles.bodySmall,
+                ),
+              ],
+            ),
           ),
         ],
       ),

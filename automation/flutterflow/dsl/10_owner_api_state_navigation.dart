@@ -381,6 +381,7 @@ void buildPandoraOwnerApp(
       runSubmitting: _PlansState.submitting,
       runError: _PlansState.error,
       askEndpoint: api.ask,
+      safetyEndpoint: api.getSafety,
       connectionsEndpoint: api.listConnections,
       runEndpoint: api.runAction,
       decideEndpoint: api.decideApproval,
@@ -542,10 +543,15 @@ _PandoraSchemas _declareSchemas(App app) {
     'lastCheckedAt': dateTime,
     'advanced': json,
   });
+  final auditIntegrity = app.struct('PandoraAuditIntegrity', {
+    'valid': bool_,
+    'eventCount': int_,
+    'lastHash': string,
+  });
   final safety = app.struct('PandoraSafety', {
     'policy': json,
     'integrations': listOf(json),
-    'auditIntegrity': json,
+    'auditIntegrity': auditIntegrity,
     'mfaRequiredForApproval': bool_,
     'currentAssuranceLevel': string,
     'state': string,
