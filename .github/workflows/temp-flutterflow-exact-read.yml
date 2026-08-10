@@ -1,4 +1,4 @@
-name: Temporary FlutterFlow Exact Project Read
+name: Temporary FlutterFlow Plain Language Repair
 
 on:
   pull_request:
@@ -14,32 +14,9 @@ jobs:
   invoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Read selected FlutterFlow YAML metadata
+      - name: Trigger validate-first FlutterFlow wording repair
         run: |
           set -euo pipefail
-          base='https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-yaml-read'
-          code='XdwZFtX00C7GclUy1bKaop_LCUN8C4Vrzirpou9DUBY'
-          files=(
-            'folders'
-            'app-details'
-            'nav-bar'
-            'theme/color-scheme'
-            'page/id-Scaffold_scaffold1_0'
-            'page/id-Scaffold_scaffold2_53'
-            'page/id-Scaffold_scaffold3_130'
-            'page/id-Scaffold_scaffold5_230'
-            'page/id-Scaffold_scaffold6_342'
-            'page/id-Scaffold_scaffold7_450'
-            'page/id-Scaffold_scaffold8_547'
-            'page/id-Scaffold_scaffold9_664'
-            'page/id-Scaffold_scaffold10_778'
-            'page/id-Scaffold_scaffold11_918'
-            'custom-file/id-MAIN'
-          )
-          for file in "${files[@]}"; do
-            echo "===== ${file} ====="
-            curl --fail --silent --show-error --get "$base" \
-              --data-urlencode "code=$code" \
-              --data-urlencode "file=$file"
-            echo
-          done
+          curl --fail --silent --show-error --get \
+            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-plain-language-repair' \
+            --data-urlencode 'code=pgQ7TPl3ar8oOT9FcjVNhB2tra5qf96xJqmRnVSWZxY'
