@@ -1,4 +1,4 @@
-name: Temporary FlutterFlow Plain Language Verify
+name: Temporary FlutterFlow Write Diagnostic
 
 on:
   pull_request:
@@ -14,9 +14,9 @@ jobs:
   invoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify saved FlutterFlow wording
+      - name: Diagnose exact FlutterFlow write behavior
         run: |
           set -euo pipefail
           curl --silent --show-error --get \
-            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-plain-language-verify' \
-            --data-urlencode 'code=pgQ7TPl3ar8oOT9FcjVNhB2tra5qf96xJqmRnVSWZxY'
+            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-write-diagnostic' \
+            --data-urlencode 'code=liFd_f2qELhrVeCaczF9p7iOkBczrp2r2WMsr7_GwmY'
