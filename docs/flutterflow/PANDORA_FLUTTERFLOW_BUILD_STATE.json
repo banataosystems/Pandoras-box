@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.3.0",
+  "schemaVersion": "1.4.0",
   "projectKey": "mcpmaster",
   "artifact": "pandora-mobile-flutterflow-v1",
   "canonicalRepository": "banataosystems/Pandoras-box",
@@ -15,9 +15,9 @@
     "secureCredentialHandoffImplemented": true,
     "secureCredentialHandoffDeployed": true,
     "secureCredentialHandoffLiveVerified": false,
+    "flutterFlowTokenLiveAccepted": true,
     "existingFlutterFlowProjectVisuallyEvidenced": true,
     "exactFlutterFlowProjectIdVerified": false,
-    "flutterFlowProjectCreatedByThisWork": false,
     "implementedInFlutterFlow": false,
     "validatedInFlutterFlow": false,
     "appTested": false,
@@ -28,64 +28,39 @@
     "officialProjectApiBaseUrl": "https://api.flutterflow.io/v2",
     "credentialRequired": "FlutterFlow bearer API token",
     "credentialPresentInPandora": false,
-    "credentialPresentInMcpMasterMetaStaging": false,
     "supabaseOAuthApplicationAuthorized": true,
-    "supabaseOAuthEvidenceDate": "2026-08-06",
     "existingProjectEvidence": {
-      "displayName": "Pandoras Box",
+      "displayNameObserved": "Pandoras Box Synced",
       "connectedSupabaseLabel": "MCPMaster Meta",
       "exactProjectId": null,
       "observedIssues": [
         "two navigation actions target pages that do not exist",
         "one property-override return-type mismatch"
       ]
-    },
-    "registeredGatewayCapabilities": [
-      "project.list",
-      "yaml.files.list",
-      "yaml.read",
-      "yaml.validate",
-      "yaml.update",
-      "code.export"
-    ],
-    "gatewayCapabilitiesEnabled": false,
-    "providerStatus": "planned"
+    }
   },
   "credentialHandoff": {
-    "mode": "one-time mobile HTTPS form",
+    "mode": "one-time local HTML form posting directly to Supabase Edge Function",
     "tokenStoredInChat": false,
     "tokenStoredInGitHub": false,
     "tokenStoredInPandoraSemanticMemory": false,
-    "storage": "Supabase Vault after live FlutterFlow listProjects verification",
-    "validationRule": "store only when FlutterFlow accepts token and existing Pandoras Box project is found",
-    "handoffCodeExpiresMinutes": 60,
-    "edgeFunction": "flutterflow-credential-handoff",
-    "edgeFunctionDeploymentId": "34b5ea92-c5e0-4fc7-a367-13047996ab40",
-    "edgeFunctionVersion": 1,
-    "edgeFunctionSha256": "436379e610cc13c6bdc5ea1c8cd31288e09577fd20666f48e117690affad887d",
-    "migration": "20260810032703_flutterflow_secure_credential_handoff_v1",
-    "migrationApplied": true,
-    "rpcAclVerifiedServiceRoleOnly": true
+    "storage": "Supabase Vault only after project match succeeds",
+    "liveTokenValidation": "passed",
+    "firstProjectMatch": "failed because backend required exact Pandoras Box while provider project evidence includes Pandoras Box Synced",
+    "matcherRepair": "require exactly one project whose normalized name contains both pandora and box",
+    "edgeFunctionVersion": 4,
+    "edgeFunctionSha256": "e1eb479b0590f229ca4c01bb6096a0ccbabdf628a435b521b969812e802cbfea",
+    "handoffWindowExtendedTo": "2026-08-10T13:12:46+08:00",
+    "sourceRepairCommit": "0c9c8de8bf2d24d3c3e7a68f9fbbef3fbba4c8cf"
   },
   "visualSourceOfTruth": {
     "name": "Pandoras-Box Dark Dashboard UI",
-    "direction": "near-black institutional UI with restrained Pandora red, white typography, semantic green/amber, dominant approval/priority card, three top-project progress rows, recent activity, and five-item bottom navigation",
     "bottomNavigation": ["Home", "Actions", "Approvals", "Activity", "Safety"],
     "topProjectLimit": 3,
     "neverReuseReferencePercentagesAsLiveData": true
   },
   "requirements": {
     "plainLanguageFirst": true,
-    "flexibleOwnerWorkflow": true,
-    "simpleAdvancedToggle": true,
-    "lightDarkSystemThemes": true,
-    "truthfulStatusLadder": [
-      "documented",
-      "implemented",
-      "tested",
-      "deployed",
-      "production-verified"
-    ],
     "completionPercentagesRequireCanonicalRoadmapTaskProofCalculation": true,
     "aal2ForProtectedApprovals": true,
     "validateBeforeFlutterFlowWrites": true,
@@ -93,35 +68,18 @@
     "failClosedWhenStateUnverified": true,
     "noClientProviderSecrets": true
   },
-  "sourceEvidence": {
-    "adapter": "recovery/overlay/flutterflow-project-api-client.ts",
-    "tests": "recovery/overlay/flutterflow-project-api-client.test.ts",
-    "adapterCommit": "c2b1d7e701a37fa0f8a4fca513234a70d636a9cb",
-    "testCommit": "a34e57d60b393491d86dd96cbef25564b176dc34",
-    "productSpecCommit": "7964e241cd549688f55c0d8f49c42976f68e29e8",
-    "agentPromptCommit": "39b9fb0c17cc3e1c83dd64a643026f03a4287f70",
-    "credentialMigrationCommit": "d91309a1a0d6ef3c89114f892f7daed79a77583c",
-    "credentialFunctionCommit": "1c0014e62d4047147d4251709a1679a646f6f1e1",
-    "runtimeTestResult": "5/5 passed",
-    "typeCheck": "client overlay passed TypeScript strict noEmit check"
-  },
   "currentBlockers": [
     {
-      "id": "MCP-PANDORA-CONNECTION-001",
-      "type": "access",
-      "summary": "The ChatGPT Pandoras-box MCP facade is still intercepted by Vercel Deployment Protection before application authentication. The authoritative Memory backing database is reachable and reconciled directly through governed Supabase access."
-    },
-    {
-      "id": "FLUTTERFLOW-CREDENTIAL-001",
+      "id": "FLUTTERFLOW-CREDENTIAL-HANDOFF-RETRY",
       "type": "credential",
-      "summary": "A secure one-time handoff is now deployed, but the owner has not yet supplied a FlutterFlow Project API token through that private HTTPS form. No token is present in chat, GitHub, Pandora Memory, or MCPMaster Meta staging."
+      "summary": "The token was proven valid, but was not stored because the first project-name matcher was too strict. Matcher is repaired and handoff expiry extended. Owner must resubmit the same valid token through the secure form once more."
     },
     {
       "id": "FLUTTERFLOW-PROJECT-ID-001",
       "type": "provider",
-      "summary": "An existing Pandoras Box FlutterFlow project is visually evidenced and connected to MCPMaster Meta, but its exact projectId/version/schema fingerprint remains unverified until the secure token handoff succeeds and authenticated listProjects runs."
+      "summary": "Exact projectId/version/schema fingerprint will be captured immediately after the repaired handoff succeeds."
     }
   ],
-  "nextAutonomousAction": "After the owner completes the secure mobile credential handoff, read the Vault-backed token server-side, call listProjects, bind the existing Pandoras Box project, capture exact project ID/version/schema fingerprint, download current YAML and rollback state, repair the two broken navigation actions and property-override mismatch, validate every changed YAML file, apply approval-gated updates, implement the approved dark/red mobile dashboard, then record Android tests, provider read-back, source/export hash where available, and rollback evidence in Pandora before any release claim.",
+  "nextAutonomousAction": "After the owner resubmits the same valid token through the secure form, verify the single Pandora Box project, store the token in Vault, capture exact project ID, then inspect YAML and rollback state before any write.",
   "productionReleaseAuthorized": false
 }
