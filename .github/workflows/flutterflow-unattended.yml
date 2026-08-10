@@ -102,7 +102,7 @@ jobs:
 
           workspace="${RUNNER_TEMP}/pandora-flutterflow-ai"
           output="${RUNNER_TEMP}/pandora-flutterflow-inspection"
-          mkdir -p "${output}"
+          mkdir -p "${output}/pages"
 
           FF_API_KEY="${ff_token}" flutterflow ai init "${workspace}" \
             --project "${FLUTTERFLOW_PROJECT_ID}" \
@@ -130,13 +130,51 @@ jobs:
               > "${output}/project-summary.txt"
             FF_API_KEY="${ff_token}" flutterflow ai resources "${FLUTTERFLOW_PROJECT_ID}" \
               > "${output}/resources.json"
+
+            pages=(
+              SplashConnection
+              SignIn
+              CommandCenter
+              ActionsCatalog
+              ActionBuilder
+              ApprovalCenter
+              ActivityAuditTrail
+              SecurityOperations
+              ProjectDetails
+              PlansExecution
+            )
+            for page in "${pages[@]}"; do
+              FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
+                --page "${page}" \
+                --dsl-json \
+                --output "${output}/pages/${page}.json"
+              FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
+                --page "${page}" \
+                --outline \
+                > "${output}/pages/${page}.outline.txt"
+            done
           )
 
           cp "${workspace}/lib/flutterflow_project.dart" \
             "${output}/flutterflow_project.dart"
+          cp -R "${workspace}/lib/flutterflow_project" \
+            "${output}/typed-sdk"
           cp "${workspace}/PROJECT_CONTEXT.md" \
             "${output}/PROJECT_CONTEXT.md"
           rm -f "${workspace}/.flutterflow/.env"
+
+          FF_SECRET="${ff_token}" python3 - "${workspace}" "${output}" <<'PY'
+          import os
+          import pathlib
+          import sys
+
+          secret = os.environ["FF_SECRET"].encode()
+          for root_arg in sys.argv[1:]:
+              root = pathlib.Path(root_arg)
+              for path in root.rglob("*"):
+                  if path.is_file() and secret in path.read_bytes():
+                      raise SystemExit(f"FlutterFlow credential persisted in {root.name}")
+          PY
           unset ff_token broker_project_id
 
       - name: Upload non-secret typed project inspection
