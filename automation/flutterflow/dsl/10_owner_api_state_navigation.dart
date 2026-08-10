@@ -400,6 +400,41 @@ _PandoraSchemas _declareSchemas(App app) {
     'dataFreshness': string,
     'lastVerifiedAt': dateTime,
   });
+  final projectPhase = app.struct('PandoraProjectPhase', {
+    'id': string,
+    'phase_key': string,
+    'name': string,
+    'sequence': int_,
+    'status': string,
+    'exit_criteria': json,
+    'started_at': dateTime,
+    'completed_at': dateTime,
+  });
+  final projectTask = app.struct('PandoraProjectTask', {
+    'id': string,
+    'task_key': string,
+    'title': string,
+    'description': string,
+    'sequence': int_,
+    'priority': int_,
+    'status': string,
+    'risk_class': string,
+    'completion_criteria': json,
+    'current_head_sha': string,
+    'result_summary': json,
+    'updated_at': dateTime,
+  });
+  final projectEvidence = app.struct('PandoraProjectEvidence', {
+    'id': string,
+    'task_id': string,
+    'evidence_type': string,
+    'provider': string,
+    'status': string,
+    'verdict': string,
+    'source_url': string,
+    'head_sha': string,
+    'observed_at': dateTime,
+  });
   final projectDetail = app.struct('PandoraProjectDetail', {
     'id': string,
     'name': string,
@@ -415,9 +450,9 @@ _PandoraSchemas _declareSchemas(App app) {
     'lastVerifiedAt': dateTime,
     'objective': string,
     'roadmapVersion': string,
-    'phases': listOf(json),
-    'tasks': listOf(json),
-    'evidence': listOf(json),
+    'phases': listOf(projectPhase),
+    'tasks': listOf(projectTask),
+    'evidence': listOf(projectEvidence),
     'currentState': json,
   });
   final systemHealth = app.struct('PandoraSystemHealth', {
