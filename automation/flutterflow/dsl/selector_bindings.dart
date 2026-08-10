@@ -337,14 +337,17 @@ void _replaceMark(
   app.editComponent(component, (editor) {
     editor.ensureReplaced(
       child,
-      Image(
-        approvedPandoraProductMark,
+      Tooltip(
         name: replacementName,
-        isNetwork: true,
-        fit: ImageFit.contain,
-        width: size,
-        height: size,
-        cached: true,
+        message: 'Pandora\'s Box',
+        child: Image(
+          approvedPandoraProductMark,
+          isNetwork: true,
+          fit: ImageFit.contain,
+          width: size,
+          height: size,
+          cached: true,
+        ),
       ),
     );
   });
@@ -548,6 +551,17 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
       ),
     ),
     ..._loadingAndError(spec.homeLoading, spec.homeError, 'Home'),
+    Button(
+      'Try loading home again',
+      name: 'PandoraHomeRetryButton',
+      variant: ButtonVariant.outlined,
+      visible: Not(Equals(State(spec.homeError), '')),
+      onTap: Navigate(
+        ff.Pages.commandCenter,
+        allowBack: false,
+        replaceRoute: true,
+      ),
+    ),
     _panel(
       name: 'PandoraSystemHealthPanel',
       child: Column(
@@ -594,7 +608,25 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
     ),
     _panel(
       name: 'PandoraPriorityPanel',
-      onTap: Navigate(ff.Pages.approvalCenter),
+      onTap: If(
+        Not(
+          Equals(
+            State(spec.homeData)['counters']['approvals'],
+            0,
+          ),
+        ),
+        then: Navigate(ff.Pages.approvalCenter),
+        orElse: If(
+          Not(
+            Equals(
+              State(spec.homeData)['counters']['needsAttention'],
+              0,
+            ),
+          ),
+          then: Navigate(ff.Pages.securityOperations),
+          orElse: Snackbar('Nothing needs your attention right now.'),
+        ),
+      ),
       child: Column(
         crossAxis: CrossAxis.start,
         spacing: 6,
@@ -648,7 +680,6 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
           spacing: 3,
           children: [
             Text(item['summary'], style: Styles.bodyMedium),
-            Text(item['actor'], style: Styles.labelSmall),
           ],
         ),
       ),
@@ -711,6 +742,17 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
       ],
     ),
     ..._loadingAndError(spec.projectLoading, spec.projectError, 'Project'),
+    Button(
+      'Try loading this project again',
+      name: 'PandoraProjectRetryButton',
+      variant: ButtonVariant.outlined,
+      visible: Not(Equals(State(spec.projectError), '')),
+      onTap: Navigate(
+        ff.Pages.projectDetails,
+        params: {'projectId': Param(spec.projectId)},
+        replaceRoute: true,
+      ),
+    ),
     Text(State(spec.projectData)['name'], style: Styles.headlineSmall),
     Text(State(spec.projectData)['plainPurpose'], style: Styles.bodyLarge),
     _panel(
@@ -732,18 +774,40 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
         crossAxis: CrossAxis.start,
         spacing: 6,
         children: [
-          Text('Verified roadmap progress', style: Styles.labelMedium),
           Text(
-            State(spec.projectData)['progressPercent'],
-            style: Styles.headlineSmall,
+            'Verified roadmap progress',
+            style: Styles.labelMedium,
+            visible: State(spec.projectData)['progressVerified'],
           ),
           Text(
-            State(spec.projectData)['dataFreshness'],
-            style: Styles.bodySmall,
+            'Progress needs verification',
+            style: Styles.titleMedium,
+            visible: Not(
+              State(spec.projectData)['progressVerified'],
+            ),
+          ),
+          Row(
+            spacing: 3,
+            visible: State(spec.projectData)['progressVerified'],
+            children: [
+              Text(
+                State(spec.projectData)['progressPercent'],
+                style: Styles.headlineSmall,
+              ),
+              Text('%', style: Styles.headlineSmall),
+            ],
+          ),
+          Text(
+            'Pandora will verify the roadmap before showing a completion percentage.',
+            style: Styles.bodyMedium,
+            visible: Not(
+              State(spec.projectData)['progressVerified'],
+            ),
           ),
           Text(
             State(spec.projectData)['lastVerifiedAt'],
             style: Styles.bodySmall,
+            visible: State(spec.projectData)['progressVerified'],
           ),
         ],
       ),
@@ -833,6 +897,17 @@ DslWidget _actionsCatalogBody(PandoraBindingSpec spec) => Column(
   children: [
     _brandHeader('Work', 'Choose a governed action'),
     ..._loadingAndError(spec.actionsLoading, spec.actionsError, 'Actions'),
+    Button(
+      'Try loading work again',
+      name: 'PandoraActionsRetryButton',
+      variant: ButtonVariant.outlined,
+      visible: Not(Equals(State(spec.actionsError), '')),
+      onTap: Navigate(
+        ff.Pages.actionsCatalog,
+        params: {'projectId': Param(spec.catalogProjectId)},
+        replaceRoute: true,
+      ),
+    ),
     ListView(
       name: 'PandoraActionsList',
       source: State(spec.actionItems),
@@ -855,7 +930,11 @@ DslWidget _actionsCatalogBody(PandoraBindingSpec spec) => Column(
             Text(item['title'], style: Styles.titleMedium),
             Text(item['description'], style: Styles.bodyMedium),
             Text(item['provider'], style: Styles.labelSmall),
-            Text(item['risk'], style: Styles.labelMedium),
+            Text(
+              'Extra identity check required',
+              style: Styles.labelMedium,
+              visible: item['extraIdentityCheckRequired'],
+            ),
           ],
         ),
       ),
@@ -969,6 +1048,16 @@ DslWidget _approvalCenterBody(PandoraBindingSpec spec) => Column(
       spec.approvalsLoading,
       spec.approvalsError,
       'Approvals',
+    ),
+    Button(
+      'Try loading approvals again',
+      name: 'PandoraApprovalsRetryButton',
+      variant: ButtonVariant.outlined,
+      visible: Not(Equals(State(spec.approvalsError), '')),
+      onTap: Navigate(
+        ff.Pages.approvalCenter,
+        replaceRoute: true,
+      ),
     ),
     Text(
       'Protected decisions require the extra identity check.',
@@ -1144,6 +1233,16 @@ DslWidget _activityBody(PandoraBindingSpec spec) => Column(
       spec.activityError,
       'Activity',
     ),
+    Button(
+      'Try loading updates again',
+      name: 'PandoraActivityRetryButton',
+      variant: ButtonVariant.outlined,
+      visible: Not(Equals(State(spec.activityError), '')),
+      onTap: Navigate(
+        ff.Pages.activityAuditTrail,
+        replaceRoute: true,
+      ),
+    ),
     ListView(
       name: 'PandoraActivityList',
       source: State(spec.activityItems),
@@ -1156,8 +1255,6 @@ DslWidget _activityBody(PandoraBindingSpec spec) => Column(
           spacing: 4,
           children: [
             Text(item['summary'], style: Styles.titleSmall),
-            Text(item['type'], style: Styles.labelMedium),
-            Text(item['actor'], style: Styles.bodySmall),
             Text(item['happenedAt'], style: Styles.bodySmall),
           ],
         ),
@@ -1372,13 +1469,16 @@ DslWidget _brandHeader(String title, String subtitle) => Row(
   ],
 );
 
-DslWidget _mark(double size) => Image(
-  approvedPandoraProductMark,
-  isNetwork: true,
-  fit: ImageFit.contain,
-  width: size,
-  height: size,
-  cached: true,
+DslWidget _mark(double size) => Tooltip(
+  message: 'Pandora\'s Box',
+  child: Image(
+    approvedPandoraProductMark,
+    isNetwork: true,
+    fit: ImageFit.contain,
+    width: size,
+    height: size,
+    cached: true,
+  ),
 );
 
 DslWidget _metric(Object label, Object value, String name) => _panel(

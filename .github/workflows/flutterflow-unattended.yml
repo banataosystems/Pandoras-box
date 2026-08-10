@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/flutterflow-unattended.yml
       - automation/flutterflow/run.json
+      - assets/brand/pandoras-box/product-mark/**
 
 permissions: {}
 
@@ -17,7 +18,7 @@ concurrency:
 jobs:
   operate-project:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
       id-token: write
@@ -39,7 +40,25 @@ jobs:
         run: |
           set -euo pipefail
           dart pub global activate flutterflow_cli 0.0.39
+          dart pub global list | grep -Fx 'flutterflow_cli 0.0.39'
           printf '%s\n' "${HOME}/.pub-cache/bin" >> "${GITHUB_PATH}"
+
+      - name: Read authorized operation mode
+        id: operation-mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          mode="$(
+            python3 -c 'import json; print(json.load(open("automation/flutterflow/run.json"))["mode"], end="")'
+          )"
+          case "${mode}" in
+            inspect|validate-auth|apply-auth|validate-owner|apply-owner|validate-mfa-action|apply-mfa-action|validate-mfa-ui|apply-mfa-ui|export-build) ;;
+            *)
+              printf 'Unsupported unattended FlutterFlow mode: %s\n' "${mode}" >&2
+              exit 64
+              ;;
+          esac
+          printf 'mode=%s\n' "${mode}" >> "${GITHUB_OUTPUT}"
 
       - name: Operate exact FlutterFlow project through one-time OIDC grant
         shell: bash
@@ -47,6 +66,9 @@ jobs:
           BROKER_URL: https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-github-oidc-broker
           OIDC_AUDIENCE: pandora-flutterflow-project-api
           FLUTTERFLOW_PROJECT_ID: pandoras-box-gj9hnb
+          EXPECTED_FFAI_VERSION: 0.0.40
+          EXPECTED_FFAI_BUILD: b5c8a09d
+          OPERATION_MODE: ${{ steps.operation-mode.outputs.mode }}
         run: |
           set -euo pipefail
           set +x
@@ -55,6 +77,9 @@ jobs:
           cleanup() {
             if [[ -n "${workspace:-}" && "${workspace}" == "${RUNNER_TEMP}/"* ]]; then
               rm -f "${workspace}/.flutterflow/.env"
+            fi
+            if [[ -n "${export_root:-}" && "${export_root}" == "${RUNNER_TEMP}/"* ]]; then
+              rm -f "${export_root}/.flutterflow/.env"
             fi
             if [[ -n "${rollback_snapshot:-}" && "${rollback_snapshot}" == "${RUNNER_TEMP}/"* ]]; then
               rm -f "${rollback_snapshot}"
@@ -98,11 +123,9 @@ jobs:
           unset broker_json
           test "${broker_project_id}" = "${FLUTTERFLOW_PROJECT_ID}"
 
-          mode="$(
-            python3 -c 'import json; print(json.load(open("automation/flutterflow/run.json"))["mode"],end="")'
-          )"
+          mode="${OPERATION_MODE}"
           case "${mode}" in
-            inspect|validate-auth|apply-auth|validate-owner|apply-owner) ;;
+            inspect|validate-auth|apply-auth|validate-owner|apply-owner|validate-mfa-action|apply-mfa-action|validate-mfa-ui|apply-mfa-ui|export-build) ;;
             *)
               printf 'Unsupported unattended FlutterFlow mode: %s\n' "${mode}" >&2
               exit 64
@@ -111,13 +134,102 @@ jobs:
 
           workspace="${RUNNER_TEMP}/pandora-flutterflow-ai"
           output="${RUNNER_TEMP}/pandora-flutterflow-result"
+          export_root="${RUNNER_TEMP}/pandora-flutter-export"
           mkdir -p "${output}/pages"
+          printf '%s\n' "${mode}" > "${output}/operation-mode.txt"
 
           FF_API_KEY="${ff_token}" flutterflow ai init "${workspace}" \
             --project "${FLUTTERFLOW_PROJECT_ID}" \
             --no-save \
             --yes
           rm -f "${workspace}/.flutterflow/.env"
+
+          (
+            cd "${workspace}"
+            FF_API_KEY="${ff_token}" flutterflow ai context-check \
+              > "${output}/context-check-signed-sdk.txt"
+          )
+          python3 - \
+            "${workspace}" \
+            "${output}/signed-sdk-verification.json" \
+            "${EXPECTED_FFAI_VERSION}" \
+            "${EXPECTED_FFAI_BUILD}" <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import re
+          import sys
+
+          workspace = pathlib.Path(sys.argv[1])
+          evidence_path = pathlib.Path(sys.argv[2])
+          expected_version = sys.argv[3]
+          expected_build = sys.argv[4]
+          config_path = workspace / ".flutterflow" / "config.yaml"
+          sdk_root = workspace / ".flutterflow" / "sdk" / "flutterflow_ai"
+          manifest_path = sdk_root / "manifest.json"
+          signature_path = sdk_root / "manifest.sig"
+          pubspec_path = sdk_root / "pubspec.yaml"
+
+          def config_value(key):
+              match = re.search(
+                  rf"(?m)^\s*{re.escape(key)}\s*:\s*['\"]?([^'\"\s#]+)",
+                  config_path.read_text(),
+              )
+              if match is None:
+                  raise SystemExit(f"Signed SDK config is missing {key}")
+              return match.group(1)
+
+          manifest = json.loads(manifest_path.read_text())
+          signature = signature_path.read_bytes()
+          pubspec_match = re.search(
+              r"(?m)^version:\s*([^\s#]+)",
+              pubspec_path.read_text(),
+          )
+          if pubspec_match is None:
+              raise SystemExit("Vendored FlutterFlow SDK pubspec has no version")
+
+          observed = {
+              "config_version": config_value("flutterflow_ai_version"),
+              "config_build": config_value("flutterflow_ai_build"),
+              "manifest_version": manifest.get("version"),
+              "manifest_build": manifest.get("build_id"),
+              "manifest_environment": manifest.get("env"),
+              "manifest_commit": manifest.get("commit"),
+              "manifest_released": manifest.get("released"),
+              "manifest_sha256": hashlib.sha256(
+                  manifest_path.read_bytes()
+              ).hexdigest(),
+              "signature_sha256": hashlib.sha256(signature).hexdigest(),
+              "pubspec_version": pubspec_match.group(1),
+          }
+          if len(signature) < 32:
+              raise SystemExit("Vendored FlutterFlow SDK signature is missing")
+          if {
+              observed["config_version"],
+              observed["manifest_version"],
+              observed["pubspec_version"],
+          } != {expected_version}:
+              raise SystemExit(f"Unexpected FlutterFlow SDK version: {observed}")
+          if {
+              observed["config_build"],
+              observed["manifest_build"],
+          } != {expected_build}:
+              raise SystemExit(f"Unexpected FlutterFlow SDK build: {observed}")
+          if observed["manifest_environment"] != "prod":
+              raise SystemExit(f"Unexpected FlutterFlow SDK environment: {observed}")
+          if not re.fullmatch(r"[0-9a-f]{40}", observed["manifest_commit"] or ""):
+              raise SystemExit(f"Invalid signed SDK commit: {observed}")
+          evidence = {
+              "verification": (
+                  "flutterflow_cli 0.0.39 ai init verified the Ed25519-signed "
+                  "manifest and archive before vendoring; context-check passed"
+              ),
+              "expected_version": expected_version,
+              "expected_build": expected_build,
+              "observed": observed,
+          }
+          evidence_path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
+          PY
 
           mkdir -p "${workspace}/dsl"
           cp automation/flutterflow/dsl/*.dart "${workspace}/dsl/"
@@ -256,6 +368,618 @@ jobs:
                 FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
                   > "${output}/post-owner-summary.txt"
                 ;;
+              validate-mfa-action)
+                FF_API_KEY="${ff_token}" flutterflow ai validate \
+                  dsl/20_mfa_aal2_custom_action.dart \
+                  --project-id "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/validate-mfa-action.txt"
+                ;;
+              apply-mfa-action)
+                rollback_snapshot="${RUNNER_TEMP}/pandora-pre-mfa-action-project-yamls.json"
+                curl --proto '=https' --tlsv1.2 \
+                  --fail --silent --show-error --max-time 120 \
+                  -H "Authorization: Bearer ${ff_token}" \
+                  "https://api.flutterflow.io/v2/projectYamls?projectId=${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${rollback_snapshot}"
+                python3 - "${rollback_snapshot}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          payload = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          value = payload.get("value")
+          encoded = value.get("project_yaml_bytes") if isinstance(value, dict) else None
+          if not isinstance(encoded, str):
+              encoded = value.get("projectYamlBytes") if isinstance(value, dict) else None
+          if not isinstance(encoded, str) or len(encoded) < 100:
+              raise SystemExit("Pre-change FlutterFlow YAML snapshot is missing")
+          PY
+                FF_API_KEY="${ff_token}" flutterflow ai validate \
+                  dsl/20_mfa_aal2_custom_action.dart \
+                  --project-id "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/validate-mfa-action.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai run \
+                  dsl/20_mfa_aal2_custom_action.dart \
+                  --project-id "${FLUTTERFLOW_PROJECT_ID}" \
+                  --commit-message 'Install fail-closed Pandora AAL2 custom action' \
+                  > "${output}/apply-mfa-action.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai refresh-context \
+                  "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/refresh-mfa-action-context.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai context-check \
+                  > "${output}/context-check-mfa-action.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai codegen status \
+                  > "${output}/codegen-status-mfa-action.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/post-mfa-action-summary.txt"
+                ;;
+              validate-mfa-ui)
+                FF_API_KEY="${ff_token}" flutterflow ai validate \
+                  dsl/21_mfa_aal2_ui_gates.dart \
+                  --project-id "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/validate-mfa-ui.txt"
+                ;;
+              apply-mfa-ui)
+                rollback_snapshot="${RUNNER_TEMP}/pandora-pre-mfa-ui-project-yamls.json"
+                curl --proto '=https' --tlsv1.2 \
+                  --fail --silent --show-error --max-time 120 \
+                  -H "Authorization: Bearer ${ff_token}" \
+                  "https://api.flutterflow.io/v2/projectYamls?projectId=${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${rollback_snapshot}"
+                python3 - "${rollback_snapshot}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          payload = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          value = payload.get("value")
+          encoded = value.get("project_yaml_bytes") if isinstance(value, dict) else None
+          if not isinstance(encoded, str):
+              encoded = value.get("projectYamlBytes") if isinstance(value, dict) else None
+          if not isinstance(encoded, str) or len(encoded) < 100:
+              raise SystemExit("Pre-change FlutterFlow YAML snapshot is missing")
+          PY
+                FF_API_KEY="${ff_token}" flutterflow ai validate \
+                  dsl/21_mfa_aal2_ui_gates.dart \
+                  --project-id "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/validate-mfa-ui.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai run \
+                  dsl/21_mfa_aal2_ui_gates.dart \
+                  --project-id "${FLUTTERFLOW_PROJECT_ID}" \
+                  --commit-message 'Gate Pandora protected work with recoverable AAL2 step-up' \
+                  > "${output}/apply-mfa-ui.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai refresh-context \
+                  "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/refresh-mfa-ui-context.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai context-check \
+                  > "${output}/context-check-mfa-ui.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai codegen status \
+                  > "${output}/codegen-status-mfa-ui.txt"
+                FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${output}/post-mfa-ui-summary.txt"
+                ;;
+              export-build)
+                test ! -e "${export_root}"
+                mkdir -p "${export_root}"
+                FLUTTERFLOW_API_TOKEN="${ff_token}" flutterflow export-code \
+                  --project "${FLUTTERFLOW_PROJECT_ID}" \
+                  --dest "${export_root}" \
+                  --include-assets \
+                  --include-export-manifest \
+                  --no-parent-folder \
+                  2>&1 | tee "${output}/export-code.txt"
+                rm -f "${export_root}/.flutterflow/.env"
+
+                python3 - \
+                  "${export_root}" \
+                  "${output}/export-metadata-verification.json" <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import re
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          evidence_path = pathlib.Path(sys.argv[2])
+          required = [
+              root / "pubspec.yaml",
+              root / ".metadata",
+              root / ".flutterflow" / "export_manifest.json",
+              root / "web" / "index.html",
+              root / "web" / "manifest.json",
+          ]
+          missing = [str(path.relative_to(root)) for path in required if not path.is_file()]
+          if missing:
+              raise SystemExit(f"FlutterFlow export is missing required metadata: {missing}")
+
+          metadata_path = root / ".metadata"
+          metadata = metadata_path.read_text()
+          revision_match = re.search(
+              r"(?m)^\s{2}revision:\s*['\"]?([0-9a-fA-F]{40})['\"]?\s*$",
+              metadata,
+          )
+          channel_match = re.search(
+              r"(?m)^\s{2}channel:\s*['\"]?([A-Za-z0-9_-]+)['\"]?\s*$",
+              metadata,
+          )
+          if revision_match is None or channel_match is None:
+              raise SystemExit(
+                  "Exported .metadata does not contain an exact Flutter revision and channel"
+              )
+          revision = revision_match.group(1).lower()
+          channel = channel_match.group(1)
+          if channel not in {"stable", "beta", "dev", "master"}:
+              raise SystemExit(f"Unsupported Flutter channel in exported .metadata: {channel}")
+
+          export_manifest_path = root / ".flutterflow" / "export_manifest.json"
+          export_manifest = json.loads(export_manifest_path.read_text())
+          if not isinstance(export_manifest, (dict, list)) or not export_manifest:
+              raise SystemExit("FlutterFlow export manifest is empty or malformed")
+
+          evidence = {
+              "project_id": "pandoras-box-gj9hnb",
+              "flutter_pin_source": ".metadata version.revision",
+              "flutter_revision": revision,
+              "flutter_channel": channel,
+              "metadata_sha256": hashlib.sha256(
+                  metadata_path.read_bytes()
+              ).hexdigest(),
+              "export_manifest_sha256": hashlib.sha256(
+                  export_manifest_path.read_bytes()
+              ).hexdigest(),
+          }
+          evidence_path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
+          print(revision)
+          PY
+                cp "${export_root}/.metadata" \
+                  "${output}/exported-flutter-metadata.yaml"
+                cp "${export_root}/.flutterflow/export_manifest.json" \
+                  "${output}/flutterflow-export-manifest.json"
+                flutter_revision="$(
+                  python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["flutter_revision"], end="")' \
+                    "${output}/export-metadata-verification.json"
+                )"
+                flutter_channel="$(
+                  python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["flutter_channel"], end="")' \
+                    "${output}/export-metadata-verification.json"
+                )"
+                flutter_root="${RUNNER_TEMP}/flutter-sdk-${flutter_revision:0:12}"
+                test ! -e "${flutter_root}"
+                mkdir -p "${flutter_root}"
+                git -C "${flutter_root}" init --quiet
+                git -C "${flutter_root}" remote add origin \
+                  https://github.com/flutter/flutter.git
+                git -C "${flutter_root}" -c protocol.version=2 fetch \
+                  --depth=1 --no-tags origin "${flutter_revision}" \
+                  > "${output}/flutter-fetch.txt" 2>&1
+                git -C "${flutter_root}" checkout --quiet --detach FETCH_HEAD
+                test "$(git -C "${flutter_root}" rev-parse HEAD)" = "${flutter_revision}"
+                export PATH="${flutter_root}/bin:${PATH}"
+                flutter config --no-analytics \
+                  > "${output}/flutter-config.txt"
+                flutter precache --web \
+                  > "${output}/flutter-precache-web.txt"
+                flutter --version --machine \
+                  > "${output}/flutter-version.json"
+                python3 - \
+                  "${output}/flutter-version.json" \
+                  "${flutter_revision}" \
+                  "${flutter_channel}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          version = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          expected_revision = sys.argv[2]
+          expected_channel = sys.argv[3]
+          if version.get("frameworkRevision") != expected_revision:
+              raise SystemExit(
+                  "Installed Flutter framework revision does not match exported .metadata"
+              )
+          installed_channel = version.get("channel")
+          if installed_channel not in {expected_channel, "unknown", "[user-branch]"}:
+              raise SystemExit(
+                  f"Installed Flutter channel {installed_channel!r} does not match "
+                  f"exported channel {expected_channel!r}"
+              )
+          PY
+
+                python3 - \
+                  "${GITHUB_WORKSPACE}" \
+                  "${export_root}" \
+                  "${output}/brand-verification.json" <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import re
+          import shutil
+          import struct
+          import sys
+
+          repository = pathlib.Path(sys.argv[1])
+          export_root = pathlib.Path(sys.argv[2])
+          evidence_path = pathlib.Path(sys.argv[3])
+          brand_root = repository / "assets" / "brand" / "pandoras-box" / "product-mark"
+          brand_manifest = json.loads((brand_root / "manifest.json").read_text())
+          derivatives = {
+              pathlib.Path(item["path"]).name: item
+              for item in brand_manifest["derivatives"]
+          }
+          required_sources = {
+              "favicon-32.png": brand_root / "derived" / "favicon-32.png",
+              "pwa-192.png": brand_root / "derived" / "pwa-192.png",
+              "pwa-512.png": brand_root / "derived" / "pwa-512.png",
+          }
+
+          def digest(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          def png_dimensions(path):
+              data = path.read_bytes()
+              if data[:8] != b"\x89PNG\r\n\x1a\n" or len(data) < 24:
+                  raise SystemExit(f"Approved brand derivative is not a valid PNG: {path}")
+              return struct.unpack(">II", data[16:24])
+
+          for name, path in required_sources.items():
+              if not path.is_file():
+                  raise SystemExit(f"Approved Pandora brand source is missing: {path}")
+              if digest(path) != derivatives[name]["sha256"]:
+                  raise SystemExit(f"Approved Pandora brand checksum mismatch: {name}")
+              if png_dimensions(path) != (
+                  derivatives[name]["width"],
+                  derivatives[name]["height"],
+              ):
+                  raise SystemExit(f"Approved Pandora brand dimensions mismatch: {name}")
+
+          targets = {
+              export_root / "web" / "favicon.png": required_sources["favicon-32.png"],
+              export_root / "web" / "icons" / "Icon-192.png": required_sources["pwa-192.png"],
+              export_root / "web" / "icons" / "Icon-512.png": required_sources["pwa-512.png"],
+              export_root / "web" / "icons" / "Icon-maskable-192.png": required_sources["pwa-192.png"],
+              export_root / "web" / "icons" / "Icon-maskable-512.png": required_sources["pwa-512.png"],
+          }
+          patched = []
+          for target, source in targets.items():
+              target.parent.mkdir(parents=True, exist_ok=True)
+              if not target.is_file() or target.read_bytes() != source.read_bytes():
+                  shutil.copyfile(source, target)
+                  patched.append(str(target.relative_to(export_root)))
+
+          web_manifest_path = export_root / "web" / "manifest.json"
+          web_manifest = json.loads(web_manifest_path.read_text())
+          expected_icons = [
+              {"src": "icons/Icon-192.png", "sizes": "192x192", "type": "image/png"},
+              {"src": "icons/Icon-512.png", "sizes": "512x512", "type": "image/png"},
+              {
+                  "src": "icons/Icon-maskable-192.png",
+                  "sizes": "192x192",
+                  "type": "image/png",
+                  "purpose": "maskable",
+              },
+              {
+                  "src": "icons/Icon-maskable-512.png",
+                  "sizes": "512x512",
+                  "type": "image/png",
+                  "purpose": "maskable",
+              },
+          ]
+          expected_manifest_values = {
+              "name": "Pandora's Box",
+              "short_name": "Pandora",
+              "start_url": ".",
+              "display": "standalone",
+              "background_color": "#000000",
+              "theme_color": "#000000",
+              "icons": expected_icons,
+          }
+          manifest_changed = any(
+              web_manifest.get(key) != value
+              for key, value in expected_manifest_values.items()
+          )
+          web_manifest.update(expected_manifest_values)
+          if manifest_changed:
+              web_manifest_path.write_text(
+                  json.dumps(web_manifest, indent=2, ensure_ascii=False) + "\n"
+              )
+              patched.append("web/manifest.json")
+
+          index_path = export_root / "web" / "index.html"
+          index = index_path.read_text()
+
+          def upsert_link(pattern, replacement):
+              global index
+              if pattern.search(index):
+                  updated = pattern.sub(replacement, index, count=1)
+              else:
+                  if "</head>" not in index:
+                      raise SystemExit("Exported web/index.html has no closing head element")
+                  updated = index.replace("</head>", f"  {replacement}\n</head>", 1)
+              changed = updated != index
+              index = updated
+              return changed
+
+          changed = False
+          changed |= upsert_link(
+              re.compile(r"<link\b(?=[^>]*\brel=['\"](?:shortcut\s+)?icon['\"])[^>]*>", re.I),
+              '<link rel="icon" type="image/png" href="favicon.png">',
+          )
+          changed |= upsert_link(
+              re.compile(r"<link\b(?=[^>]*\brel=['\"]manifest['\"])[^>]*>", re.I),
+              '<link rel="manifest" href="manifest.json">',
+          )
+          changed |= upsert_link(
+              re.compile(r"<link\b(?=[^>]*\brel=['\"]apple-touch-icon['\"])[^>]*>", re.I),
+              '<link rel="apple-touch-icon" href="icons/Icon-192.png">',
+          )
+          if changed:
+              index_path.write_text(index)
+              patched.append("web/index.html")
+
+          verified_targets = {
+              str(target.relative_to(export_root)): digest(target)
+              for target in sorted(targets)
+          }
+          for target, source in targets.items():
+              if target.read_bytes() != source.read_bytes():
+                  raise SystemExit(f"Pandora identity target does not match approved source: {target}")
+          evidence = {
+              "brand_decision_id": brand_manifest["decision_id"],
+              "brand_manifest_sha256": hashlib.sha256(
+                  (brand_root / "manifest.json").read_bytes()
+              ).hexdigest(),
+              "patched_targets": patched,
+              "verified_targets": verified_targets,
+          }
+          evidence_path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
+          PY
+
+                mkdir -p "${export_root}/test"
+                python3 - "${export_root}/test/unattended_export_integrity_test.dart" <<'PY'
+          import pathlib
+          import sys
+
+          pathlib.Path(sys.argv[1]).write_text(
+              """import 'dart:convert';
+          import 'dart:io';
+
+          import 'package:flutter_test/flutter_test.dart';
+
+          void main() {
+            test('Pandora export contains the approved web identity contract', () {
+              final manifestFile = File('web/manifest.json');
+              expect(manifestFile.existsSync(), isTrue);
+              final manifest = jsonDecode(manifestFile.readAsStringSync())
+                  as Map<String, dynamic>;
+              expect(manifest['name'], "Pandora's Box");
+              expect(manifest['short_name'], 'Pandora');
+              expect(File('web/favicon.png').existsSync(), isTrue);
+              expect(File('web/icons/Icon-192.png').existsSync(), isTrue);
+              expect(File('web/icons/Icon-512.png').existsSync(), isTrue);
+            });
+          }
+          """
+          )
+          PY
+
+                cd "${export_root}"
+                if [[ -f pubspec.lock ]]; then
+                  flutter pub get --enforce-lockfile \
+                    2>&1 | tee "${output}/flutter-pub-get.txt"
+                else
+                  flutter pub get \
+                    2>&1 | tee "${output}/flutter-pub-get.txt"
+                fi
+                sha256sum pubspec.yaml pubspec.lock \
+                  > "${output}/flutter-dependency-lock-sha256.txt"
+                flutter analyze --no-pub \
+                  2>&1 | tee "${output}/flutter-analyze.txt"
+                flutter test --no-pub --reporter expanded \
+                  2>&1 | tee "${output}/flutter-test.txt"
+                flutter build web --release --no-pub \
+                  2>&1 | tee "${output}/flutter-build-web.txt"
+
+                python3 - "${export_root}/build/web/vercel.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          config = {
+              "$schema": "https://openapi.vercel.sh/vercel.json",
+              "rewrites": [
+                  {"source": "/(.*)", "destination": "/index.html"},
+              ],
+          }
+          pathlib.Path(sys.argv[1]).write_text(
+              json.dumps(config, indent=2, sort_keys=True) + "\n"
+          )
+          PY
+
+                python3 - \
+                  "${GITHUB_WORKSPACE}" \
+                  "${export_root}" \
+                  "${output}/web-build-verification.json" \
+                  "${output}/web-build-files.json" \
+                  "${output}/web-build-sha256.txt" <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          repository = pathlib.Path(sys.argv[1])
+          export_root = pathlib.Path(sys.argv[2])
+          evidence_path = pathlib.Path(sys.argv[3])
+          inventory_path = pathlib.Path(sys.argv[4])
+          checksums_path = pathlib.Path(sys.argv[5])
+          build = export_root / "build" / "web"
+          if not build.is_dir():
+              raise SystemExit("Flutter release web build was not created")
+
+          required = [
+              build / "index.html",
+              build / "flutter_bootstrap.js",
+              build / "main.dart.js",
+              build / "manifest.json",
+              build / "favicon.png",
+              build / "icons" / "Icon-192.png",
+              build / "icons" / "Icon-512.png",
+              build / "icons" / "Icon-maskable-192.png",
+              build / "icons" / "Icon-maskable-512.png",
+              build / "vercel.json",
+          ]
+          missing = [str(path.relative_to(build)) for path in required if not path.is_file()]
+          if missing:
+              raise SystemExit(f"Release web build is incomplete: {missing}")
+
+          approved = repository / "assets" / "brand" / "pandoras-box" / "product-mark" / "derived"
+          expected_pairs = {
+              build / "favicon.png": approved / "favicon-32.png",
+              build / "icons" / "Icon-192.png": approved / "pwa-192.png",
+              build / "icons" / "Icon-512.png": approved / "pwa-512.png",
+              build / "icons" / "Icon-maskable-192.png": approved / "pwa-192.png",
+              build / "icons" / "Icon-maskable-512.png": approved / "pwa-512.png",
+          }
+
+          def digest(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          for target, source in expected_pairs.items():
+              if target.read_bytes() != source.read_bytes():
+                  raise SystemExit(
+                      f"Built Pandora identity asset differs from approved source: {target}"
+                  )
+
+          manifest = json.loads((build / "manifest.json").read_text())
+          icon_sources = {item.get("src") for item in manifest.get("icons", [])}
+          expected_icon_sources = {
+              "icons/Icon-192.png",
+              "icons/Icon-512.png",
+              "icons/Icon-maskable-192.png",
+              "icons/Icon-maskable-512.png",
+          }
+          if icon_sources != expected_icon_sources:
+              raise SystemExit(f"Built PWA manifest icon set is wrong: {icon_sources}")
+          maskable_sources = {
+              item.get("src")
+              for item in manifest.get("icons", [])
+              if item.get("purpose") == "maskable"
+          }
+          if maskable_sources != {
+              "icons/Icon-maskable-192.png",
+              "icons/Icon-maskable-512.png",
+          }:
+              raise SystemExit(
+                  f"Built PWA manifest maskable icon set is wrong: {maskable_sources}"
+              )
+          index = (build / "index.html").read_text()
+          for required_reference in (
+              'href="favicon.png"',
+              'href="manifest.json"',
+              'href="icons/Icon-192.png"',
+          ):
+              if required_reference not in index:
+                  raise SystemExit(
+                      f"Built web entrypoint is missing {required_reference}"
+                  )
+
+          files = sorted(path for path in build.rglob("*") if path.is_file())
+          inventory = [
+              {
+                  "path": str(path.relative_to(build)),
+                  "bytes": path.stat().st_size,
+                  "sha256": digest(path),
+              }
+              for path in files
+          ]
+          inventory_path.write_text(json.dumps(inventory, indent=2) + "\n")
+          checksums_path.write_text(
+              "".join(f"{item['sha256']}  {item['path']}\n" for item in inventory)
+          )
+          evidence = {
+              "build_root": "build/web",
+              "file_count": len(inventory),
+              "total_bytes": sum(item["bytes"] for item in inventory),
+              "entrypoint_sha256": digest(build / "index.html"),
+              "main_dart_js_sha256": digest(build / "main.dart.js"),
+              "service_worker_sha256": (
+                  digest(build / "flutter_service_worker.js")
+                  if (build / "flutter_service_worker.js").is_file()
+                  else None
+              ),
+              "approved_identity_assets": {
+                  str(target.relative_to(build)): digest(target)
+                  for target in sorted(expected_pairs)
+              },
+              "spa_fallback": "vercel.json catch-all rewrite to /index.html",
+          }
+          evidence_path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
+          PY
+
+                FF_SECRET="${ff_token}" python3 - \
+                  "${export_root}" \
+                  "${output}" \
+                  "${output}/secret-scan.json" <<'PY'
+          import base64
+          import json
+          import os
+          import pathlib
+          import re
+          import sys
+
+          roots = [pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])]
+          evidence_path = pathlib.Path(sys.argv[3])
+          exact_secret = os.environ["FF_SECRET"].encode()
+          forbidden_patterns = {
+              "private_key": re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+              "github_token": re.compile(rb"(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"),
+              "supabase_secret": re.compile(rb"(?:sb_secret_|sbp_)[A-Za-z0-9_-]{20,}"),
+              "stripe_secret": re.compile(rb"sk_(?:live|test)_[A-Za-z0-9]{20,}"),
+              "aws_access_key": re.compile(rb"(?:AKIA|ASIA)[A-Z0-9]{16}"),
+          }
+          jwt_pattern = re.compile(
+              rb"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"
+          )
+          violations = []
+          scanned_files = 0
+          scanned_bytes = 0
+          for root in roots:
+              for path in root.rglob("*"):
+                  if not path.is_file():
+                      continue
+                  data = path.read_bytes()
+                  scanned_files += 1
+                  scanned_bytes += len(data)
+                  relative = f"{root.name}/{path.relative_to(root)}"
+                  if exact_secret in data:
+                      violations.append({"kind": "flutterflow_token", "path": relative})
+                  for kind, pattern in forbidden_patterns.items():
+                      if pattern.search(data):
+                          violations.append({"kind": kind, "path": relative})
+                  for token_match in jwt_pattern.finditer(data):
+                      token = token_match.group().split(b".")
+                      try:
+                          payload = json.loads(
+                              base64.urlsafe_b64decode(
+                                  token[1] + b"=" * (-len(token[1]) % 4)
+                              )
+                          )
+                      except Exception:
+                          continue
+                      if payload.get("role") == "service_role":
+                          violations.append(
+                              {"kind": "supabase_service_role_jwt", "path": relative}
+                          )
+          evidence = {
+              "result": "fail" if violations else "pass",
+              "scanned_files": scanned_files,
+              "scanned_bytes": scanned_bytes,
+              "checks": ["exact brokered FlutterFlow token", *forbidden_patterns, "service_role JWT"],
+              "violations": violations,
+          }
+          evidence_path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
+          if violations:
+              raise SystemExit(f"Potential secret material found: {violations}")
+          PY
+                ;;
             esac
           }
           operate
@@ -283,9 +1007,19 @@ jobs:
           unset ff_token broker_project_id
 
       - name: Upload non-secret operation evidence
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: pandora-flutterflow-operation-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/pandora-flutterflow-result
-          if-no-files-found: error
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Upload verified Flutter release web build
+        if: always() && steps.operation-mode.outputs.mode == 'export-build'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pandora-flutter-web-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pandora-flutter-export/build/web
+          if-no-files-found: ignore
           retention-days: 1
