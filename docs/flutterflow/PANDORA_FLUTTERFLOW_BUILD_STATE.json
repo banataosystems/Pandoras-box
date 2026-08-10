@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "projectKey": "mcpmaster",
   "artifact": "pandora-mobile-flutterflow-v1",
   "canonicalRepository": "banataosystems/Pandoras-box",
@@ -12,6 +12,9 @@
     "flutterFlowApiClientOverlayImplemented": true,
     "flutterFlowApiClientTypeChecked": true,
     "flutterFlowApiClientRuntimeTestsPassed": 5,
+    "secureCredentialHandoffImplemented": true,
+    "secureCredentialHandoffDeployed": true,
+    "secureCredentialHandoffLiveVerified": false,
     "existingFlutterFlowProjectVisuallyEvidenced": true,
     "exactFlutterFlowProjectIdVerified": false,
     "flutterFlowProjectCreatedByThisWork": false,
@@ -48,6 +51,22 @@
     "gatewayCapabilitiesEnabled": false,
     "providerStatus": "planned"
   },
+  "credentialHandoff": {
+    "mode": "one-time mobile HTTPS form",
+    "tokenStoredInChat": false,
+    "tokenStoredInGitHub": false,
+    "tokenStoredInPandoraSemanticMemory": false,
+    "storage": "Supabase Vault after live FlutterFlow listProjects verification",
+    "validationRule": "store only when FlutterFlow accepts token and existing Pandoras Box project is found",
+    "handoffCodeExpiresMinutes": 60,
+    "edgeFunction": "flutterflow-credential-handoff",
+    "edgeFunctionDeploymentId": "34b5ea92-c5e0-4fc7-a367-13047996ab40",
+    "edgeFunctionVersion": 1,
+    "edgeFunctionSha256": "436379e610cc13c6bdc5ea1c8cd31288e09577fd20666f48e117690affad887d",
+    "migration": "20260810032703_flutterflow_secure_credential_handoff_v1",
+    "migrationApplied": true,
+    "rpcAclVerifiedServiceRoleOnly": true
+  },
   "visualSourceOfTruth": {
     "name": "Pandoras-Box Dark Dashboard UI",
     "direction": "near-black institutional UI with restrained Pandora red, white typography, semantic green/amber, dominant approval/priority card, three top-project progress rows, recent activity, and five-item bottom navigation",
@@ -81,6 +100,8 @@
     "testCommit": "a34e57d60b393491d86dd96cbef25564b176dc34",
     "productSpecCommit": "7964e241cd549688f55c0d8f49c42976f68e29e8",
     "agentPromptCommit": "39b9fb0c17cc3e1c83dd64a643026f03a4287f70",
+    "credentialMigrationCommit": "d91309a1a0d6ef3c89114f892f7daed79a77583c",
+    "credentialFunctionCommit": "1c0014e62d4047147d4251709a1679a646f6f1e1",
     "runtimeTestResult": "5/5 passed",
     "typeCheck": "client overlay passed TypeScript strict noEmit check"
   },
@@ -88,19 +109,19 @@
     {
       "id": "MCP-PANDORA-CONNECTION-001",
       "type": "access",
-      "summary": "The ChatGPT Pandoras-box MCP facade is still intercepted by Vercel Deployment Protection before application authentication. The authoritative Memory backing database is reachable and has been reconciled directly through Supabase, but the MCP facade itself is not repaired."
+      "summary": "The ChatGPT Pandoras-box MCP facade is still intercepted by Vercel Deployment Protection before application authentication. The authoritative Memory backing database is reachable and reconciled directly through governed Supabase access."
     },
     {
       "id": "FLUTTERFLOW-CREDENTIAL-001",
       "type": "credential",
-      "summary": "No FlutterFlow Project API bearer token is available to Pandora, MCPMaster Meta staging, or this ChatGPT session. FlutterFlow's official Project API requires that token. It must not be pasted into chat or committed to source."
+      "summary": "A secure one-time handoff is now deployed, but the owner has not yet supplied a FlutterFlow Project API token through that private HTTPS form. No token is present in chat, GitHub, Pandora Memory, or MCPMaster Meta staging."
     },
     {
       "id": "FLUTTERFLOW-PROJECT-ID-001",
       "type": "provider",
-      "summary": "An existing Pandoras Box FlutterFlow project is visually evidenced and connected to MCPMaster Meta, but its exact FlutterFlow projectId/version/schema fingerprint has not been authenticated and verified. The ID must come from listProjects before any mutation."
+      "summary": "An existing Pandoras Box FlutterFlow project is visually evidenced and connected to MCPMaster Meta, but its exact projectId/version/schema fingerprint remains unverified until the secure token handoff succeeds and authenticated listProjects runs."
     }
   ],
-  "nextAutonomousAction": "When a supported secure FlutterFlow credential handoff becomes available, call listProjects and bind the existing Pandoras Box project; capture exact project ID/version/schema fingerprint; read its YAML; create rollback evidence; inspect and repair the two broken navigation actions and property-override mismatch; validate every changed YAML file; apply only approval-gated updates; implement the approved dark/red mobile dashboard; then record mobile tests, provider verification, source/export hash where available, and rollback evidence in Pandora before any release claim.",
+  "nextAutonomousAction": "After the owner completes the secure mobile credential handoff, read the Vault-backed token server-side, call listProjects, bind the existing Pandoras Box project, capture exact project ID/version/schema fingerprint, download current YAML and rollback state, repair the two broken navigation actions and property-override mismatch, validate every changed YAML file, apply approval-gated updates, implement the approved dark/red mobile dashboard, then record Android tests, provider read-back, source/export hash where available, and rollback evidence in Pandora before any release claim.",
   "productionReleaseAuthorized": false
 }
