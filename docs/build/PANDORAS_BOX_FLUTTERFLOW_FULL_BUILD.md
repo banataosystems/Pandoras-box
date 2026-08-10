@@ -27,12 +27,12 @@ Before making substantial changes:
 
 1. Connect to Pandora Memory/MCPMaster.
 2. Recover the current roadmap, architecture, decisions, tasks, blockers, source state, integrations, deployment evidence, tests, rollback information, and next action.
-3. Pandora/MCPMaster was recently returning:
-   `401 Protected deployment`
-   from Vercel Authentication.
-4. Diagnose and repair that connection if your available permissions allow it.
-5. Do not invent missing Pandora state.
-6. If newer verified evidence contradicts Pandora, correct Pandora first and preserve the previous history.
+3. Treat `https://mcpmaster.vercel.app/mcp` as the legacy machine route that was blocked by Vercel Authentication with HTTP 401.
+4. The current direct production Memory OAuth MCP resource is `https://pandorasbox-memory.vercel.app/api/mcp`. Live verification on 2026-08-10 showed that this route reaches application authorization and returns the expected bearer challenge; its protected-resource metadata is also live.
+5. The current ChatGPT/Pandora Memory health and search binding still fails with HTTP 404 even though the direct production MCP resource is reachable. Diagnose the exact connector endpoint, OAuth binding, workload identity, namespace, and grant path before changing application authorization.
+6. Do not disable Vercel protection globally, allow anonymous Memory access, weaken application authorization, invent a universal credential, or expose any bearer or workload token merely to clear the connection error.
+7. Do not invent missing Pandora state.
+8. If newer verified evidence contradicts Pandora, correct Pandora first and preserve the previous history.
 
 Distinguish at all times:
 
