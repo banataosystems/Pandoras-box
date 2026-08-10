@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "mode": "apply-owner",
+  "mode": "validate-owner",
   "projectId": "pandoras-box-gj9hnb",
-  "purpose": "Apply the remotely validated owner interface, guarded commands, recovery-session handling, typed project proof, connection checks, navigation, and approved product mark."
+  "purpose": "Dry-run the neutral light/dark design system, explicit password confirmation, recovery-session behavior, and the existing live owner interface before a corrective apply."
 }

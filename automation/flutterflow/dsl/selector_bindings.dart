@@ -18,6 +18,7 @@ final class PandoraBindingSpec {
     required this.organizationId,
     required this.signInEmail,
     required this.signInPassword,
+    required this.signInConfirmPassword,
     required this.homeData,
     required this.homeProjects,
     required this.homeLoading,
@@ -65,6 +66,7 @@ final class PandoraBindingSpec {
   final ProjectAppStateFieldHandle organizationId;
   final ProjectStateFieldHandle signInEmail;
   final ProjectStateFieldHandle signInPassword;
+  final ProjectStateFieldHandle signInConfirmPassword;
   final ProjectStateFieldHandle homeData;
   final ProjectStateFieldHandle homeProjects;
   final ProjectStateFieldHandle homeLoading;
@@ -350,9 +352,16 @@ DslWidget _signInBody(PandoraBindingSpec spec) => Column(
       obscureText: true,
       name: 'PandoraPasswordField',
       onChanged: SetState(spec.signInPassword, const TextValue()),
-      onSubmitted: LoginEmailPassword(
-        State(spec.signInEmail),
-        State(spec.signInPassword),
+    ),
+    TextField(
+      label: 'Confirm new password',
+      hint: 'Enter the new password again',
+      obscureText: true,
+      name: 'PandoraConfirmPasswordField',
+      visible: const Global(GlobalProperty.isUserLoggedIn),
+      onChanged: SetState(
+        spec.signInConfirmPassword,
+        const TextValue(),
       ),
     ),
     Button(
@@ -389,15 +398,26 @@ DslWidget _signInBody(PandoraBindingSpec spec) => Column(
       onTap: If(
         Not(Equals(State(spec.signInPassword), '')),
         then: [
-          UpdatePassword(
-            State(spec.signInPassword),
-            confirmPassword: State(spec.signInPassword),
-          ),
-          Snackbar('Your password has been updated.'),
-          Navigate(
-            ff.Pages.commandCenter,
-            allowBack: false,
-            replaceRoute: true,
+          If(
+            Equals(
+              State(spec.signInPassword),
+              State(spec.signInConfirmPassword),
+            ),
+            then: [
+              UpdatePassword(
+                State(spec.signInPassword),
+                confirmPassword: State(spec.signInConfirmPassword),
+              ),
+              Snackbar('Your password has been updated.'),
+              Navigate(
+                ff.Pages.commandCenter,
+                allowBack: false,
+                replaceRoute: true,
+              ),
+            ],
+            orElse: [
+              Snackbar('The two passwords do not match.'),
+            ],
           ),
         ],
         orElse: [
@@ -1185,6 +1205,36 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
           ),
         ],
       ),
+    ),
+    Text('Appearance', style: Styles.titleLarge),
+    Row(
+      spacing: 8,
+      children: [
+        Expanded(
+          Button(
+            'System',
+            name: 'PandoraThemeSystemButton',
+            variant: ButtonVariant.outlined,
+            onTap: const SetDarkMode(DarkModePreference.system),
+          ),
+        ),
+        Expanded(
+          Button(
+            'Light',
+            name: 'PandoraThemeLightButton',
+            variant: ButtonVariant.outlined,
+            onTap: const SetDarkMode(DarkModePreference.light),
+          ),
+        ),
+        Expanded(
+          Button(
+            'Dark',
+            name: 'PandoraThemeDarkButton',
+            variant: ButtonVariant.outlined,
+            onTap: const SetDarkMode(DarkModePreference.dark),
+          ),
+        ),
+      ],
     ),
     _panel(
       name: 'PandoraAboutPanel',

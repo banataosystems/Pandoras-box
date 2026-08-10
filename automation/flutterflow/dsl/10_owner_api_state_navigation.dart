@@ -45,6 +45,11 @@ abstract final class _SignInState {
     key: 'pandora_dsl_sign_in_password',
     typeName: 'String',
   );
+  static const confirmPassword = ProjectStateFieldHandle(
+    name: 'confirmPassword',
+    key: 'pandora_dsl_sign_in_confirm_password',
+    typeName: 'String',
+  );
 }
 
 abstract final class _CommandCenterState {
@@ -314,6 +319,7 @@ void buildPandoraOwnerApp(
   App app, {
   bool installGlobalNavigation = false,
 }) {
+  _configurePandoraTheme(app);
   final schemas = _declareSchemas(app);
   final api = _declareOwnerApi(app, schemas);
 
@@ -335,6 +341,7 @@ void buildPandoraOwnerApp(
       organizationId: _organizationId,
       signInEmail: _SignInState.email,
       signInPassword: _SignInState.password,
+      signInConfirmPassword: _SignInState.confirmPassword,
       homeData: _CommandCenterState.data,
       homeProjects: _CommandCenterState.projects,
       homeLoading: _CommandCenterState.loading,
@@ -383,6 +390,35 @@ void buildPandoraOwnerApp(
   if (installGlobalNavigation) {
     _installGlobalBottomNavigation(app);
   }
+}
+
+void _configurePandoraTheme(App app) {
+  app.themeColor('primary', 0xFF111827, dark: 0xFF374151);
+  app.themeColor('secondary', 0xFF4B5563, dark: 0xFF6B7280);
+  app.themeColor('tertiary', 0xFF6B7280, dark: 0xFF9CA3AF);
+  app.themeColor('alternate', 0xFFD1D5DB, dark: 0xFF374151);
+  app.themeColor(
+    'primaryBackground',
+    0xFFF7F8FA,
+    dark: 0xFF0B0F14,
+  );
+  app.themeColor(
+    'secondaryBackground',
+    0xFFFFFFFF,
+    dark: 0xFF151A21,
+  );
+  app.themeColor('primaryText', 0xFF111827, dark: 0xFFF9FAFB);
+  app.themeColor('secondaryText', 0xFF4B5563, dark: 0xFFB7C0CC);
+  app.themeColor('accent1', 0x24111827, dark: 0x33374151);
+  app.themeColor('accent2', 0x244B5563, dark: 0x336B7280);
+  app.themeColor('accent3', 0x246B7280, dark: 0x339CA3AF);
+  app.themeColor('accent4', 0xCCFFFFFF, dark: 0xCC151A21);
+  app.themeColor('success', 0xFF16794A, dark: 0xFF4FAE7A);
+  app.themeColor('warning', 0xFFA15C00, dark: 0xFFD99A3D);
+  app.themeColor('error', 0xFFB42318, dark: 0xFFE57373);
+  app.themeColor('info', 0xFF375A7F, dark: 0xFF7FA6C9);
+  app.darkMode(enabled: true);
+  app.breakpoints(small: 479, medium: 991, large: 1200);
 }
 
 _PandoraSchemas _declareSchemas(App app) {
@@ -727,6 +763,10 @@ void _declarePageStateAndHydration(
   app.editPageState(ff.Pages.signIn, (state) {
     state.ensureField(_SignInState.email, string.withDefault(''));
     state.ensureField(_SignInState.password, string.withDefault(''));
+    state.ensureField(
+      _SignInState.confirmPassword,
+      string.withDefault(''),
+    );
   });
 
   app.editPageState(ff.Pages.commandCenter, (state) {
