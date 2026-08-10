@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectKey": "mcpmaster-pandoras-box",
+  "artifact": "pandora-mobile-flutterflow-v1",
+  "canonicalRepository": "banataosystems/Pandoras-box",
+  "branch": "feature/flutterflow-pandora-mobile-v1",
+  "requestedPlatform": "FlutterFlow",
+  "primaryDevice": "smartphone",
+  "state": {
+    "documented": true,
+    "implementationPrepared": true,
+    "flutterFlowProjectCreated": false,
+    "implementedInFlutterFlow": false,
+    "validatedInFlutterFlow": false,
+    "tested": false,
+    "deployed": false,
+    "productionVerified": false
+  },
+  "requirements": {
+    "plainLanguageFirst": true,
+    "flexibleOwnerWorkflow": true,
+    "simpleAdvancedToggle": true,
+    "lightDarkSystemThemes": true,
+    "truthfulStatusLadder": [
+      "documented",
+      "implemented",
+      "tested",
+      "deployed",
+      "production-verified"
+    ],
+    "aal2ForProtectedApprovals": true,
+    "failClosedWhenStateUnverified": true,
+    "noClientProviderSecrets": true
+  },
+  "currentBlocker": {
+    "id": "MCP-PANDORA-CONNECTION-001",
+    "type": "access",
+    "summary": "Pandoras-box MCP endpoint is intercepted by Vercel Deployment Protection and returns HTTP 401 before application authentication; this session also has no direct FlutterFlow connector.",
+    "safeRepair": "Provide machine automation access through Vercel Deployment Protection while retaining application-level MCP/OAuth authentication, then use the governed FlutterFlow adapter or FlutterFlow MCP workspace.",
+    "doNot": "Do not make the entire MCPMaster application public merely to bypass the 401."
+  },
+  "nextAutonomousAction": "Restore canonical MCPMaster operational source and repair machine MCP connectivity; then initialize or bind the FlutterFlow AI workspace, validate the documented app prompt, create the real FlutterFlow project, and record project/version/rollback evidence.",
+  "productionReleaseAuthorized": false
+}
