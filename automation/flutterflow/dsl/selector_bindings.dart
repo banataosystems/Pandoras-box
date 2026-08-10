@@ -22,6 +22,10 @@ final class PandoraBindingSpec {
     required this.homeProjects,
     required this.homeLoading,
     required this.homeError,
+    required this.homeCommand,
+    required this.homeCommandResponse,
+    required this.homeCommandSubmitting,
+    required this.homeCommandError,
     required this.projectId,
     required this.projectData,
     required this.projectLoading,
@@ -53,6 +57,7 @@ final class PandoraBindingSpec {
     required this.runSubmitting,
     required this.runError,
     required this.askEndpoint,
+    required this.connectionsEndpoint,
     required this.runEndpoint,
     required this.decideEndpoint,
   });
@@ -64,6 +69,10 @@ final class PandoraBindingSpec {
   final ProjectStateFieldHandle homeProjects;
   final ProjectStateFieldHandle homeLoading;
   final ProjectStateFieldHandle homeError;
+  final ProjectStateFieldHandle homeCommand;
+  final ProjectStateFieldHandle homeCommandResponse;
+  final ProjectStateFieldHandle homeCommandSubmitting;
+  final ProjectStateFieldHandle homeCommandError;
   final ProjectParamHandle projectId;
   final ProjectStateFieldHandle projectData;
   final ProjectStateFieldHandle projectLoading;
@@ -95,6 +104,7 @@ final class PandoraBindingSpec {
   final ProjectStateFieldHandle runSubmitting;
   final ProjectStateFieldHandle runError;
   final Endpoint askEndpoint;
+  final Endpoint connectionsEndpoint;
   final Endpoint runEndpoint;
   final Endpoint decideEndpoint;
 }
@@ -289,7 +299,7 @@ DslWidget _splashBody() => Column(
   spacing: 16,
   padding: const EdgeInsets.all(24),
   children: [
-    _mark(96),
+    _mark(200),
     Text('PANDORAS-BOX', style: Styles.headlineSmall),
     Text('Banatao Systems', style: Styles.bodyMedium),
     ProgressBar.circular(size: 28),
@@ -305,7 +315,18 @@ DslWidget _signInBody(PandoraBindingSpec spec) => Column(
   padding: const EdgeInsets.all(24),
   scrollable: true,
   children: [
-    _brandHeader('Sign in', 'Use your Banatao Systems account.'),
+    Column(
+      crossAxis: CrossAxis.center,
+      spacing: 8,
+      children: [
+        _mark(160),
+        Text('Pandora\'s Box', style: Styles.headlineSmall),
+        Text(
+          'Use your Banatao Systems account.',
+          style: Styles.bodyMedium,
+        ),
+      ],
+    ),
     TextField(
       label: 'Email address',
       hint: 'you@banatao.systems',
@@ -337,6 +358,15 @@ DslWidget _signInBody(PandoraBindingSpec spec) => Column(
         State(spec.signInPassword),
       ),
     ),
+    Button(
+      'Forgot password?',
+      name: 'PandoraResetPasswordButton',
+      variant: ButtonVariant.text,
+      onTap: [
+        ResetPassword(State(spec.signInEmail)),
+        Snackbar('Check your email for the secure reset link.'),
+      ],
+    ),
     _panel(
       name: 'PandoraSignInSafetyPanel',
       child: Text(
@@ -355,6 +385,48 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
   scrollable: true,
   children: [
     _brandHeader('Pandoras-Box', 'Owner command center'),
+    _panel(
+      name: 'PandoraOwnerCommandPanel',
+      child: Column(
+        crossAxis: CrossAxis.stretch,
+        spacing: 10,
+        children: [
+          Text(
+            'What do you want Pandora to do?',
+            style: Styles.titleLarge,
+          ),
+          TextField(
+            label: 'Ask Pandora',
+            hint: 'Continue a project, check a release, or fix a blocker',
+            maxLines: 3,
+            name: 'PandoraOwnerCommandField',
+            onChanged: SetState(spec.homeCommand, const TextValue()),
+            onSubmitted: _submitHomeCommand(spec),
+          ),
+          Button(
+            'Ask Pandora',
+            name: 'PandoraOwnerCommandButton',
+            visible: Not(State(spec.homeCommandSubmitting)),
+            onTap: _submitHomeCommand(spec),
+          ),
+          ProgressBar.circular(
+            name: 'PandoraOwnerCommandProgress',
+            visible: State(spec.homeCommandSubmitting),
+          ),
+          Text(
+            State(spec.homeCommandError),
+            name: 'PandoraOwnerCommandError',
+            style: Styles.bodyMedium,
+            visible: Not(Equals(State(spec.homeCommandError), '')),
+          ),
+          Text(
+            State(spec.homeCommandResponse)['reply'],
+            name: 'PandoraOwnerCommandResponse',
+            style: Styles.bodyMedium,
+          ),
+        ],
+      ),
+    ),
     ..._loadingAndError(spec.homeLoading, spec.homeError, 'Home'),
     _panel(
       name: 'PandoraSystemHealthPanel',
@@ -464,6 +536,30 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
   ],
 );
 
+List<DslAction> _submitHomeCommand(PandoraBindingSpec spec) => [
+  SetState(spec.homeCommandSubmitting, true),
+  SetState(spec.homeCommandError, ''),
+  ApiCall(
+    spec.askEndpoint,
+    outputAs: 'pandoraHomeCommandResult',
+    params: _apiParams(spec, {
+      'message': State(spec.homeCommand),
+      'projectId': '',
+    }),
+    onSuccess: (result) => [
+      SetState(spec.homeCommandResponse, result),
+      SetState(spec.homeCommandSubmitting, false),
+    ],
+    onFailure: [
+      SetState(spec.homeCommandSubmitting, false),
+      SetState(
+        spec.homeCommandError,
+        'Pandora could not save that request. Check your connection and try again.',
+      ),
+    ],
+  ),
+];
+
 DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
   name: 'PandoraProjectDetailsBody',
   crossAxis: CrossAxis.stretch,
@@ -500,6 +596,28 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
       ),
     ),
     _panel(
+      name: 'PandoraProjectProgressPanel',
+      child: Column(
+        crossAxis: CrossAxis.start,
+        spacing: 6,
+        children: [
+          Text('Verified roadmap progress', style: Styles.labelMedium),
+          Text(
+            State(spec.projectData)['progressPercent'],
+            style: Styles.headlineSmall,
+          ),
+          Text(
+            State(spec.projectData)['dataFreshness'],
+            style: Styles.bodySmall,
+          ),
+          Text(
+            State(spec.projectData)['lastVerifiedAt'],
+            style: Styles.bodySmall,
+          ),
+        ],
+      ),
+    ),
+    _panel(
       name: 'PandoraProjectNextPanel',
       child: Column(
         crossAxis: CrossAxis.start,
@@ -518,6 +636,52 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
           ),
         ],
       ),
+    ),
+    Text('Roadmap work', style: Styles.titleLarge),
+    ListView(
+      name: 'PandoraProjectTasksList',
+      source: State(spec.projectData)['tasks'],
+      shrinkWrap: true,
+      spacing: 8,
+      itemBuilder: (item) => _panel(
+        name: 'PandoraProjectTaskRow',
+        child: Column(
+          crossAxis: CrossAxis.start,
+          spacing: 4,
+          children: [
+            Text(item['title'], style: Styles.titleSmall),
+            Text(item['status'], style: Styles.labelMedium),
+            Text(item['description'], style: Styles.bodySmall),
+            Text(item['result_summary'], style: Styles.bodySmall),
+          ],
+        ),
+      ),
+    ),
+    Text('Recent proof', style: Styles.titleLarge),
+    ListView(
+      name: 'PandoraProjectEvidenceList',
+      source: State(spec.projectData)['evidence'],
+      shrinkWrap: true,
+      spacing: 8,
+      itemBuilder: (item) => _panel(
+        name: 'PandoraProjectEvidenceRow',
+        child: Column(
+          crossAxis: CrossAxis.start,
+          spacing: 4,
+          children: [
+            Text(item['evidence_type'], style: Styles.titleSmall),
+            Text(item['provider'], style: Styles.bodySmall),
+            Text(item['verdict'], style: Styles.labelMedium),
+            Text(item['observed_at'], style: Styles.bodySmall),
+          ],
+        ),
+      ),
+    ),
+    Button(
+      'Review approvals for this project',
+      name: 'PandoraProjectApprovalsButton',
+      variant: ButtonVariant.outlined,
+      onTap: Navigate(ff.Pages.approvalCenter),
     ),
     Button(
       'Set up work for this project',
@@ -898,6 +1062,31 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
       ),
     ),
     Text('Connections', style: Styles.titleLarge),
+    Button(
+      'Check connections now',
+      name: 'PandoraRefreshConnectionsButton',
+      variant: ButtonVariant.outlined,
+      onTap: [
+        SetState(spec.safetyLoading, true),
+        SetState(spec.safetyError, ''),
+        ApiCall(
+          spec.connectionsEndpoint,
+          outputAs: 'pandoraConnectionsRefreshResult',
+          params: _apiParams(spec, const {}),
+          onSuccess: (result) => [
+            SetState(spec.connectionItems, result),
+            SetState(spec.safetyLoading, false),
+          ],
+          onFailure: [
+            SetState(spec.safetyLoading, false),
+            SetState(
+              spec.safetyError,
+              'Pandora could not check connections. Try again in a moment.',
+            ),
+          ],
+        ),
+      ],
+    ),
     ListView(
       name: 'PandoraConnectionsList',
       source: State(spec.connectionItems),
@@ -931,6 +1120,24 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
           Text(
             'Technical proof stays behind the governed owner API.',
             style: Styles.bodySmall,
+          ),
+        ],
+      ),
+    ),
+    _panel(
+      name: 'PandoraAboutPanel',
+      child: Row(
+        spacing: 12,
+        children: [
+          _mark(48),
+          Column(
+            crossAxis: CrossAxis.start,
+            spacing: 3,
+            children: [
+              Text('Pandora\'s Box', style: Styles.titleMedium),
+              Text('Banatao Systems', style: Styles.bodySmall),
+              Text('Protected owner control center', style: Styles.bodySmall),
+            ],
           ),
         ],
       ),

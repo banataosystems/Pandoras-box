@@ -68,6 +68,26 @@ abstract final class _CommandCenterState {
     key: 'pandora_dsl_project_items',
     typeName: 'List<PandoraProjectSummary>',
   );
+  static const command = ProjectStateFieldHandle(
+    name: 'ownerCommand',
+    key: 'pandora_dsl_owner_command',
+    typeName: 'String',
+  );
+  static const commandResponse = ProjectStateFieldHandle(
+    name: 'ownerCommandResponse',
+    key: 'pandora_dsl_owner_command_response',
+    typeName: 'PandoraAskResponse',
+  );
+  static const commandSubmitting = ProjectStateFieldHandle(
+    name: 'ownerCommandIsSubmitting',
+    key: 'pandora_dsl_owner_command_submitting',
+    typeName: 'bool',
+  );
+  static const commandError = ProjectStateFieldHandle(
+    name: 'ownerCommandError',
+    key: 'pandora_dsl_owner_command_error',
+    typeName: 'String',
+  );
 }
 
 abstract final class _ProjectDetailsParams {
@@ -319,6 +339,10 @@ void buildPandoraOwnerApp(
       homeProjects: _CommandCenterState.projects,
       homeLoading: _CommandCenterState.loading,
       homeError: _CommandCenterState.error,
+      homeCommand: _CommandCenterState.command,
+      homeCommandResponse: _CommandCenterState.commandResponse,
+      homeCommandSubmitting: _CommandCenterState.commandSubmitting,
+      homeCommandError: _CommandCenterState.commandError,
       projectId: _ProjectDetailsParams.projectId,
       projectData: _ProjectDetailsState.data,
       projectLoading: _ProjectDetailsState.loading,
@@ -350,6 +374,7 @@ void buildPandoraOwnerApp(
       runSubmitting: _PlansState.submitting,
       runError: _PlansState.error,
       askEndpoint: api.ask,
+      connectionsEndpoint: api.listConnections,
       runEndpoint: api.runAction,
       decideEndpoint: api.decideApproval,
     ),
@@ -673,10 +698,20 @@ void _declarePageStateAndHydration(
     state.ensureField(_CommandCenterState.data, schemas.home);
     state.ensureField(
       _CommandCenterState.projects,
-      listOf(schemas.projectSummary).withDefault(const []),
+      listOf(schemas.projectSummary),
     );
     state.ensureField(_CommandCenterState.loading, bool_.withDefault(false));
     state.ensureField(_CommandCenterState.error, string.withDefault(''));
+    state.ensureField(_CommandCenterState.command, string.withDefault(''));
+    state.ensureField(_CommandCenterState.commandResponse, schemas.askResponse);
+    state.ensureField(
+      _CommandCenterState.commandSubmitting,
+      bool_.withDefault(false),
+    );
+    state.ensureField(
+      _CommandCenterState.commandError,
+      string.withDefault(''),
+    );
   });
   app.editPageOnLoad(
     ff.Pages.commandCenter,
@@ -731,7 +766,7 @@ void _declarePageStateAndHydration(
   app.editPageState(ff.Pages.actionsCatalog, (state) {
     state.ensureField(
       _ActionsCatalogState.items,
-      listOf(schemas.actionItem).withDefault(const []),
+      listOf(schemas.actionItem),
     );
     state.ensureField(_ActionsCatalogState.loading, bool_.withDefault(false));
     state.ensureField(_ActionsCatalogState.error, string.withDefault(''));
@@ -765,7 +800,7 @@ void _declarePageStateAndHydration(
   app.editPageState(ff.Pages.approvalCenter, (state) {
     state.ensureField(
       _ApprovalCenterState.items,
-      listOf(schemas.approval).withDefault(const []),
+      listOf(schemas.approval),
     );
     state.ensureField(_ApprovalCenterState.loading, bool_.withDefault(false));
     state.ensureField(_ApprovalCenterState.error, string.withDefault(''));
@@ -784,7 +819,7 @@ void _declarePageStateAndHydration(
   app.editPageState(ff.Pages.activityAuditTrail, (state) {
     state.ensureField(
       _ActivityState.items,
-      listOf(schemas.activity).withDefault(const []),
+      listOf(schemas.activity),
     );
     state.ensureField(_ActivityState.loading, bool_.withDefault(false));
     state.ensureField(_ActivityState.error, string.withDefault(''));
@@ -804,7 +839,7 @@ void _declarePageStateAndHydration(
     state.ensureField(_SecurityState.data, schemas.safety);
     state.ensureField(
       _SecurityState.connections,
-      listOf(schemas.connection).withDefault(const []),
+      listOf(schemas.connection),
     );
     state.ensureField(_SecurityState.loading, bool_.withDefault(false));
     state.ensureField(_SecurityState.error, string.withDefault(''));
