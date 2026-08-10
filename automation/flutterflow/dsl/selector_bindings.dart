@@ -367,6 +367,18 @@ DslWidget _signInBody(PandoraBindingSpec spec) => Column(
         Snackbar('Check your email for the secure reset link.'),
       ],
     ),
+    Button(
+      'Set new password after opening reset link',
+      name: 'PandoraUpdatePasswordButton',
+      variant: ButtonVariant.text,
+      onTap: [
+        UpdatePassword(
+          State(spec.signInPassword),
+          confirmPassword: State(spec.signInPassword),
+        ),
+        Snackbar('Your password has been updated. You can sign in now.'),
+      ],
+    ),
     _panel(
       name: 'PandoraSignInSafetyPanel',
       child: Text(
@@ -401,13 +413,19 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
             maxLines: 3,
             name: 'PandoraOwnerCommandField',
             onChanged: SetState(spec.homeCommand, const TextValue()),
-            onSubmitted: _submitHomeCommand(spec),
+            onSubmitted: _submitHomeCommand(
+              spec,
+              outputAs: 'pandoraHomeCommandSubmitResult',
+            ),
           ),
           Button(
             'Ask Pandora',
             name: 'PandoraOwnerCommandButton',
             visible: Not(State(spec.homeCommandSubmitting)),
-            onTap: _submitHomeCommand(spec),
+            onTap: _submitHomeCommand(
+              spec,
+              outputAs: 'pandoraHomeCommandButtonResult',
+            ),
           ),
           ProgressBar.circular(
             name: 'PandoraOwnerCommandProgress',
@@ -536,12 +554,15 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
   ],
 );
 
-List<DslAction> _submitHomeCommand(PandoraBindingSpec spec) => [
+List<DslAction> _submitHomeCommand(
+  PandoraBindingSpec spec, {
+  required String outputAs,
+}) => [
   SetState(spec.homeCommandSubmitting, true),
   SetState(spec.homeCommandError, ''),
   ApiCall(
     spec.askEndpoint,
-    outputAs: 'pandoraHomeCommandResult',
+    outputAs: outputAs,
     params: _apiParams(spec, {
       'message': State(spec.homeCommand),
       'projectId': '',
