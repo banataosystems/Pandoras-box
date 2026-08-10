@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "mode": "apply-auth",
+  "mode": "validate-owner",
   "projectId": "pandoras-box-gj9hnb",
-  "purpose": "Apply the remotely validated Supabase auth, canonical routes, initial page, and route guards."
+  "purpose": "Compile and remotely dry-run the exact ten-page owner UI, live API bindings, actions, navigation, and product mark without mutating the project."
 }
