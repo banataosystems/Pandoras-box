@@ -4,7 +4,7 @@
 
 ## Core rule
 
-FlutterFlow does **not** connect directly to each raw MCP server. It connects to one authenticated **Pandora Owner API** in MCPMaster/ProjectOS. The backend owns MCP discovery, credentials, scopes, policies, approvals, execution, verification, and audit.
+FlutterFlow does **not** connect directly to each raw MCP server. It connects to one authenticated **Pandora Owner API** deployed as the JWT-required `pandora-owner-api` function in MCPMaster Meta Supabase/ProjectOS. The backend owns MCP discovery, credentials, scopes, policies, approvals, execution, verification, and audit.
 
 This keeps the phone UI simple and means adding a new MCP/service does not require redesigning or republishing the app.
 
@@ -75,6 +75,12 @@ Recommended stable high-level routes:
 - `POST /api/owner/actions/:id/run` — start an allowed governed action.
 - `POST /api/owner/approvals/:id/decide` — approve/reject after required identity check.
 
+FlutterFlow configures one API-group base URL:
+
+`https://jcyqixttuebxqqfkjonq.supabase.co/functions/v1/pandora-owner-api`
+
+Each request passes the signed-in Supabase user JWT as `Authorization: Bearer <JWT>` and the active organization as `X-Organization-Id`. Browser requests are accepted only from exact allowlisted HTTPS origins. Before web release, add the final FlutterFlow site origin to `PANDORA_ALLOWED_ORIGINS`; never use `*`.
+
 FlutterFlow should never call raw provider mutation endpoints directly.
 
 ## Ask Pandora contract
@@ -126,7 +132,7 @@ Advanced detail may contain exact action hash, provider, environment, commit/dep
 1. No MCP/provider token, API key, service-role key, refresh token, or secret is stored in FlutterFlow client state.
 2. FlutterFlow receives owner-safe projections only.
 3. Provider writes happen server-side after policy evaluation.
-4. Protected actions require the backend's MFA/AAL2 gate.
+4. Protected actions require both the Edge API gate and the database RPC's current non-anonymous AAL2-session check.
 5. Every material write has duplicate protection, audit, read-back verification, and recovery evidence where supported.
 6. New MCPs start read-only until their provider adapter and approval policy pass verification.
 7. When connection health is unknown, UI says `Not checked yet`; it never guesses.

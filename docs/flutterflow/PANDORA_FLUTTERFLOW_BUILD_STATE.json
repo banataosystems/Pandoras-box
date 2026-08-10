@@ -21,7 +21,11 @@
     "plainLanguageScreensTotal": 10,
     "plainLanguageRepairComplete": true,
     "ownerApiBridgeImplemented": true,
-    "ownerApiBridgeTestsPassed": 6,
+    "ownerApiBridgeTestsPassed": 8,
+    "ownerApiEdgeFunctionDeployed": true,
+    "ownerApiEdgeFunctionVersion": 2,
+    "ownerApiJwtRequired": true,
+    "databaseAal2ApprovalBoundaryVerified": true,
     "preExistingFlutterFlowIssuesRepaired": false,
     "liveMcpMasterOwnerApiWired": false,
     "androidVisualNavigationTested": false,
@@ -68,7 +72,10 @@
   "connectionsBridge": {
     "source": "recovery/overlay/pandora-owner-api-client.ts",
     "tests": "recovery/overlay/pandora-owner-api-client.test.ts",
-    "testsPassed": 6,
+    "testsPassed": 8,
+    "edgeFunction": "pandora-owner-api",
+    "edgeFunctionBaseUrl": "https://jcyqixttuebxqqfkjonq.supabase.co/functions/v1/pandora-owner-api",
+    "webOriginAllowlistPending": true,
     "goal": "FlutterFlow talks to one governed Pandora owner API. The backend routes to connected MCPs/services; Simple mode does not expose raw MCP/provider jargon or client-side provider secrets."
   },
   "remainingV1Work": [

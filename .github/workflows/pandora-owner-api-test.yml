@@ -1,0 +1,24 @@
+name: Pandora Owner API Tests
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pandora-owner-api-test.yml'
+      - 'recovery/overlay/**'
+      - 'supabase/functions/pandora-owner-api/**'
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run contract and client tests
+        run: node --experimental-strip-types --test recovery/overlay/*.test.ts
