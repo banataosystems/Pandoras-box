@@ -2,8 +2,14 @@ import "jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2.57.2";
 import {
   allowedCorsOrigin,
+  automaticIntakeWindow,
+  connectionActionAllowed,
+  isReleaseEvidenceType,
   normalizeOwnerRoute,
+  normalizeIntakeFingerprintPart,
+  ownerRiskLabel,
   parseAllowedOrigins,
+  type OwnerConnectionAction,
 } from "./contract.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -310,6 +316,52 @@ function projectSummary(value: unknown) {
   };
 }
 
+function plainEvidenceSummary(value: unknown) {
+  const evidence = asRecord(value);
+  return {
+    id: textValue(evidence.id),
+    task_id: textValue(evidence.task_id) || null,
+    evidence_type: textValue(evidence.evidence_type),
+    provider: textValue(evidence.provider),
+    status: textValue(evidence.status),
+    verdict: textValue(evidence.verdict) || null,
+    source_url: textValue(evidence.source_url) || null,
+    head_sha: textValue(evidence.head_sha) || null,
+    observed_at: evidence.observed_at ?? null,
+  };
+}
+
+function releaseSummary(value: unknown) {
+  const evidence = asRecord(value);
+  const payload = asRecord(evidence.payload_redacted);
+  const status = textValue(evidence.status);
+  const verdict = textValue(evidence.verdict);
+  const verified = /(^|[._ -])(pass(?:ed)?|success|verified)([._ -]|$)/i.test(
+    `${status} ${verdict}`,
+  );
+  const rollbackReference = payload.rollbackTarget ?? payload.rollback_target ??
+    payload.previousDeployment ?? payload.previous_deployment ?? payload.rollback;
+  return {
+    id: textValue(evidence.id),
+    title: textValue(
+      payload.plainTitle ?? payload.title ?? payload.name,
+      "Live version evidence",
+    ),
+    plainStatus: verified
+      ? "Verified"
+      : textValue(verdict, textValue(status, "Not checked yet"))
+        .replace(/[._-]+/g, " "),
+    verified,
+    environment: textValue(payload.environment) || null,
+    releaseId: textValue(evidence.external_id) || null,
+    sourceUrl: textValue(evidence.source_url) || null,
+    headSha: textValue(evidence.head_sha) || null,
+    rollbackAvailable: rollbackReference !== null &&
+      rollbackReference !== undefined && rollbackReference !== "",
+    observedAt: evidence.observed_at ?? null,
+  };
+}
+
 async function loadProjectSummaries(context: UserContext) {
   const { data: rows, error: projectsError } = await context.client
     .from("projectos_projects")
@@ -415,15 +467,20 @@ function connectionSummary(value: unknown, healthRows: JsonRecord[] = []) {
     canRead: ready,
     canChange: ready &&
       scopes.some((scope) => /write|admin|manage/i.test(scope)),
+    canConnect: connectionActionAllowed("connect", state),
+    canReconnect: connectionActionAllowed("reconnect", state),
+    canTest: connectionActionAllowed("test", state),
+    canDisconnect: connectionActionAllowed("disconnect", state),
     needsOwnerApprovalForChanges: true,
     lastCheckedAt: connection.last_health_check_at ?? null,
     advanced: { provider, scopes, observedStatus: status },
   };
 }
 
-function approvalSummary(value: unknown) {
+function approvalSummary(value: unknown, riskCode = "") {
   const approval = asRecord(value);
   const preview = asRecord(approval.preview_redacted);
+  const undo = textValue(preview.howWeCanUndoIt ?? preview.rollback);
   return {
     id: textValue(approval.id),
     projectId: textValue(preview.projectId ?? preview.project_id) || null,
@@ -435,14 +492,27 @@ function approvalSummary(value: unknown) {
       approval.request_reason,
       "Pandora needs your decision before it can continue.",
     ),
-    whatCouldGoWrong: textValue(preview.whatCouldGoWrong ?? preview.risk) ||
-      null,
-    howWeCanUndoIt: textValue(preview.howWeCanUndoIt ?? preview.rollback) ||
-      null,
+    whatWillChange: textValue(
+      preview.whatWillChange ?? preview.changes ?? preview.details,
+      "No additional change details were recorded.",
+    ),
+    whatCouldGoWrong: textValue(
+      preview.whatCouldGoWrong ?? preview.risk,
+      "No specific risk explanation was recorded.",
+    ),
+    howWeCanUndoIt: undo || "No recovery path was recorded.",
+    riskLevel: ownerRiskLabel(riskCode),
+    reversible: Boolean(undo),
     extraIdentityCheckRequired: true,
     decision: textValue(approval.decision, "pending"),
     expiresAt: approval.expires_at ?? null,
     createdAt: approval.created_at ?? null,
+    advanced: {
+      riskCode: riskCode || null,
+      actionHash: approval.action_hash ?? null,
+      runId: approval.run_id ?? null,
+      stepId: approval.step_id ?? null,
+    },
   };
 }
 
@@ -460,8 +530,9 @@ async function home(context: UserContext) {
     connections(context),
     safety(context),
   ]);
-  const blocked =
-    projectItems.filter((item) => item.plainStatus === "blocked").length;
+  const blocked = projectItems.filter((item) =>
+    item.plainStatus.toLowerCase() === "blocked"
+  ).length;
   const connectionProblems =
     connectionItems.filter((item) =>
       item.state === "problem" || item.state === "needs_permission"
@@ -547,7 +618,7 @@ async function project(context: UserContext, identifier: string) {
         projectRow.id,
       ).order("sequence"),
     context.client.from("projectos_evidence").select(
-      "id, task_id, evidence_type, provider, status, verdict, source_url, head_sha, observed_at",
+      "id, task_id, evidence_type, provider, external_id, status, verdict, source_url, head_sha, payload_redacted, observed_at",
     )
       .eq("organization_id", context.organizationId).eq(
         "project_id",
@@ -563,6 +634,7 @@ async function project(context: UserContext, identifier: string) {
   if (phases.error || tasks.error || evidence.error || projection.error) {
     throw new Error("BACKEND_READ_FAILED");
   }
+  const evidenceRows = (evidence.data || []) as JsonRecord[];
   return {
     ...projectSummary({
       ...projectRow,
@@ -574,7 +646,11 @@ async function project(context: UserContext, identifier: string) {
     roadmapVersion: projectRow.roadmap_version,
     phases: phases.data || [],
     tasks: tasks.data || [],
-    evidence: evidence.data || [],
+    evidence: evidenceRows.map(plainEvidenceSummary),
+    recentReleases: evidenceRows
+      .filter((item) => isReleaseEvidenceType(textValue(item.evidence_type)))
+      .map(releaseSummary)
+      .slice(0, 10),
     currentState: projection.data?.projection || null,
   };
 }
@@ -601,11 +677,59 @@ async function connections(
   );
 }
 
+async function connectionAction(
+  context: UserContext,
+  connectionId: string,
+  requestedAction: string,
+  idempotencyKey?: string | null,
+) {
+  type GovernedConnectionAction = Exclude<OwnerConnectionAction, "view">;
+  const allowedActions = new Set<GovernedConnectionAction>([
+    "connect",
+    "reconnect",
+    "test",
+    "disconnect",
+  ]);
+  if (!allowedActions.has(requestedAction as GovernedConnectionAction)) {
+    throw new Error("CONNECTION_ACTION_NOT_FOUND");
+  }
+  const action = requestedAction as GovernedConnectionAction;
+  const item = (await connections(context)).find((connection) =>
+    connection.id === connectionId
+  );
+  if (!item) throw new Error("CONNECTION_NOT_FOUND");
+  if (!connectionActionAllowed(action, item.state)) {
+    throw new Error("CONNECTION_ACTION_NOT_AVAILABLE");
+  }
+  if (action !== "test" && context.aal !== "aal2") {
+    throw new Error("AAL2_REQUIRED");
+  }
+
+  const provider = textValue(asRecord(item.advanced).provider, item.name);
+  const requests: Record<GovernedConnectionAction, string> = {
+    connect:
+      `Prepare to finish connecting ${provider}. Verify the owner-approved account, requested permissions, and rollback before changing access.`,
+    reconnect:
+      `Prepare to reconnect ${provider}. Diagnose the expired or unhealthy authorization first, request only the required permissions, and preserve rollback.`,
+    test:
+      `Check the ${provider} connection without changing its permissions or configuration. Record fresh health evidence and explain any owner action in plain language.`,
+    disconnect:
+      `Prepare to disconnect ${provider}. Show what will stop working, verify recovery and rollback, and do not remove access until the protected approval is valid.`,
+  };
+  return acceptIntake(
+    context,
+    { message: requests[action] },
+    undefined,
+    idempotencyKey,
+    `connection:${connectionId}:${action}`,
+  );
+}
+
 async function approvals(context: UserContext, limit: number) {
   const now = new Date().toISOString();
   const { data, error } = await context.client.from("approvals")
     .select(
-      "id, decision, preview_redacted, request_reason, decision_reason, expires_at, decided_at, created_at, requested_by, assigned_to, step_id",
+      "id, run_id, step_id, decision, action_hash, preview_redacted, request_reason, decision_reason, expires_at, decided_at, created_at, requested_by, assigned_to",
     )
     .eq("organization_id", context.organizationId)
     .eq("decision", "pending")
@@ -635,7 +759,7 @@ async function approvals(context: UserContext, limit: number) {
     const risk = risks.get(textValue(row.step_id));
     return !(["R3", "R4"].includes(risk || "") &&
       row.requested_by === context.userId);
-  }).map(approvalSummary);
+  }).map((row) => approvalSummary(row, risks.get(textValue(row.step_id))));
 }
 
 async function activity(context: UserContext, limit: number) {
@@ -662,6 +786,152 @@ async function activity(context: UserContext, limit: number) {
       details: event.payload_redacted,
     },
   }));
+}
+
+async function resolveMemoryProject(
+  context: UserContext,
+  identifier: string,
+) {
+  if (!identifier) return null;
+  const uuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      .test(identifier);
+  let query = context.client.from("projectos_projects")
+    .select("id, project_key, name")
+    .eq("organization_id", context.organizationId);
+  query = uuid ? query.eq("id", identifier) : query.eq("project_key", identifier);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new Error("BACKEND_READ_FAILED");
+  if (!data) throw new Error("PROJECT_NOT_FOUND");
+  return asRecord(data);
+}
+
+async function memory(
+  context: UserContext,
+  queryText: string,
+  requestedProject: string,
+  limit: number,
+) {
+  if (queryText.length > 200) throw new Error("INVALID_QUERY");
+  const project = await resolveMemoryProject(context, requestedProject);
+  const projectId = textValue(project?.id);
+
+  let decisionsQuery = context.client.from("projectos_decisions")
+    .select("id, project_id, statement, rationale, confidence, created_at")
+    .eq("organization_id", context.organizationId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  let tasksQuery = context.client.from("projectos_tasks")
+    .select("id, project_id, title, description, status, updated_at")
+    .eq("organization_id", context.organizationId)
+    .order("updated_at", { ascending: false })
+    .limit(50);
+  let lessonsQuery = context.client.from("projectos_lessons")
+    .select("id, project_id, category, lesson, status, confidence, updated_at")
+    .eq("organization_id", context.organizationId)
+    .eq("status", "active")
+    .order("updated_at", { ascending: false })
+    .limit(50);
+  let evidenceQuery = context.client.from("projectos_evidence")
+    .select(
+      "id, project_id, evidence_type, provider, status, verdict, observed_at",
+    )
+    .eq("organization_id", context.organizationId)
+    .is("invalidated_at", null)
+    .order("observed_at", { ascending: false })
+    .limit(50);
+  if (projectId) {
+    decisionsQuery = decisionsQuery.eq("project_id", projectId);
+    tasksQuery = tasksQuery.eq("project_id", projectId);
+    lessonsQuery = lessonsQuery.eq("project_id", projectId);
+    evidenceQuery = evidenceQuery.eq("project_id", projectId);
+  }
+  const [decisions, tasks, lessons, evidence] = await Promise.all([
+    decisionsQuery,
+    tasksQuery,
+    lessonsQuery,
+    evidenceQuery,
+  ]);
+  if (decisions.error || tasks.error || lessons.error || evidence.error) {
+    throw new Error("BACKEND_READ_FAILED");
+  }
+
+  const items = [
+    ...((decisions.data || []) as JsonRecord[]).map((item) => ({
+      id: textValue(item.id),
+      projectId: textValue(item.project_id) || null,
+      kind: "Decision",
+      title: textValue(item.statement, "Recorded decision"),
+      summary: textValue(item.rationale, "No reason was recorded."),
+      plainStatus: Number(item.confidence) >= 0.8
+        ? "High-confidence record"
+        : "Recorded",
+      happenedAt: item.created_at ?? null,
+    })),
+    ...((tasks.data || []) as JsonRecord[]).map((item) => ({
+      id: textValue(item.id),
+      projectId: textValue(item.project_id) || null,
+      kind: "Work",
+      title: textValue(item.title, "Project work"),
+      summary: textValue(item.description, "No summary was recorded."),
+      plainStatus: textValue(item.status, "Not checked yet").replace(
+        /[._-]+/g,
+        " ",
+      ),
+      happenedAt: item.updated_at ?? null,
+    })),
+    ...((lessons.data || []) as JsonRecord[]).map((item) => ({
+      id: textValue(item.id),
+      projectId: textValue(item.project_id) || null,
+      kind: "Lesson",
+      title: textValue(item.category, "What Pandora learned").replace(
+        /[._-]+/g,
+        " ",
+      ),
+      summary: textValue(item.lesson, "No summary was recorded."),
+      plainStatus: Number(item.confidence) >= 0.8
+        ? "High-confidence record"
+        : "Recorded",
+      happenedAt: item.updated_at ?? null,
+    })),
+    ...((evidence.data || []) as JsonRecord[]).map((item) => ({
+      id: textValue(item.id),
+      projectId: textValue(item.project_id) || null,
+      kind: "Proof",
+      title: textValue(item.evidence_type, "Project proof").replace(
+        /[._-]+/g,
+        " ",
+      ),
+      summary: `${textValue(item.provider, "Recorded service")}: ${
+        textValue(item.verdict, textValue(item.status, "not checked yet"))
+          .replace(/[._-]+/g, " ")
+      }`,
+      plainStatus: textValue(item.status, "Not checked yet").replace(
+        /[._-]+/g,
+        " ",
+      ),
+      happenedAt: item.observed_at ?? null,
+    })),
+  ];
+  const term = normalizeIntakeFingerprintPart(queryText);
+  const filtered = term
+    ? items.filter((item) =>
+      normalizeIntakeFingerprintPart(
+        `${item.kind} ${item.title} ${item.summary} ${item.plainStatus}`,
+      ).includes(term)
+    )
+    : items;
+  filtered.sort((left, right) =>
+    Date.parse(String(right.happenedAt || "")) -
+    Date.parse(String(left.happenedAt || ""))
+  );
+  return {
+    query: queryText,
+    projectId: projectId || null,
+    plainSource: "Governed project record",
+    directMemoryStatus: "Not checked yet",
+    items: filtered.slice(0, limit),
+  };
 }
 
 async function safety(context: UserContext) {
@@ -735,6 +1005,7 @@ async function acceptIntake(
   body: JsonRecord,
   fallbackMessage?: string,
   idempotencyKey?: string | null,
+  operationName = "ask",
 ) {
   if (context.isAnonymous) throw new Error("PERMANENT_ACCOUNT_REQUIRED");
   const message = textValue(body.message, fallbackMessage || "");
@@ -763,7 +1034,15 @@ async function acceptIntake(
   ) {
     throw new Error("INVALID_IDEMPOTENCY_KEY");
   }
-  const actionKey = providedKey || crypto.randomUUID();
+  const automaticFingerprint = await sha256Hex(
+    [
+      normalizeIntakeFingerprintPart(operationName),
+      normalizeIntakeFingerprintPart(projectKey || "projectos-inbox"),
+      normalizeIntakeFingerprintPart(message),
+    ].join("\n"),
+  );
+  const actionKey = providedKey ||
+    `automatic:${automaticIntakeWindow(Date.now())}:${automaticFingerprint}`;
   const idempotency = await sha256Hex(
     `${context.organizationId}:${context.userId}:${actionKey}`,
   );
@@ -801,6 +1080,9 @@ async function acceptIntake(
       intakeId: intake.id ?? null,
       projectKey: acceptedProject.project_key ?? null,
       idempotencyKey: idempotency,
+      duplicateProtection: providedKey
+        ? "client_key"
+        : "ten_minute_retry_window",
     },
   };
 }
@@ -882,6 +1164,16 @@ Deno.serve(async (req: Request) => {
     if (req.method === "GET" && route === "/connections") {
       return send(await connections(context));
     }
+    if (req.method === "GET" && route === "/memory") {
+      return send(
+        await memory(
+          context,
+          "",
+          textValue(url.searchParams.get("projectId")),
+          intValue(url.searchParams.get("limit"), 20, 50),
+        ),
+      );
+    }
     if (req.method === "GET" && route === "/approvals") {
       return send(
         await approvals(
@@ -919,6 +1211,33 @@ Deno.serve(async (req: Request) => {
           await bodyJson(req),
           undefined,
           req.headers.get("idempotency-key"),
+          "ask",
+        ),
+        202,
+      );
+    }
+    if (req.method === "POST" && route === "/memory/search") {
+      const body = await bodyJson(req);
+      return send(
+        await memory(
+          context,
+          textValue(body.query),
+          textValue(body.projectId ?? body.projectKey),
+          20,
+        ),
+      );
+    }
+    if (
+      req.method === "POST" &&
+      /^\/connections\/[^/]+\/actions\/[^/]+$/.test(route)
+    ) {
+      const segments = route.split("/");
+      return send(
+        await connectionAction(
+          context,
+          decodeURIComponent(segments[2]),
+          decodeURIComponent(segments[4]),
+          req.headers.get("idempotency-key"),
         ),
         202,
       );
@@ -935,6 +1254,7 @@ Deno.serve(async (req: Request) => {
       }
       const body = await bodyJson(req);
       const projectId = textValue(body.projectId ?? body.projectKey) || null;
+      const ownerOutcome = textValue(body.message);
       return send(
         await acceptIntake(
           context,
@@ -943,10 +1263,15 @@ Deno.serve(async (req: Request) => {
             projectId,
             message: `${action.request}${
               projectId ? ` Project: ${projectId}.` : ""
+            }${
+              ownerOutcome
+                ? ` The owner described this outcome: ${ownerOutcome}`
+                : ""
             }`,
           },
           undefined,
           req.headers.get("idempotency-key"),
+          `action:${actionId}`,
         ),
         202,
       );
@@ -999,6 +1324,7 @@ Deno.serve(async (req: Request) => {
         "INVALID_MESSAGE",
         "INVALID_DECISION",
         "INVALID_IDEMPOTENCY_KEY",
+        "INVALID_QUERY",
         "BODY_TOO_LARGE",
       ]
         .includes(code)
@@ -1006,14 +1332,25 @@ Deno.serve(async (req: Request) => {
       return reject(400, code, "Please check that information and try again.");
     }
     if (
-      ["PROJECT_NOT_FOUND", "ACTION_NOT_FOUND", "APPROVAL_NOT_FOUND"].includes(
-        code,
-      )
+      [
+        "PROJECT_NOT_FOUND",
+        "ACTION_NOT_FOUND",
+        "APPROVAL_NOT_FOUND",
+        "CONNECTION_NOT_FOUND",
+        "CONNECTION_ACTION_NOT_FOUND",
+      ].includes(code)
     ) {
       return reject(404, code, "Pandora could not find that item.");
     }
     if (code === "APPROVAL_CONFLICT") {
       return reject(409, code, "That approval is no longer available.");
+    }
+    if (code === "CONNECTION_ACTION_NOT_AVAILABLE") {
+      return reject(
+        409,
+        code,
+        "That connection action is not available in its current state.",
+      );
     }
     console.error(JSON.stringify({ requestId, code }));
     return reject(

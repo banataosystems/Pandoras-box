@@ -140,3 +140,93 @@ test("Owner API preflight bypasses user auth and safety verification uses servic
     /context\.client\.rpc\("verify_execution_audit_chain"/,
   );
 });
+
+test("Owner API deduplicates retries and sends catalog work through one intake", () => {
+  const ownerApi = source(
+    "../../supabase/functions/pandora-owner-api/index.ts",
+  );
+  const intakeStart = ownerApi.indexOf("async function acceptIntake(");
+  const intakeEnd = ownerApi.indexOf("async function decide(");
+  assert.ok(intakeStart >= 0 && intakeEnd > intakeStart);
+  const intakeSource = ownerApi.slice(intakeStart, intakeEnd);
+  assertOrdered(
+    intakeSource,
+    "normalizeIntakeFingerprintPart(operationName)",
+    "automaticIntakeWindow(Date.now())",
+    'context.client.rpc("projectos_accept_intake"',
+  );
+  assert.doesNotMatch(intakeSource, /crypto\.randomUUID\(\)/);
+  assert.match(ownerApi, /The owner described this outcome:/);
+  assert.match(ownerApi, /`action:\$\{actionId\}`/);
+});
+
+test("Memory returns bounded summaries without raw record payloads", () => {
+  const ownerApi = source(
+    "../../supabase/functions/pandora-owner-api/index.ts",
+  );
+  const memoryStart = ownerApi.indexOf("async function memory(");
+  const memoryEnd = ownerApi.indexOf("async function safety(");
+  assert.ok(memoryStart >= 0 && memoryEnd > memoryStart);
+  const memorySource = ownerApi.slice(memoryStart, memoryEnd);
+  assert.match(memorySource, /queryText\.length > 200/);
+  assert.match(memorySource, /\.limit\(50\)/);
+  assert.match(memorySource, /items: filtered\.slice\(0, limit\)/);
+  assert.doesNotMatch(memorySource, /payload_redacted/);
+  assert.doesNotMatch(memorySource, /projectos_workspace_documents/);
+
+  const ownerDsl = source(
+    "../../automation/flutterflow/dsl/10_owner_api_state_navigation.dart",
+  );
+  assert.match(ownerDsl, /Endpoint\.post\(\s*'PandoraSearchMemory'/);
+  assert.match(ownerDsl, /'\/memory\/search'/);
+  assert.doesNotMatch(ownerDsl, /\/memory\?query=<query>/);
+});
+
+test("Connection changes remain governed and protected by AAL2", () => {
+  const ownerApi = source(
+    "../../supabase/functions/pandora-owner-api/index.ts",
+  );
+  const actionStart = ownerApi.indexOf("async function connectionAction(");
+  const actionEnd = ownerApi.indexOf("async function approvals(");
+  assert.ok(actionStart >= 0 && actionEnd > actionStart);
+  const actionSource = ownerApi.slice(actionStart, actionEnd);
+  assertOrdered(
+    actionSource,
+    "connectionActionAllowed(action, item.state)",
+    'action !== "test" && context.aal !== "aal2"',
+    "return acceptIntake(",
+  );
+  assert.doesNotMatch(actionSource, /connector_installations"\)\.update/);
+  assert.doesNotMatch(actionSource, /connector_installations"\)\.delete/);
+});
+
+test("FlutterFlow catalog work submits exactly once from the review screen", () => {
+  const selector = source(
+    "../../automation/flutterflow/dsl/selector_bindings.dart",
+  );
+  const builderStart = selector.indexOf("DslWidget _actionBuilderBody(");
+  const builderEnd = selector.indexOf("DslWidget _approvalCenterBody(");
+  assert.ok(builderStart >= 0 && builderEnd > builderStart);
+  const builderSource = selector.slice(builderStart, builderEnd);
+  assert.doesNotMatch(builderSource, /ApiCall\(\s*spec\.askEndpoint/);
+  assert.match(builderSource, /'requestMessage': State\(spec\.requestMessage\)/);
+
+  const planStart = selector.indexOf("DslWidget _plansExecutionBody(");
+  const planEnd = selector.indexOf("DslWidget _activityBody(");
+  assert.ok(planStart >= 0 && planEnd > planStart);
+  const planSource = selector.slice(planStart, planEnd);
+  assert.match(planSource, /ApiCall\(\s*spec\.runEndpoint/);
+  assert.match(planSource, /'message': Param\(spec\.planRequestMessage\)/);
+  assert.match(planSource, /visible: Not\(State\(spec\.runSubmitting\)\)/);
+});
+
+test("FlutterFlow owner controls retain phone-safe wrapping and touch targets", () => {
+  const selector = source(
+    "../../automation/flutterflow/dsl/selector_bindings.dart",
+  );
+  assert.match(selector, /Wrap\(\s*name: 'PandoraHomeMetricsWrap'/);
+  assert.match(selector, /name: 'ApprovePandoraChangeButton'[\s\S]*height: 48/);
+  assert.match(selector, /name: 'RejectPandoraChangeButton'[\s\S]*height: 48/);
+  assert.match(selector, /name: 'PandoraMemorySearchButton'[\s\S]*height: 48/);
+  assert.match(selector, /name: 'PandoraDisconnectButton'[\s\S]*height: 48/);
+});

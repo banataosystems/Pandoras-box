@@ -48,3 +48,70 @@ export function normalizeOwnerRoute(pathname: string): string {
   if (!route.startsWith("/")) route = `/${route}`;
   return route;
 }
+
+export type OwnerConnectionAction =
+  | "view"
+  | "connect"
+  | "reconnect"
+  | "test"
+  | "disconnect";
+
+/**
+ * Normalizes only the fields used to fingerprint an owner intake request.
+ * The original owner text is still persisted unchanged by ProjectOS.
+ */
+export function normalizeIntakeFingerprintPart(value: string): string {
+  return value.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/**
+ * A short server-side window protects FlutterFlow retries and duplicate taps
+ * even before the client can supply a stable Idempotency-Key header.
+ */
+export function automaticIntakeWindow(
+  nowMs: number,
+  windowMs = 10 * 60 * 1000,
+): number {
+  if (!Number.isFinite(nowMs) || !Number.isFinite(windowMs) || windowMs <= 0) {
+    throw new RangeError("A finite positive intake window is required.");
+  }
+  return Math.floor(nowMs / windowMs);
+}
+
+export function ownerRiskLabel(riskCode: string): string {
+  switch (riskCode.trim().toUpperCase()) {
+    case "R0":
+    case "READ":
+      return "Low";
+    case "R1":
+      return "Low";
+    case "R2":
+    case "WRITE":
+      return "Medium";
+    case "R3":
+      return "High";
+    case "R4":
+    case "CRITICAL":
+      return "Critical";
+    default:
+      return "Not checked yet";
+  }
+}
+
+export function isReleaseEvidenceType(evidenceType: string): boolean {
+  return /(^|[._-])(deploy(?:ment|ed)?|release|preview|production)([._-]|$)/i
+    .test(evidenceType.trim());
+}
+
+export function connectionActionAllowed(
+  action: OwnerConnectionAction,
+  state: string,
+): boolean {
+  const normalizedState = state.trim().toLowerCase();
+  if (action === "view" || action === "test") return true;
+  if (action === "connect") {
+    return normalizedState === "off" || normalizedState === "needs_permission";
+  }
+  if (action === "reconnect") return normalizedState === "problem";
+  return action === "disconnect" && normalizedState === "ready";
+}
