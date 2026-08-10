@@ -61,6 +61,31 @@ test("anonymous sessions cannot enter ProjectOS intake", () => {
   );
 });
 
+test("shared organization RLS helpers reject anonymous JWTs", () => {
+  const migration = source(
+    "../../supabase/migrations/20260810112000_reject_anonymous_org_membership_helpers.sql",
+  );
+
+  const guards = migration.match(/auth\.jwt\(\) ->> 'is_anonymous'/g) || [];
+  assert.equal(guards.length, 2);
+  assertOrdered(
+    migration,
+    "create or replace function private.is_org_member(",
+    "auth.jwt() ->> 'is_anonymous'",
+    "from public.memberships membership",
+    "create or replace function private.has_org_role(",
+  );
+  const roleHelper = migration.slice(
+    migration.indexOf("create or replace function private.has_org_role("),
+  );
+  assertOrdered(
+    roleHelper,
+    "auth.jwt() ->> 'is_anonymous'",
+    "from public.memberships membership",
+    "membership.role = any(allowed_roles)",
+  );
+});
+
 test("organization creation is RPC-only and rejects anonymous accounts", () => {
   const migration = source(
     "../../supabase/migrations/20260810110000_reject_anonymous_organization_creation.sql",
