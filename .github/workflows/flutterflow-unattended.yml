@@ -52,7 +52,13 @@ jobs:
           set +x
           umask 077
           ulimit -c 0 || true
-          trap 'unset oidc_json oidc_token broker_json ff_token broker_project_id' EXIT
+          cleanup() {
+            if [[ -n "${workspace:-}" && "${workspace}" == "${RUNNER_TEMP}/"* ]]; then
+              rm -f "${workspace}/.flutterflow/.env"
+            fi
+            unset oidc_json oidc_token broker_json ff_token broker_project_id
+          }
+          trap cleanup EXIT
 
           oidc_json="$(
             curl --proto '=https' --tlsv1.2 \
@@ -102,6 +108,19 @@ jobs:
             --project "${FLUTTERFLOW_PROJECT_ID}" \
             --no-save \
             --yes
+          rm -f "${workspace}/.flutterflow/.env"
+
+          FF_SECRET="${ff_token}" python3 - "${workspace}" <<'PY'
+          import os
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          secret = os.environ["FF_SECRET"].encode()
+          for path in root.rglob("*"):
+              if path.is_file() and secret in path.read_bytes():
+                  raise SystemExit("FlutterFlow credential persisted outside the deleted workspace .env")
+          PY
 
           (
             cd "${workspace}"
@@ -117,6 +136,7 @@ jobs:
             "${output}/flutterflow_project.dart"
           cp "${workspace}/PROJECT_CONTEXT.md" \
             "${output}/PROJECT_CONTEXT.md"
+          rm -f "${workspace}/.flutterflow/.env"
           unset ff_token broker_project_id
 
       - name: Upload non-secret typed project inspection
