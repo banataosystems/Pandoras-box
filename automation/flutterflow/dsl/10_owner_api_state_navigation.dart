@@ -222,6 +222,26 @@ abstract final class _ActivityState {
     key: 'pandora_dsl_activity_error',
     typeName: 'String',
   );
+  static const memory = ProjectStateFieldHandle(
+    name: 'memoryData',
+    key: 'pandora_dsl_memory_data',
+    typeName: 'PandoraMemoryPayload',
+  );
+  static const memoryQuery = ProjectStateFieldHandle(
+    name: 'memoryQuery',
+    key: 'pandora_dsl_memory_query',
+    typeName: 'String',
+  );
+  static const memoryLoading = ProjectStateFieldHandle(
+    name: 'memoryIsLoading',
+    key: 'pandora_dsl_memory_loading',
+    typeName: 'bool',
+  );
+  static const memoryError = ProjectStateFieldHandle(
+    name: 'memoryError',
+    key: 'pandora_dsl_memory_error',
+    typeName: 'String',
+  );
 }
 
 abstract final class _SecurityState {
@@ -256,6 +276,11 @@ abstract final class _PlansParams {
   static const projectId = ProjectParamHandle(
     name: 'projectId',
     key: 'pandora_dsl_plans_project_id',
+    typeName: 'String',
+  );
+  static const requestMessage = ProjectParamHandle(
+    name: 'requestMessage',
+    key: 'pandora_dsl_plans_request_message',
     typeName: 'String',
   );
 }
@@ -371,18 +396,25 @@ void buildPandoraOwnerApp(
       activityItems: _ActivityState.items,
       activityLoading: _ActivityState.loading,
       activityError: _ActivityState.error,
+      memoryData: _ActivityState.memory,
+      memoryQuery: _ActivityState.memoryQuery,
+      memoryLoading: _ActivityState.memoryLoading,
+      memoryError: _ActivityState.memoryError,
       safetyData: _SecurityState.data,
       connectionItems: _SecurityState.connections,
       safetyLoading: _SecurityState.loading,
       safetyError: _SecurityState.error,
       planActionId: _PlansParams.actionId,
       planProjectId: _PlansParams.projectId,
+      planRequestMessage: _PlansParams.requestMessage,
       runResponse: _PlansState.response,
       runSubmitting: _PlansState.submitting,
       runError: _PlansState.error,
       askEndpoint: api.ask,
       safetyEndpoint: api.getSafety,
       connectionsEndpoint: api.listConnections,
+      memoryEndpoint: api.searchMemory,
+      connectionActionEndpoint: api.connectionAction,
       runEndpoint: api.runAction,
       decideEndpoint: api.decideApproval,
     ),
@@ -472,6 +504,18 @@ _PandoraSchemas _declareSchemas(App app) {
     'head_sha': string,
     'observed_at': dateTime,
   });
+  final release = app.struct('PandoraRelease', {
+    'id': string,
+    'title': string,
+    'plainStatus': string,
+    'verified': bool_,
+    'environment': string,
+    'releaseId': string,
+    'sourceUrl': string,
+    'headSha': string,
+    'rollbackAvailable': bool_,
+    'observedAt': dateTime,
+  });
   final projectDetail = app.struct('PandoraProjectDetail', {
     'id': string,
     'name': string,
@@ -490,6 +534,7 @@ _PandoraSchemas _declareSchemas(App app) {
     'phases': listOf(projectPhase),
     'tasks': listOf(projectTask),
     'evidence': listOf(projectEvidence),
+    'recentReleases': listOf(release),
     'currentState': json,
   });
   final systemHealth = app.struct('PandoraSystemHealth', {
@@ -507,12 +552,16 @@ _PandoraSchemas _declareSchemas(App app) {
     'projectId': string,
     'whatWillHappen': string,
     'whyINeedYou': string,
+    'whatWillChange': string,
     'whatCouldGoWrong': string,
     'howWeCanUndoIt': string,
+    'riskLevel': string,
+    'reversible': bool_,
     'extraIdentityCheckRequired': bool_,
     'decision': string,
     'expiresAt': dateTime,
     'createdAt': dateTime,
+    'advanced': json,
   });
   final activity = app.struct('PandoraActivity', {
     'id': string,
@@ -521,6 +570,22 @@ _PandoraSchemas _declareSchemas(App app) {
     'summary': string,
     'happenedAt': dateTime,
     'advanced': json,
+  });
+  final memoryItem = app.struct('PandoraMemoryItem', {
+    'id': string,
+    'projectId': string,
+    'kind': string,
+    'title': string,
+    'summary': string,
+    'plainStatus': string,
+    'happenedAt': dateTime,
+  });
+  final memory = app.struct('PandoraMemoryPayload', {
+    'query': string,
+    'projectId': string,
+    'plainSource': string,
+    'directMemoryStatus': string,
+    'items': listOf(memoryItem),
   });
   final home = app.struct('PandoraHomePayload', {
     'systemHealth': systemHealth,
@@ -539,6 +604,10 @@ _PandoraSchemas _declareSchemas(App app) {
     'plainStatus': string,
     'canRead': bool_,
     'canChange': bool_,
+    'canConnect': bool_,
+    'canReconnect': bool_,
+    'canTest': bool_,
+    'canDisconnect': bool_,
     'needsOwnerApprovalForChanges': bool_,
     'lastCheckedAt': dateTime,
     'advanced': json,
@@ -589,6 +658,7 @@ _PandoraSchemas _declareSchemas(App app) {
     projectDetail: projectDetail,
     approval: approval,
     activity: activity,
+    memory: memory,
     home: home,
     connection: connection,
     safety: safety,
@@ -639,6 +709,22 @@ _PandoraApi _declareOwnerApi(App app, _PandoraSchemas schemas) {
     variables: variables(),
     headers: headers,
     response: listOf(schemas.connection),
+    settings: _ownerEndpointSettings,
+  );
+  final searchMemory = Endpoint.post(
+    'PandoraSearchMemory',
+    '/memory/search',
+    variables: variables({
+      'query': string,
+      'projectId': string,
+    }),
+    headers: headers,
+    body: const {
+      'query': '<query>',
+      'projectId': '<projectId>',
+      'clientMode': 'simple',
+    },
+    response: schemas.memory,
     settings: _ownerEndpointSettings,
   );
   final listApprovals = Endpoint.get(
@@ -695,12 +781,26 @@ _PandoraApi _declareOwnerApi(App app, _PandoraSchemas schemas) {
     variables: variables({
       'actionId': string,
       'projectId': string,
+      'message': string,
     }),
     headers: headers,
     body: const {
       'projectId': '<projectId>',
+      'message': '<message>',
       'clientMode': 'simple',
     },
+    response: schemas.askResponse,
+    settings: _ownerEndpointSettings,
+  );
+  final connectionAction = Endpoint.post(
+    'PandoraConnectionAction',
+    '/connections/[connectionId]/actions/[connectionAction]',
+    variables: variables({
+      'connectionId': string,
+      'connectionAction': string,
+    }),
+    headers: headers,
+    body: const {'clientMode': 'simple'},
     response: schemas.askResponse,
     settings: _ownerEndpointSettings,
   );
@@ -731,12 +831,14 @@ _PandoraApi _declareOwnerApi(App app, _PandoraSchemas schemas) {
       listProjects,
       getProject,
       listConnections,
+      searchMemory,
       listApprovals,
       listActivity,
       getSafety,
       listActions,
       ask,
       runAction,
+      connectionAction,
       decideApproval,
     ],
   );
@@ -746,12 +848,14 @@ _PandoraApi _declareOwnerApi(App app, _PandoraSchemas schemas) {
     listProjects: listProjects,
     getProject: getProject,
     listConnections: listConnections,
+    searchMemory: searchMemory,
     listApprovals: listApprovals,
     listActivity: listActivity,
     getSafety: getSafety,
     listActions: listActions,
     ask: ask,
     runAction: runAction,
+    connectionAction: connectionAction,
     decideApproval: decideApproval,
   );
 }
@@ -899,16 +1003,35 @@ void _declarePageStateAndHydration(
     );
     state.ensureField(_ActivityState.loading, bool_.withDefault(false));
     state.ensureField(_ActivityState.error, string.withDefault(''));
+    state.ensureField(_ActivityState.memory, schemas.memory);
+    state.ensureField(_ActivityState.memoryQuery, string.withDefault(''));
+    state.ensureField(
+      _ActivityState.memoryLoading,
+      bool_.withDefault(false),
+    );
+    state.ensureField(_ActivityState.memoryError, string.withDefault(''));
   });
   app.editPageOnLoad(
     ff.Pages.activityAuditTrail,
-    _readPage(
-      api.listActivity,
-      dataField: _ActivityState.items,
-      loadingField: _ActivityState.loading,
-      errorField: _ActivityState.error,
-      outputAs: 'pandoraActivityResult',
-    ),
+    [
+      Parallel([
+        _readPage(
+          api.listActivity,
+          dataField: _ActivityState.items,
+          loadingField: _ActivityState.loading,
+          errorField: _ActivityState.error,
+          outputAs: 'pandoraActivityResult',
+        ),
+        _readPage(
+          api.searchMemory,
+          dataField: _ActivityState.memory,
+          loadingField: _ActivityState.memoryLoading,
+          errorField: _ActivityState.memoryError,
+          outputAs: 'pandoraMemoryResult',
+          extraParams: const {'query': '', 'projectId': ''},
+        ),
+      ]),
+    ],
   );
 
   app.editPageState(ff.Pages.securityOperations, (state) {
@@ -931,6 +1054,7 @@ void _declarePageStateAndHydration(
   app.editPageParams(ff.Pages.plansExecution, (params) {
     params.ensureParam(_PlansParams.actionId, string);
     params.ensureParam(_PlansParams.projectId, string);
+    params.ensureParam(_PlansParams.requestMessage, string);
   });
   app.editPageState(ff.Pages.plansExecution, (state) {
     state.ensureField(_PlansState.response, schemas.askResponse);
@@ -1101,6 +1225,7 @@ _PandoraBlocks _declareWriteActionBlocks(
         params: _authenticatedParams({
           'actionId': const ActionBlockParam('actionId'),
           'projectId': const ActionBlockParam('projectId'),
+          'message': '',
         }),
       ),
       Terminate(const ActionOutput('pandoraRunBlockResult')),
@@ -1189,7 +1314,7 @@ void _installGlobalBottomNavigation(App app) {
       project,
       pageName: 'ActivityAuditTrail',
       iconName: 'history',
-      label: 'Updates',
+      label: 'Memory',
     );
     _addLabeledNavPage(
       project,
@@ -1227,6 +1352,7 @@ final class _PandoraSchemas {
     required this.projectDetail,
     required this.approval,
     required this.activity,
+    required this.memory,
     required this.home,
     required this.connection,
     required this.safety,
@@ -1239,6 +1365,7 @@ final class _PandoraSchemas {
   final StructHandle projectDetail;
   final StructHandle approval;
   final StructHandle activity;
+  final StructHandle memory;
   final StructHandle home;
   final StructHandle connection;
   final StructHandle safety;
@@ -1253,12 +1380,14 @@ final class _PandoraApi {
     required this.listProjects,
     required this.getProject,
     required this.listConnections,
+    required this.searchMemory,
     required this.listApprovals,
     required this.listActivity,
     required this.getSafety,
     required this.listActions,
     required this.ask,
     required this.runAction,
+    required this.connectionAction,
     required this.decideApproval,
   });
 
@@ -1266,12 +1395,14 @@ final class _PandoraApi {
   final Endpoint listProjects;
   final Endpoint getProject;
   final Endpoint listConnections;
+  final Endpoint searchMemory;
   final Endpoint listApprovals;
   final Endpoint listActivity;
   final Endpoint getSafety;
   final Endpoint listActions;
   final Endpoint ask;
   final Endpoint runAction;
+  final Endpoint connectionAction;
   final Endpoint decideApproval;
 }
 

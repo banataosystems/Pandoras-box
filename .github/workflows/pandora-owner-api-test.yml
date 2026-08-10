@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/pandora-owner-api-test.yml'
+      - 'automation/flutterflow/**'
       - 'recovery/overlay/**'
       - 'supabase/functions/pandora-owner-api/**'
       - 'supabase/migrations/**'

@@ -48,18 +48,25 @@ final class PandoraBindingSpec {
     required this.activityItems,
     required this.activityLoading,
     required this.activityError,
+    required this.memoryData,
+    required this.memoryQuery,
+    required this.memoryLoading,
+    required this.memoryError,
     required this.safetyData,
     required this.connectionItems,
     required this.safetyLoading,
     required this.safetyError,
     required this.planActionId,
     required this.planProjectId,
+    required this.planRequestMessage,
     required this.runResponse,
     required this.runSubmitting,
     required this.runError,
     required this.askEndpoint,
     required this.safetyEndpoint,
     required this.connectionsEndpoint,
+    required this.memoryEndpoint,
+    required this.connectionActionEndpoint,
     required this.runEndpoint,
     required this.decideEndpoint,
   });
@@ -97,18 +104,25 @@ final class PandoraBindingSpec {
   final ProjectStateFieldHandle activityItems;
   final ProjectStateFieldHandle activityLoading;
   final ProjectStateFieldHandle activityError;
+  final ProjectStateFieldHandle memoryData;
+  final ProjectStateFieldHandle memoryQuery;
+  final ProjectStateFieldHandle memoryLoading;
+  final ProjectStateFieldHandle memoryError;
   final ProjectStateFieldHandle safetyData;
   final ProjectStateFieldHandle connectionItems;
   final ProjectStateFieldHandle safetyLoading;
   final ProjectStateFieldHandle safetyError;
   final ProjectParamHandle planActionId;
   final ProjectParamHandle planProjectId;
+  final ProjectParamHandle planRequestMessage;
   final ProjectStateFieldHandle runResponse;
   final ProjectStateFieldHandle runSubmitting;
   final ProjectStateFieldHandle runError;
   final Endpoint askEndpoint;
   final Endpoint safetyEndpoint;
   final Endpoint connectionsEndpoint;
+  final Endpoint memoryEndpoint;
+  final Endpoint connectionActionEndpoint;
   final Endpoint runEndpoint;
   final Endpoint decideEndpoint;
 }
@@ -580,29 +594,25 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
         ],
       ),
     ),
-    Row(
+    Wrap(
+      name: 'PandoraHomeMetricsWrap',
       spacing: 8,
+      runSpacing: 8,
       children: [
-        Expanded(
-          _metric(
-            'Approvals',
-            State(spec.homeData)['counters']['approvals'],
-            'PandoraApprovalsMetric',
-          ),
+        _metric(
+          'Approvals',
+          State(spec.homeData)['counters']['approvals'],
+          'PandoraApprovalsMetric',
         ),
-        Expanded(
-          _metric(
-            'Active',
-            State(spec.homeData)['counters']['activeProjects'],
-            'PandoraActiveMetric',
-          ),
+        _metric(
+          'Active',
+          State(spec.homeData)['counters']['activeProjects'],
+          'PandoraActiveMetric',
         ),
-        Expanded(
-          _metric(
-            'Attention',
-            State(spec.homeData)['counters']['needsAttention'],
-            'PandoraAttentionMetric',
-          ),
+        _metric(
+          'Attention',
+          State(spec.homeData)['counters']['needsAttention'],
+          'PandoraAttentionMetric',
         ),
       ],
     ),
@@ -851,6 +861,31 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
         ),
       ),
     ),
+    Text('Recent live versions', style: Styles.titleLarge),
+    ListView(
+      name: 'PandoraProjectReleasesList',
+      source: State(spec.projectData)['recentReleases'],
+      shrinkWrap: true,
+      spacing: 8,
+      itemBuilder: (item) => _panel(
+        name: 'PandoraProjectReleaseRow',
+        child: Column(
+          crossAxis: CrossAxis.start,
+          spacing: 4,
+          children: [
+            Text(item['title'], style: Styles.titleSmall),
+            Text(item['plainStatus'], style: Styles.labelMedium),
+            Text(item['environment'], style: Styles.bodySmall),
+            Text(item['observedAt'], style: Styles.bodySmall),
+            Text(
+              'A recovery version is recorded.',
+              style: Styles.bodySmall,
+              visible: item['rollbackAvailable'],
+            ),
+          ],
+        ),
+      ),
+    ),
     Text('Recent proof', style: Styles.titleLarge),
     ListView(
       name: 'PandoraProjectEvidenceList',
@@ -970,67 +1005,37 @@ DslWidget _actionBuilderBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraRequestField',
       onChanged: SetState(spec.requestMessage, const TextValue()),
     ),
-    Button(
-      'Ask Pandora',
-      name: 'PandoraAskButton',
-      disabled: false,
-      visible: Not(State(spec.requestSubmitting)),
-      onTap: If(
-        Not(Equals(State(spec.requestMessage), '')),
-        then: [
-          SetState(spec.requestSubmitting, true),
-          SetState(spec.requestError, ''),
-          ApiCall(
-            spec.askEndpoint,
-            outputAs: 'pandoraAskPageResult',
-            params: _apiParams(spec, {
-              'message': State(spec.requestMessage),
-              'projectId': Param(spec.actionProjectId),
-            }),
-            onSuccess: (result) => [
-              SetState(spec.askResponse, result),
-              SetState(spec.requestSubmitting, false),
-            ],
-            onFailure: [
-              SetState(spec.requestSubmitting, false),
-              SetState(
-                spec.requestError,
-                'Pandora could not save that request. Please try again.',
-              ),
-            ],
+    _panel(
+      name: 'PandoraActionPlanFirstPanel',
+      child: Column(
+        crossAxis: CrossAxis.start,
+        spacing: 5,
+        children: [
+          Text('How it will run', style: Styles.titleSmall),
+          Text(
+            'Review the request first. Pandora records it only once when you '
+            'choose Prepare this action on the next screen.',
+            style: Styles.bodyMedium,
           ),
         ],
-        orElse: [
-          Snackbar('Describe the result you want first.'),
-        ],
-      ),
-    ),
-    ProgressBar.circular(
-      name: 'PandoraAskProgress',
-      visible: State(spec.requestSubmitting),
-    ),
-    Text(
-      State(spec.requestError),
-      style: Styles.bodyMedium,
-      visible: Not(Equals(State(spec.requestError), '')),
-    ),
-    _panel(
-      name: 'PandoraAskResponsePanel',
-      child: Text(
-        State(spec.askResponse)['reply'],
-        style: Styles.bodyMedium,
       ),
     ),
     Button(
-      'Review action plan',
+      'Review this request',
       name: 'PandoraReviewPlanButton',
-      variant: ButtonVariant.outlined,
-      onTap: Navigate(
-        ff.Pages.plansExecution,
-        params: {
-          'actionId': Param(spec.actionId),
-          'projectId': Param(spec.actionProjectId),
-        },
+      width: double.infinity,
+      height: 48,
+      onTap: If(
+        Not(Equals(State(spec.requestMessage), '')),
+        then: Navigate(
+          ff.Pages.plansExecution,
+          params: {
+            'actionId': Param(spec.actionId),
+            'projectId': Param(spec.actionProjectId),
+            'requestMessage': State(spec.requestMessage),
+          },
+        ),
+        orElse: Snackbar('Describe the result you want first.'),
       ),
     ),
   ],
@@ -1075,57 +1080,78 @@ DslWidget _approvalCenterBody(PandoraBindingSpec spec) => Column(
           spacing: 8,
           children: [
             Text(item['whatWillHappen'], style: Styles.titleMedium),
+            Text('Why Pandora needs you', style: Styles.labelMedium),
             Text(item['whyINeedYou'], style: Styles.bodyMedium),
+            Text('What will change', style: Styles.labelMedium),
+            Text(item['whatWillChange'], style: Styles.bodyMedium),
+            Text('Risk level', style: Styles.labelMedium),
+            Text(item['riskLevel'], style: Styles.titleSmall),
+            Text('What could go wrong', style: Styles.labelMedium),
             Text(item['whatCouldGoWrong'], style: Styles.bodySmall),
+            Text('How it can be undone', style: Styles.labelMedium),
             Text(item['howWeCanUndoIt'], style: Styles.bodySmall),
-            Row(
+            Text(
+              'Pandora has a recorded recovery path.',
+              style: Styles.bodySmall,
+              visible: item['reversible'],
+            ),
+            Column(
+              crossAxis: CrossAxis.stretch,
               spacing: 8,
               children: [
-                Expanded(
-                  Button(
-                    'Approve',
-                    name: 'ApprovePandoraChangeButton',
-                    onTap: ApiCall(
-                      spec.decideEndpoint,
-                      outputAs: 'pandoraApproveResult',
-                      params: _apiParams(spec, {
-                        'approvalId': item['id'],
-                        'decision': 'approve',
-                        'reason': '',
-                      }),
-                      onSuccess: (_) => [
-                        Snackbar('Approval recorded.'),
-                      ],
-                      onFailure: [
-                        Snackbar(
-                          'Complete the extra identity check, then try again.',
-                        ),
-                      ],
-                    ),
+                Button(
+                  'Approve this change',
+                  name: 'ApprovePandoraChangeButton',
+                  width: double.infinity,
+                  height: 48,
+                  onTap: ApiCall(
+                    spec.decideEndpoint,
+                    outputAs: 'pandoraApproveResult',
+                    params: _apiParams(spec, {
+                      'approvalId': item['id'],
+                      'decision': 'approve',
+                      'reason': '',
+                    }),
+                    onSuccess: (_) => [
+                      Snackbar('Approval recorded.'),
+                      Navigate(
+                        ff.Pages.approvalCenter,
+                        replaceRoute: true,
+                      ),
+                    ],
+                    onFailure: [
+                      Snackbar(
+                        'Complete the extra identity check, then try again.',
+                      ),
+                    ],
                   ),
                 ),
-                Expanded(
-                  Button(
-                    'Reject',
-                    name: 'RejectPandoraChangeButton',
-                    variant: ButtonVariant.outlined,
-                    onTap: ApiCall(
-                      spec.decideEndpoint,
-                      outputAs: 'pandoraRejectResult',
-                      params: _apiParams(spec, {
-                        'approvalId': item['id'],
-                        'decision': 'reject',
-                        'reason': '',
-                      }),
-                      onSuccess: (_) => [
-                        Snackbar('Rejection recorded.'),
-                      ],
-                      onFailure: [
-                        Snackbar(
-                          'Complete the extra identity check, then try again.',
-                        ),
-                      ],
-                    ),
+                Button(
+                  'Reject this change',
+                  name: 'RejectPandoraChangeButton',
+                  width: double.infinity,
+                  height: 48,
+                  variant: ButtonVariant.outlined,
+                  onTap: ApiCall(
+                    spec.decideEndpoint,
+                    outputAs: 'pandoraRejectResult',
+                    params: _apiParams(spec, {
+                      'approvalId': item['id'],
+                      'decision': 'reject',
+                      'reason': '',
+                    }),
+                    onSuccess: (_) => [
+                      Snackbar('Rejection recorded.'),
+                      Navigate(
+                        ff.Pages.approvalCenter,
+                        replaceRoute: true,
+                      ),
+                    ],
+                    onFailure: [
+                      Snackbar(
+                        'Complete the extra identity check, then try again.',
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -1166,6 +1192,8 @@ DslWidget _plansExecutionBody(PandoraBindingSpec spec) => Column(
           Text(Param(spec.planActionId), style: Styles.titleMedium),
           Text('Project', style: Styles.labelMedium),
           Text(Param(spec.planProjectId), style: Styles.bodyMedium),
+          Text('Requested outcome', style: Styles.labelMedium),
+          Text(Param(spec.planRequestMessage), style: Styles.bodyMedium),
         ],
       ),
     ),
@@ -1177,6 +1205,9 @@ DslWidget _plansExecutionBody(PandoraBindingSpec spec) => Column(
     Button(
       'Prepare this action',
       name: 'PandoraRunActionButton',
+      width: double.infinity,
+      height: 48,
+      visible: Not(State(spec.runSubmitting)),
       onTap: [
         SetState(spec.runSubmitting, true),
         SetState(spec.runError, ''),
@@ -1186,6 +1217,7 @@ DslWidget _plansExecutionBody(PandoraBindingSpec spec) => Column(
           params: _apiParams(spec, {
             'actionId': Param(spec.planActionId),
             'projectId': Param(spec.planProjectId),
+            'message': Param(spec.planRequestMessage),
           }),
           onSuccess: (result) => [
             SetState(spec.runResponse, result),
@@ -1227,7 +1259,81 @@ DslWidget _activityBody(PandoraBindingSpec spec) => Column(
   padding: const EdgeInsets.all(16),
   scrollable: true,
   children: [
-    _brandHeader('Updates', 'Verified activity'),
+    _brandHeader('Memory & updates', 'Continue from verified records'),
+    Text('What Pandora remembers', style: Styles.titleLarge),
+    TextField(
+      label: 'Search Memory',
+      hint: 'Why did we make this decision?',
+      maxLines: 2,
+      name: 'PandoraMemorySearchField',
+      onChanged: SetState(spec.memoryQuery, const TextValue()),
+      onSubmitted: _searchMemory(
+        spec,
+        outputAs: 'pandoraMemoryKeyboardResult',
+      ),
+    ),
+    Button(
+      'Search verified records',
+      name: 'PandoraMemorySearchButton',
+      width: double.infinity,
+      height: 48,
+      visible: Not(State(spec.memoryLoading)),
+      onTap: _searchMemory(
+        spec,
+        outputAs: 'pandoraMemoryButtonResult',
+      ),
+    ),
+    ProgressBar.circular(
+      name: 'PandoraMemoryLoading',
+      visible: State(spec.memoryLoading),
+    ),
+    Text(
+      State(spec.memoryError),
+      name: 'PandoraMemoryError',
+      style: Styles.bodyMedium,
+      visible: Not(Equals(State(spec.memoryError), '')),
+    ),
+    _panel(
+      name: 'PandoraMemorySourcePanel',
+      child: Column(
+        crossAxis: CrossAxis.start,
+        spacing: 4,
+        children: [
+          Text('Showing', style: Styles.labelMedium),
+          Text(
+            State(spec.memoryData)['plainSource'],
+            style: Styles.bodyMedium,
+          ),
+          Text('Direct Memory connection', style: Styles.labelMedium),
+          Text(
+            State(spec.memoryData)['directMemoryStatus'],
+            style: Styles.bodySmall,
+          ),
+        ],
+      ),
+    ),
+    ListView(
+      name: 'PandoraMemoryResultsList',
+      source: State(spec.memoryData)['items'],
+      shrinkWrap: true,
+      spacing: 8,
+      itemBuilder: (item) => _panel(
+        name: 'PandoraMemoryResultRow',
+        child: Column(
+          crossAxis: CrossAxis.start,
+          spacing: 4,
+          children: [
+            Text(item['kind'], style: Styles.labelMedium),
+            Text(item['title'], style: Styles.titleSmall),
+            Text(item['summary'], style: Styles.bodyMedium),
+            Text(item['plainStatus'], style: Styles.bodySmall),
+            Text(item['happenedAt'], style: Styles.bodySmall),
+          ],
+        ),
+      ),
+    ),
+    Divider(),
+    Text('Recent verified updates', style: Styles.titleLarge),
     ..._loadingAndError(
       spec.activityLoading,
       spec.activityError,
@@ -1262,6 +1368,33 @@ DslWidget _activityBody(PandoraBindingSpec spec) => Column(
     ),
   ],
 );
+
+List<DslAction> _searchMemory(
+  PandoraBindingSpec spec, {
+  required String outputAs,
+}) => [
+  SetState(spec.memoryLoading, true),
+  SetState(spec.memoryError, ''),
+  ApiCall(
+    spec.memoryEndpoint,
+    outputAs: outputAs,
+    params: _apiParams(spec, {
+      'query': State(spec.memoryQuery),
+      'projectId': '',
+    }),
+    onSuccess: (result) => [
+      SetState(spec.memoryData, result),
+      SetState(spec.memoryLoading, false),
+    ],
+    onFailure: [
+      SetState(spec.memoryLoading, false),
+      SetState(
+        spec.memoryError,
+        'Pandora could not search verified records right now.',
+      ),
+    ],
+  ),
+];
 
 DslWidget _securityBody(PandoraBindingSpec spec) => Column(
   name: 'PandoraSecurityBody',
@@ -1347,6 +1480,89 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
             Text(item['plainPurpose'], style: Styles.bodyMedium),
             Text(item['plainStatus'], style: Styles.labelMedium),
             Text(item['lastCheckedAt'], style: Styles.bodySmall),
+            Expandable(
+              name: 'PandoraConnectionDetails',
+              header: Text('View details', style: Styles.labelMedium),
+              collapsed: Text(''),
+              expanded: Column(
+                crossAxis: CrossAxis.start,
+                spacing: 4,
+                children: [
+                  Text(
+                    'Read access is ready.',
+                    style: Styles.bodySmall,
+                    visible: item['canRead'],
+                  ),
+                  Text(
+                    'Change access is available, but owner approval still applies.',
+                    style: Styles.bodySmall,
+                    visible: item['canChange'],
+                  ),
+                  Text(
+                    'Connection changes are planned first and never happen from a single tap.',
+                    style: Styles.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            Button(
+              'Continue setup',
+              name: 'PandoraConnectButton',
+              width: double.infinity,
+              height: 48,
+              visible: item['canConnect'],
+              onTap: _requestConnectionAction(
+                spec,
+                connectionId: item['id'],
+                action: 'connect',
+                outputAs: 'pandoraConnectRequestResult',
+                successMessage: 'Pandora saved the connection setup request.',
+              ),
+            ),
+            Button(
+              'Reconnect',
+              name: 'PandoraReconnectButton',
+              width: double.infinity,
+              height: 48,
+              visible: item['canReconnect'],
+              onTap: _requestConnectionAction(
+                spec,
+                connectionId: item['id'],
+                action: 'reconnect',
+                outputAs: 'pandoraReconnectRequestResult',
+                successMessage: 'Pandora saved the reconnect request.',
+              ),
+            ),
+            Button(
+              'Check connection',
+              name: 'PandoraTestConnectionButton',
+              width: double.infinity,
+              height: 48,
+              variant: ButtonVariant.outlined,
+              visible: item['canTest'],
+              onTap: _requestConnectionAction(
+                spec,
+                connectionId: item['id'],
+                action: 'test',
+                outputAs: 'pandoraTestConnectionResult',
+                successMessage: 'Pandora saved the connection check.',
+              ),
+            ),
+            Button(
+              'Request disconnect',
+              name: 'PandoraDisconnectButton',
+              width: double.infinity,
+              height: 48,
+              variant: ButtonVariant.outlined,
+              visible: item['canDisconnect'],
+              onTap: _requestConnectionAction(
+                spec,
+                connectionId: item['id'],
+                action: 'disconnect',
+                outputAs: 'pandoraDisconnectRequestResult',
+                successMessage: 'Pandora saved the disconnect request.',
+              ),
+            ),
           ],
         ),
       ),
@@ -1370,32 +1586,33 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
       ),
     ),
     Text('Appearance', style: Styles.titleLarge),
-    Row(
+    Column(
+      crossAxis: CrossAxis.stretch,
       spacing: 8,
       children: [
-        Expanded(
-          Button(
-            'System',
-            name: 'PandoraThemeSystemButton',
-            variant: ButtonVariant.outlined,
-            onTap: const SetDarkMode(DarkModePreference.system),
-          ),
+        Button(
+          'Use device setting',
+          name: 'PandoraThemeSystemButton',
+          width: double.infinity,
+          height: 48,
+          variant: ButtonVariant.outlined,
+          onTap: const SetDarkMode(DarkModePreference.system),
         ),
-        Expanded(
-          Button(
-            'Light',
-            name: 'PandoraThemeLightButton',
-            variant: ButtonVariant.outlined,
-            onTap: const SetDarkMode(DarkModePreference.light),
-          ),
+        Button(
+          'Light',
+          name: 'PandoraThemeLightButton',
+          width: double.infinity,
+          height: 48,
+          variant: ButtonVariant.outlined,
+          onTap: const SetDarkMode(DarkModePreference.light),
         ),
-        Expanded(
-          Button(
-            'Dark',
-            name: 'PandoraThemeDarkButton',
-            variant: ButtonVariant.outlined,
-            onTap: const SetDarkMode(DarkModePreference.dark),
-          ),
+        Button(
+          'Dark',
+          name: 'PandoraThemeDarkButton',
+          width: double.infinity,
+          height: 48,
+          variant: ButtonVariant.outlined,
+          onTap: const SetDarkMode(DarkModePreference.dark),
         ),
       ],
     ),
@@ -1431,6 +1648,31 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
   ],
 );
 
+List<DslAction> _requestConnectionAction(
+  PandoraBindingSpec spec, {
+  required Object connectionId,
+  required String action,
+  required String outputAs,
+  required String successMessage,
+}) => [
+  ApiCall(
+    spec.connectionActionEndpoint,
+    outputAs: outputAs,
+    params: _apiParams(spec, {
+      'connectionId': connectionId,
+      'connectionAction': action,
+    }),
+    onSuccess: (_) => [Snackbar(successMessage)],
+    onFailure: [
+      Snackbar(
+        action == 'test'
+            ? 'Pandora could not request that check. Try again in a moment.'
+            : 'Complete the extra identity check, then try again.',
+      ),
+    ],
+  ),
+];
+
 List<DslWidget> _loadingAndError(
   ProjectStateFieldHandle loading,
   ProjectStateFieldHandle error,
@@ -1448,24 +1690,25 @@ List<DslWidget> _loadingAndError(
   ),
 ];
 
-DslWidget _brandHeader(String title, String subtitle) => Row(
-  mainAxis: MainAxis.spaceBetween,
-  crossAxis: CrossAxis.center,
+DslWidget _brandHeader(String title, String subtitle) => Column(
+  crossAxis: CrossAxis.start,
+  spacing: 6,
   children: [
     Row(
       spacing: 10,
       children: [
         _mark(42),
-        Column(
-          crossAxis: CrossAxis.start,
-          spacing: 2,
-          children: [
-            Text(title, style: Styles.titleLarge),
-            Text(subtitle, style: Styles.bodySmall),
-          ],
+        Flexible(
+          Text(
+            title,
+            style: Styles.titleLarge,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     ),
+    Text(subtitle, style: Styles.bodySmall, maxLines: 2),
   ],
 );
 
@@ -1483,6 +1726,7 @@ DslWidget _mark(double size) => Tooltip(
 
 DslWidget _metric(Object label, Object value, String name) => _panel(
   name: name,
+  width: 136,
   child: Column(
     crossAxis: CrossAxis.start,
     spacing: 4,
@@ -1497,11 +1741,13 @@ DslWidget _panel({
   required String name,
   required DslWidget child,
   Object? onTap,
+  double? width,
 }) => Container(
   name: name,
   padding: const EdgeInsets.all(14),
   borderRadius: 12,
   color: Colors.secondaryBackground,
+  width: width,
   onTap: onTap,
   child: child,
 );
