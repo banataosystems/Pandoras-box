@@ -25,7 +25,11 @@ jobs:
             test -s "recovery/mcpmaster-source.part-${part}"
           done
           cat recovery/mcpmaster-source.part-* > /tmp/mcpmaster-recovery-source.zip
-          echo "dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83  /tmp/mcpmaster-recovery-source.zip" | sha256sum -c -
+          expected="dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83"
+          actual="$(sha256sum /tmp/mcpmaster-recovery-source.zip | awk '{print $1}')"
+          echo "expected_archive_sha256=${expected}"
+          echo "actual_archive_sha256=${actual}"
+          test "$actual" = "$expected"
           rm -rf /tmp/mcpmaster-recovery
           mkdir -p /tmp/mcpmaster-recovery
           unzip -q /tmp/mcpmaster-recovery-source.zip -d /tmp/mcpmaster-recovery
@@ -35,4 +39,3 @@ jobs:
           file_count="$(find /tmp/mcpmaster-recovery/source -type f | wc -l | tr -d ' ')"
           test "$file_count" -ge 500
           echo "recovered_source_files=${file_count}"
-          echo "archive_sha256=dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83"
