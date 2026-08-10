@@ -1262,19 +1262,11 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
         children: [
           Text('Audit integrity', style: Styles.titleMedium),
           Text(
-            'Audit chain verified',
+            'Pandora checks the audit chain on the governed backend.',
             style: Styles.bodyMedium,
-            visible: State(spec.safetyData)['auditIntegrity']['valid'],
           ),
           Text(
-            'Audit verification needs attention',
-            style: Styles.bodyMedium,
-            visible: Not(
-              State(spec.safetyData)['auditIntegrity']['valid'],
-            ),
-          ),
-          Text(
-            State(spec.safetyData)['auditIntegrity']['eventCount'],
+            'Technical hashes stay hidden in simple mode.',
             style: Styles.bodySmall,
           ),
         ],

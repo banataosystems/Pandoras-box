@@ -543,15 +543,10 @@ _PandoraSchemas _declareSchemas(App app) {
     'lastCheckedAt': dateTime,
     'advanced': json,
   });
-  final auditIntegrity = app.struct('PandoraAuditIntegrity', {
-    'valid': bool_,
-    'eventCount': int_,
-    'lastHash': string,
-  });
   final safety = app.struct('PandoraSafety', {
     'policy': json,
     'integrations': listOf(json),
-    'auditIntegrity': auditIntegrity,
+    'auditIntegrity': json,
     'mfaRequiredForApproval': bool_,
     'currentAssuranceLevel': string,
     'state': string,
