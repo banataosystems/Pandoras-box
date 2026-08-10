@@ -122,7 +122,9 @@ begin
 end;
 $$;
 
-revoke all on table private.flutterflow_github_oidc_grants from public, anon, authenticated;
+alter table private.flutterflow_github_oidc_grants enable row level security;
+revoke all on table private.flutterflow_github_oidc_grants
+  from public, anon, authenticated, service_role;
 revoke all on function public.consume_flutterflow_github_oidc_grant(
   text,text,text,text,text,text,text,text,text,text,integer
 ) from public, anon, authenticated;

@@ -2,8 +2,12 @@ const issuer = "https://token.actions.githubusercontent.com";
 const audience = "pandora-flutterflow-project-api";
 const expectedRepository = "banataosystems/Pandoras-box";
 const expectedRepositoryId = "1326729533";
+const expectedRepositoryOwner = "banataosystems";
 const expectedRepositoryOwnerId = "314296438";
 const expectedRef = "refs/heads/feature/flutterflow-pandora-mobile-v1";
+const expectedRefType = "branch";
+const expectedWorkflow = "FlutterFlow unattended project inspection";
+const expectedRepositoryVisibility = "public";
 const expectedWorkflowRef =
   "banataosystems/Pandoras-box/.github/workflows/flutterflow-unattended.yml@refs/heads/feature/flutterflow-pandora-mobile-v1";
 const expectedProjectId = "pandoras-box-gj9hnb";
@@ -18,6 +22,8 @@ let cachedJwks: { keys: GithubJwk[]; fetchedAt: number } | undefined;
 const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store, max-age=0",
+  "content-security-policy": "default-src 'none'",
+  "pragma": "no-cache",
 };
 
 function response(status: number, code: string, message: string): Response {
@@ -32,6 +38,22 @@ function requiredString(value: unknown, name: string): string {
     throw new Error(`missing_${name}`);
   }
   return value;
+}
+
+function adminKey(): string {
+  const modernKeys = Deno.env.get("SUPABASE_SECRET_KEYS");
+  if (modernKeys) {
+    try {
+      const key = JSON.parse(modernKeys)?.default;
+      if (typeof key === "string" && key.length > 0) return key;
+    } catch {
+      throw new Error("secret_keys_invalid");
+    }
+  }
+  return requiredString(
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+    "service_role_key",
+  );
 }
 
 async function sha256(value: string): Promise<string> {
@@ -170,7 +192,11 @@ Deno.serve(async (request: Request) => {
 
   let requestedProjectId = "";
   try {
-    const body = await request.json();
+    const bodyText = await request.text();
+    if (new TextEncoder().encode(bodyText).length > 128) {
+      return response(413, "REQUEST_TOO_LARGE", "The request is too large.");
+    }
+    const body = JSON.parse(bodyText);
     requestedProjectId = requiredString(body?.project_id, "project_id");
   } catch {
     return response(400, "INVALID_REQUEST", "A valid project_id is required.");
@@ -193,16 +219,27 @@ Deno.serve(async (request: Request) => {
   try {
     const repository = requiredString(claims.repository, "repository");
     const repositoryId = requiredString(claims.repository_id, "repository_id");
+    const repositoryOwner = requiredString(
+      claims.repository_owner,
+      "repository_owner",
+    );
     const repositoryOwnerId = requiredString(
       claims.repository_owner_id,
       "repository_owner_id",
     );
     const workflowRef = requiredString(claims.workflow_ref, "workflow_ref");
     const workflowSha = requiredString(claims.workflow_sha, "workflow_sha");
+    const workflow = requiredString(claims.workflow, "workflow");
     const ref = requiredString(claims.ref, "ref");
+    const refType = requiredString(claims.ref_type, "ref_type");
     const commitSha = requiredString(claims.sha, "sha");
     const eventName = requiredString(claims.event_name, "event_name");
     const actorId = requiredString(claims.actor_id, "actor_id");
+    const repositoryVisibility = requiredString(
+      claims.repository_visibility,
+      "repository_visibility",
+    );
+    requiredString(claims.sub, "sub");
     const runnerEnvironment = requiredString(
       claims.runner_environment,
       "runner_environment",
@@ -216,13 +253,19 @@ Deno.serve(async (request: Request) => {
     if (
       repository !== expectedRepository ||
       repositoryId !== expectedRepositoryId ||
+      repositoryOwner !== expectedRepositoryOwner ||
       repositoryOwnerId !== expectedRepositoryOwnerId ||
       workflowRef !== expectedWorkflowRef ||
+      workflow !== expectedWorkflow ||
       ref !== expectedRef ||
+      refType !== expectedRefType ||
       workflowSha !== commitSha ||
       eventName !== "push" ||
+      repositoryVisibility !== expectedRepositoryVisibility ||
       runnerEnvironment !== "github-hosted" ||
       !/^[0-9a-f]{40}$/.test(commitSha) ||
+      !/^[1-9][0-9]*$/.test(runId) ||
+      !/^[1-9][0-9]*$/.test(actorId) ||
       !Number.isInteger(runAttempt) ||
       runAttempt < 1
     ) {
@@ -237,10 +280,7 @@ Deno.serve(async (request: Request) => {
       Deno.env.get("SUPABASE_URL"),
       "supabase_url",
     );
-    const serviceRoleKey = requiredString(
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
-      "service_role_key",
-    );
+    const serviceRoleKey = adminKey();
     const grantResponse = await fetch(
       `${supabaseUrl}/rest/v1/rpc/consume_flutterflow_github_oidc_grant`,
       {
