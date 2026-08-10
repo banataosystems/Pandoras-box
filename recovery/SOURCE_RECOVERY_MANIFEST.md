@@ -30,3 +30,4 @@ A bounded pre-push scan was performed against the recovered archive. Token-like 
 - Production verification: not claimed.
 
 Recovery trigger: Contents API push on 2026-08-09 Asia/Manila.
+Recovery retrigger: 2026-08-10T11:08+08:00 owner-authorized full FlutterFlow/Pandora execution prerequisite.
