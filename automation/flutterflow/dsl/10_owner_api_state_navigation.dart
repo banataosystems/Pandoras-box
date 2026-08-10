@@ -1112,16 +1112,6 @@ void _wireAuthAwareEntryPages(App app) {
       ),
     ),
   ]);
-  app.editPageOnLoad(ff.Pages.signIn, [
-    If(
-      const Global(GlobalProperty.isUserLoggedIn),
-      then: Navigate(
-        ff.Pages.commandCenter,
-        allowBack: false,
-        replaceRoute: true,
-      ),
-    ),
-  ]);
 }
 
 void _installGlobalBottomNavigation(App app) {

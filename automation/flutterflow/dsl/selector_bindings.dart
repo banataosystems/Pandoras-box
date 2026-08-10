@@ -300,7 +300,7 @@ DslWidget _splashBody() => Column(
   padding: const EdgeInsets.all(24),
   children: [
     _mark(200),
-    Text('PANDORAS-BOX', style: Styles.headlineSmall),
+    Text('Pandora\'s Box', style: Styles.headlineSmall),
     Text('Banatao Systems', style: Styles.bodyMedium),
     ProgressBar.circular(size: 28),
     Text('Opening your protected workspace', style: Styles.bodySmall),
@@ -337,6 +337,12 @@ DslWidget _signInBody(PandoraBindingSpec spec) => Column(
         State(spec.signInEmail),
         State(spec.signInPassword),
       ),
+      visible: Not(const Global(GlobalProperty.isUserLoggedIn)),
+    ),
+    Text(
+      'Enter and confirm your new password to finish account recovery.',
+      style: Styles.bodyMedium,
+      visible: const Global(GlobalProperty.isUserLoggedIn),
     ),
     TextField(
       label: 'Password',
@@ -353,6 +359,7 @@ DslWidget _signInBody(PandoraBindingSpec spec) => Column(
       'Sign in',
       name: 'PandoraSignInButton',
       width: double.infinity,
+      visible: Not(const Global(GlobalProperty.isUserLoggedIn)),
       onTap: LoginEmailPassword(
         State(spec.signInEmail),
         State(spec.signInPassword),
@@ -362,22 +369,41 @@ DslWidget _signInBody(PandoraBindingSpec spec) => Column(
       'Forgot password?',
       name: 'PandoraResetPasswordButton',
       variant: ButtonVariant.text,
-      onTap: [
-        ResetPassword(State(spec.signInEmail)),
-        Snackbar('Check your email for the secure reset link.'),
-      ],
+      visible: Not(const Global(GlobalProperty.isUserLoggedIn)),
+      onTap: If(
+        Not(Equals(State(spec.signInEmail), '')),
+        then: [
+          ResetPassword(State(spec.signInEmail)),
+          Snackbar('Check your email for the secure reset link.'),
+        ],
+        orElse: [
+          Snackbar('Enter your email address first.'),
+        ],
+      ),
     ),
     Button(
       'Set new password after opening reset link',
       name: 'PandoraUpdatePasswordButton',
       variant: ButtonVariant.text,
-      onTap: [
-        UpdatePassword(
-          State(spec.signInPassword),
-          confirmPassword: State(spec.signInPassword),
-        ),
-        Snackbar('Your password has been updated. You can sign in now.'),
-      ],
+      visible: const Global(GlobalProperty.isUserLoggedIn),
+      onTap: If(
+        Not(Equals(State(spec.signInPassword), '')),
+        then: [
+          UpdatePassword(
+            State(spec.signInPassword),
+            confirmPassword: State(spec.signInPassword),
+          ),
+          Snackbar('Your password has been updated.'),
+          Navigate(
+            ff.Pages.commandCenter,
+            allowBack: false,
+            replaceRoute: true,
+          ),
+        ],
+        orElse: [
+          Snackbar('Enter your new password first.'),
+        ],
+      ),
     ),
     _panel(
       name: 'PandoraSignInSafetyPanel',
@@ -396,7 +422,7 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
   padding: const EdgeInsets.all(16),
   scrollable: true,
   children: [
-    _brandHeader('Pandoras-Box', 'Owner command center'),
+    _brandHeader('Pandora\'s Box', 'Owner command center'),
     _panel(
       name: 'PandoraOwnerCommandPanel',
       child: Column(
@@ -558,25 +584,33 @@ List<DslAction> _submitHomeCommand(
   PandoraBindingSpec spec, {
   required String outputAs,
 }) => [
-  SetState(spec.homeCommandSubmitting, true),
-  SetState(spec.homeCommandError, ''),
-  ApiCall(
-    spec.askEndpoint,
-    outputAs: outputAs,
-    params: _apiParams(spec, {
-      'message': State(spec.homeCommand),
-      'projectId': '',
-    }),
-    onSuccess: (result) => [
-      SetState(spec.homeCommandResponse, result),
-      SetState(spec.homeCommandSubmitting, false),
-    ],
-    onFailure: [
-      SetState(spec.homeCommandSubmitting, false),
-      SetState(
-        spec.homeCommandError,
-        'Pandora could not save that request. Check your connection and try again.',
+  If(
+    Not(Equals(State(spec.homeCommand), '')),
+    then: [
+      SetState(spec.homeCommandSubmitting, true),
+      SetState(spec.homeCommandError, ''),
+      ApiCall(
+        spec.askEndpoint,
+        outputAs: outputAs,
+        params: _apiParams(spec, {
+          'message': State(spec.homeCommand),
+          'projectId': '',
+        }),
+        onSuccess: (result) => [
+          SetState(spec.homeCommandResponse, result),
+          SetState(spec.homeCommandSubmitting, false),
+        ],
+        onFailure: [
+          SetState(spec.homeCommandSubmitting, false),
+          SetState(
+            spec.homeCommandError,
+            'Pandora could not save that request. Check your connection and try again.',
+          ),
+        ],
       ),
+    ],
+    orElse: [
+      Snackbar('Describe what you want Pandora to do first.'),
     ],
   ),
 ];
@@ -786,29 +820,36 @@ DslWidget _actionBuilderBody(PandoraBindingSpec spec) => Column(
       'Ask Pandora',
       name: 'PandoraAskButton',
       disabled: false,
-      onTap: [
-        SetState(spec.requestSubmitting, true),
-        SetState(spec.requestError, ''),
-        ApiCall(
-          spec.askEndpoint,
-          outputAs: 'pandoraAskPageResult',
-          params: _apiParams(spec, {
-            'message': State(spec.requestMessage),
-            'projectId': Param(spec.actionProjectId),
-          }),
-          onSuccess: (result) => [
-            SetState(spec.askResponse, result),
-            SetState(spec.requestSubmitting, false),
-          ],
-          onFailure: [
-            SetState(spec.requestSubmitting, false),
-            SetState(
-              spec.requestError,
-              'Pandora could not save that request. Please try again.',
-            ),
-          ],
-        ),
-      ],
+      visible: Not(State(spec.requestSubmitting)),
+      onTap: If(
+        Not(Equals(State(spec.requestMessage), '')),
+        then: [
+          SetState(spec.requestSubmitting, true),
+          SetState(spec.requestError, ''),
+          ApiCall(
+            spec.askEndpoint,
+            outputAs: 'pandoraAskPageResult',
+            params: _apiParams(spec, {
+              'message': State(spec.requestMessage),
+              'projectId': Param(spec.actionProjectId),
+            }),
+            onSuccess: (result) => [
+              SetState(spec.askResponse, result),
+              SetState(spec.requestSubmitting, false),
+            ],
+            onFailure: [
+              SetState(spec.requestSubmitting, false),
+              SetState(
+                spec.requestError,
+                'Pandora could not save that request. Please try again.',
+              ),
+            ],
+          ),
+        ],
+        orElse: [
+          Snackbar('Describe the result you want first.'),
+        ],
+      ),
     ),
     ProgressBar.circular(
       name: 'PandoraAskProgress',
