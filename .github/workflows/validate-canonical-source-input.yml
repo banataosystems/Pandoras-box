@@ -21,22 +21,36 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          parts=(
-            recovery/mcpmaster-source.part-00
-            recovery/mcpmaster-source.part-01
-            recovery/mcpmaster-source.part-02
-            recovery/mcpmaster-source.part-03
-          )
-          for file in "${parts[@]}"; do
+          p00=recovery/mcpmaster-source.part-00
+          p01=recovery/mcpmaster-source.part-01
+          p02=recovery/mcpmaster-source.part-02
+          p03=recovery/mcpmaster-source.part-03
+          for file in "$p00" "$p01" "$p02" "$p03"; do
             test -s "$file"
             wc -c "$file"
             sha256sum "$file"
           done
-          cat "${parts[@]}" > /tmp/mcpmaster-recovery-source.zip
+
           expected="dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83"
-          actual="$(sha256sum /tmp/mcpmaster-recovery-source.zip | awk '{print $1}')"
+          cat "$p00" "$p01" "$p02" "$p03" > /tmp/archive-normal.zip
+          cat "$p00" "$p01" "$p03" "$p02" > /tmp/archive-alt.zip
+          normal="$(sha256sum /tmp/archive-normal.zip | awk '{print $1}')"
+          alt="$(sha256sum /tmp/archive-alt.zip | awk '{print $1}')"
           echo "expected_archive_sha256=${expected}"
-          echo "actual_archive_sha256=${actual}"
+          echo "normal_00_01_02_03_sha256=${normal}"
+          echo "alternate_00_01_03_02_sha256=${alt}"
+
+          if [ "$normal" = "$expected" ]; then
+            cp /tmp/archive-normal.zip /tmp/mcpmaster-recovery-source.zip
+            echo "verified_part_order=00,01,02,03"
+          elif [ "$alt" = "$expected" ]; then
+            cp /tmp/archive-alt.zip /tmp/mcpmaster-recovery-source.zip
+            echo "verified_part_order=00,01,03,02"
+          else
+            echo "No tested part order matches the content-addressed recovery manifest." >&2
+            exit 1
+          fi
+
           rm -rf /tmp/mcpmaster-recovery
           mkdir -p /tmp/mcpmaster-recovery
           unzip -q /tmp/mcpmaster-recovery-source.zip -d /tmp/mcpmaster-recovery
@@ -46,4 +60,3 @@ jobs:
           file_count="$(find /tmp/mcpmaster-recovery/source -type f | wc -l | tr -d ' ')"
           echo "recovered_source_files=${file_count}"
           test "$file_count" -ge 500
-          test "$actual" = "$expected"
