@@ -14,15 +14,12 @@ jobs:
   invoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Repair FlutterFlow screens with validate-first gates
+      - name: Repair FlutterFlow sign-in screen with validation
         run: |
           set -euo pipefail
-          endpoint='https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-page-language-repair'
-          code='VJ2GnTHMuyJKYrOCDNBFzp4BZ964mdTGTmrxpvbX2bc'
-          for page in 1 2 3 4 5 6 7 8 9 10; do
-            echo "===== PAGE ${page} ====="
-            response="$(curl --silent --show-error --get "$endpoint" --data-urlencode "code=$code" --data-urlencode "page=$page")"
-            echo "$response"
-            echo "$response" | jq -e '.ok == true' >/dev/null
-            sleep 6
-          done
+          response="$(curl --silent --show-error --get \
+            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-page-language-repair' \
+            --data-urlencode 'code=VJ2GnTHMuyJKYrOCDNBFzp4BZ964mdTGTmrxpvbX2bc' \
+            --data-urlencode 'page=2')"
+          echo "$response"
+          echo "$response" | jq -e '.ok == true' >/dev/null
