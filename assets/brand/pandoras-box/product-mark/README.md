@@ -9,4 +9,3 @@ Do not edit the provenance master. Create deterministic display derivatives in a
 The black background is part of the approved treatment. Automated transparency removal would also remove or damage internal black contours and is prohibited without a later owner decision.
 
 See `docs/decisions/2026-08-10-pandoras-box-product-mark.md` and issue #11 for the approved role, placements, proof gates, and rollback.
-

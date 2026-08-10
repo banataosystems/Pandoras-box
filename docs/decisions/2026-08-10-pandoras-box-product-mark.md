@@ -58,4 +58,3 @@ The current production control tower still references a historical Red Apple fav
 ## Rollback
 
 Remove only the new display references and restore the preceding product identity. Preserve this decision, source asset, checksum, and supersession history as recovery evidence.
-
