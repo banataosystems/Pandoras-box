@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Verify exact recovery archive and required source
         shell: bash
         run: |
@@ -41,6 +43,11 @@ jobs:
               "source/package.json",
               "source/src/http-server.ts",
               "source/SOURCE_AUTHORITY_POLICY.json",
+          }
+          required_suffixes = {
+              "package.json",
+              "src/http-server.ts",
+              "SOURCE_AUTHORITY_POLICY.json",
           }
           names = ("00", "01", "02", "03")
           parts = {
@@ -72,6 +79,61 @@ jobs:
               f"central_headers={canonical.count(central_sig)} "
               f"eocd_headers={canonical.count(eocd_sig)}"
           )
+
+          # A ZIP can lose its central directory while retaining local headers.
+          # Inventory every local-header filename independently so we can prove
+          # which source paths are actually present in the surviving bytes. This
+          # is diagnostic only: local headers do not establish archive integrity.
+          local_positions = []
+          cursor = 0
+          while True:
+              pos = canonical.find(local_sig, cursor)
+              if pos < 0:
+                  break
+              local_positions.append(pos)
+              cursor = pos + 4
+
+          local_entries = []
+          for pos in local_positions:
+              if pos + 30 > len(canonical):
+                  local_entries.append((pos, "<truncated-header>", None, None, None))
+                  continue
+              try:
+                  (
+                      sig, version_needed, flags, method, mod_time, mod_date,
+                      crc32, compressed_size, uncompressed_size,
+                      filename_len, extra_len,
+                  ) = struct.unpack_from("<4s5H3L2H", canonical, pos)
+              except struct.error:
+                  local_entries.append((pos, "<unparseable-header>", None, None, None))
+                  continue
+              name_start = pos + 30
+              name_end = name_start + filename_len
+              if name_end > len(canonical):
+                  filename = "<truncated-filename>"
+              else:
+                  raw_name = canonical[name_start:name_end]
+                  encoding = "utf-8" if flags & 0x800 else "cp437"
+                  filename = raw_name.decode(encoding, errors="replace")
+              local_entries.append((pos, filename, flags, compressed_size, uncompressed_size))
+
+          print(f"local_header_entries={len(local_entries)}")
+          for pos, filename, flags, compressed_size, uncompressed_size in local_entries:
+              print(
+                  f"local_header offset={pos} name={filename!r} flags={flags} "
+                  f"compressed_size={compressed_size} uncompressed_size={uncompressed_size}"
+              )
+
+          observed_names = {
+              filename for _, filename, *_ in local_entries
+              if not filename.startswith("<")
+          }
+          suffix_presence = {
+              suffix: any(name == suffix or name.endswith("/" + suffix) for name in observed_names)
+              for suffix in sorted(required_suffixes)
+          }
+          print("required_source_suffixes_in_surviving_local_headers=" + repr(suffix_presence))
+
           eocd = canonical.rfind(eocd_sig)
           if eocd >= 0 and len(canonical) >= eocd + 22:
               sig, disk_no, cd_disk, disk_entries, total_entries, cd_size, cd_offset, comment_len = struct.unpack_from(
