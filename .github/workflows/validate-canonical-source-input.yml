@@ -5,6 +5,7 @@ on:
     paths:
       - 'recovery/mcpmaster-source.part-*'
       - 'recovery/SOURCE_RECOVERY_MANIFEST.md'
+      - 'recovery/evidence/diagnostics/pr171-dep0169-trace.patch'
       - '.github/workflows/recover-canonical-source.yml'
       - '.github/workflows/validate-canonical-source-input.yml'
   workflow_dispatch:
@@ -26,6 +27,13 @@ jobs:
       - name: Prove exact recovery head
         shell: bash
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Verify exact preserved DEP0169 diagnostic source
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch='recovery/evidence/diagnostics/pr171-dep0169-trace.patch'
+          test "$(wc -c < "$patch" | tr -d ' ')" = '860'
+          printf '%s  %s\n' 'abcbd7040ef2a4ce02b96ae11e66d0734f2e4e419c66bf7781d9b2e43e0c0941' "$patch" | sha256sum -c -
       - name: Verify exact recovery archive and required source
         shell: bash
         run: |
@@ -65,8 +73,6 @@ jobs:
           central_sig = bytes.fromhex("504b0102")
           eocd_sig = bytes.fromhex("504b0506")
 
-          # Read-only structural diagnostics. These make corruption geometry
-          # explicit without attempting to repair, reorder, or publish source.
           print("archive_part_diagnostics_begin")
           for name in names:
               payload = parts[name]
@@ -87,10 +93,6 @@ jobs:
               f"eocd_headers={canonical.count(eocd_sig)}"
           )
 
-          # A ZIP can lose its central directory while retaining local headers.
-          # Inventory every local-header filename independently so we can prove
-          # which source paths are actually present in the surviving bytes. This
-          # is diagnostic only: local headers do not establish archive integrity.
           local_positions = []
           cursor = 0
           while True:
@@ -200,9 +202,6 @@ jobs:
           echo "recovered_source_files=${file_count}"
           test "$file_count" -ge 500
 
-          # DEP0169 source gate. The historical exact PR #171 runtime still emits
-          # Node DEP0169 from url.parse(). Once a complete canonical source archive
-          # is recovered, fail closed if direct application-source calls remain.
           direct_url_parse="$(grep -RInE --include='*.js' --include='*.cjs' --include='*.mjs' --include='*.ts' --include='*.tsx' '(^|[^[:alnum:]_])url\.parse[[:space:]]*\(' /tmp/mcpmaster-recovery/source --exclude-dir=node_modules || true)"
           if [ -n "$direct_url_parse" ]; then
             echo 'BLOCKED: recovered application source still contains direct url.parse() calls:'
