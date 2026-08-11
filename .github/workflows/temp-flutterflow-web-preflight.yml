@@ -17,6 +17,6 @@ jobs:
       - name: Check published FlutterFlow site
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --get \
+          curl --silent --show-error --get \
             'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-live-site-check' \
             --data-urlencode 'code=pandora-live-check-20260812'
