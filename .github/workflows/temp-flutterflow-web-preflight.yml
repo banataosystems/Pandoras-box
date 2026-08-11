@@ -1,4 +1,4 @@
-name: Temporary FlutterFlow Manifest Diagnostic
+name: Temporary FlutterFlow API Action Diagnostic
 
 on:
   pull_request:
@@ -14,9 +14,9 @@ jobs:
   diagnose:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect FlutterFlow file manifest response shape
+      - name: Trace FlutterFlow API action variable bindings
         run: |
           set -euo pipefail
           curl --silent --show-error --get \
-            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-error-diagnostic' \
-            --data-urlencode 'code=ffdiag-20260812-0330-8f4d1'
+            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-api-action-diagnostic' \
+            --data-urlencode 'code=ff-api-action-diag-20260812'
