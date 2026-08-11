@@ -1,0 +1,368 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectKey": "mcpmaster-pandoras-box",
+  "roadmapKey": "pandora-full-capacity-v1",
+  "createdAt": "2026-08-12T07:32:53+08:00",
+  "primaryDevice": "smartphone",
+  "currentAppProjectId": "pandoras-box-gj9hnb",
+  "canonicalRepository": "banataosystems/Pandoras-box",
+  "planningBase": {
+    "branch": "feature/flutterflow-pandora-mobile-v1",
+    "commit": "f5db616d7ba6c57acdeda25387c9b69cffd620d5",
+    "schemaFingerprint": "f237da5d53110b3aa14501753ed13f6687ce0033",
+    "partitionerVersion": 9,
+    "rollbackSnapshot": "15e6d5e8-bbcb-4812-b507-f20fbed88ef8"
+  },
+  "productionReleaseAuthorized": false,
+  "productionReleaseRule": "Every live release requires a separate explicit owner approval bound to the exact tested candidate. No prior blanket deployment instruction carries forward.",
+  "overallPercentage": null,
+  "percentageReason": "Do not calculate until the weighted roadmap is loaded into canonical Pandora task/proof state and each task has current evidence-backed status.",
+  "userFacingLifecycle": [
+    "Build",
+    "Preview",
+    "Fix",
+    "Publish",
+    "Live",
+    "Undo"
+  ],
+  "forbiddenUserFacingTerms": [
+    "FlutterFlow",
+    "MCP",
+    "YAML",
+    "CI",
+    "provider",
+    "bearer token",
+    "service role",
+    "schema fingerprint",
+    "AAL2",
+    "TOTP"
+  ],
+  "statusLadder": [
+    "documented",
+    "implemented",
+    "tested",
+    "deployed",
+    "production_verified"
+  ],
+  "phases": [
+    {
+      "id": "P0",
+      "name": "Canon and release-policy correction",
+      "status": "documented",
+      "weight": 5,
+      "goal": "Record the full-capacity product contract, make provider invisibility canonical, and supersede blanket production authorization.",
+      "tasks": [
+        {
+          "id": "P0-T1",
+          "name": "Record master architecture plan",
+          "status": "implemented",
+          "proofRequired": ["exact Git path", "exact commit SHA", "content hash"]
+        },
+        {
+          "id": "P0-T2",
+          "name": "Record premium UI/UX specification",
+          "status": "implemented",
+          "proofRequired": ["exact Git path", "exact commit SHA", "content hash"]
+        },
+        {
+          "id": "P0-T3",
+          "name": "Supersede prior broad production release authorization",
+          "status": "documented",
+          "proofRequired": ["newer owner directive", "build-state update", "Memory decision/source link"]
+        },
+        {
+          "id": "P0-T4",
+          "name": "Mirror decision and roadmap into canonical Pandora Memory",
+          "status": "blocked",
+          "blocker": "Current ChatGPT session does not expose the Pandora Memory write connector; GitHub memory mirror can be updated but live semantic canon write cannot be independently proven.",
+          "proofRequired": ["Memory record ID", "source commit link", "content hash", "supersession link"]
+        }
+      ],
+      "exitCriteria": [
+        "master plan committed",
+        "UI/UX spec committed",
+        "roadmap committed",
+        "production release flag false in active build state",
+        "Memory source record updated or blocker explicitly recorded"
+      ]
+    },
+    {
+      "id": "P1",
+      "name": "Provider-invisibility firewall",
+      "status": "documented",
+      "weight": 7,
+      "goal": "Guarantee hidden implementation/provider terminology can never leak into user-visible Pandora surfaces.",
+      "tasks": [
+        {"id": "P1-T1", "name": "Create forbidden-string lint", "status": "documented"},
+        {"id": "P1-T2", "name": "Add server error sanitizer/translator", "status": "documented"},
+        {"id": "P1-T3", "name": "Remove hidden app builder from Connections UI", "status": "documented"},
+        {"id": "P1-T4", "name": "Scan UI strings, accessibility labels, notifications, approvals, activity, release copy", "status": "documented"},
+        {"id": "P1-T5", "name": "Add regression test that fails release on forbidden user-visible strings", "status": "documented"}
+      ],
+      "exitCriteria": [
+        "zero forbidden implementation terms in user-visible project strings",
+        "raw provider/build/host errors cannot be rendered directly",
+        "candidate release check blocks terminology regressions"
+      ]
+    },
+    {
+      "id": "P2",
+      "name": "Premium design system and app shell",
+      "status": "documented",
+      "weight": 12,
+      "goal": "Apply the premium Pandora design language and standardized component system to the existing app.",
+      "tasks": [
+        {"id": "P2-T1", "name": "Lock semantic color/theme tokens from approved mark", "status": "documented"},
+        {"id": "P2-T2", "name": "Lock typography, spacing, radii, touch targets, iconography, motion", "status": "documented"},
+        {"id": "P2-T3", "name": "Build shared AppScaffold/TopBar/BottomNav/Button/State components", "status": "documented"},
+        {"id": "P2-T4", "name": "Implement Light/Dark/System themes", "status": "documented"},
+        {"id": "P2-T5", "name": "Implement one-handed and safe-area rules", "status": "documented"}
+      ],
+      "exitCriteria": [
+        "component system implemented in current app project",
+        "all shared components validate/read back",
+        "44–48 minimum touch target policy enforced",
+        "three theme modes verified"
+      ]
+    },
+    {
+      "id": "P3",
+      "name": "Current screen premium redesign",
+      "status": "documented",
+      "weight": 14,
+      "goal": "Transform all ten current app screens into the target owner experience without creating a duplicate app project.",
+      "screenMap": [
+        {"current": "SplashConnection", "target": "Launch Gate"},
+        {"current": "SignIn", "target": "Sign In"},
+        {"current": "CommandCenter", "target": "Home"},
+        {"current": "ProjectDetails", "target": "Project Detail"},
+        {"current": "ActionsCatalog", "target": "Actions"},
+        {"current": "ActionBuilder", "target": "Ask Pandora / Build / Fix"},
+        {"current": "ApprovalCenter", "target": "Approvals"},
+        {"current": "PlansExecution", "target": "Preview / Action Progress"},
+        {"current": "ActivityAuditTrail", "target": "Activity"},
+        {"current": "SecurityOperations", "target": "Safety"}
+      ],
+      "tasks": [
+        {"id": "P3-T1", "name": "Redesign Launch Gate and Sign In", "status": "documented"},
+        {"id": "P3-T2", "name": "Redesign Home with Ask Pandora, one priority card, truthful projects/activity", "status": "documented"},
+        {"id": "P3-T3", "name": "Redesign Project Detail", "status": "documented"},
+        {"id": "P3-T4", "name": "Redesign Actions and Ask Pandora/Build/Fix composer", "status": "documented"},
+        {"id": "P3-T5", "name": "Redesign Approvals", "status": "documented"},
+        {"id": "P3-T6", "name": "Redesign Preview/Action Progress", "status": "documented"},
+        {"id": "P3-T7", "name": "Redesign Activity", "status": "documented"},
+        {"id": "P3-T8", "name": "Redesign Safety", "status": "documented"},
+        {"id": "P3-T9", "name": "Add loading/empty/error/offline/stale states for every page", "status": "documented"}
+      ],
+      "exitCriteria": [
+        "all ten screens use shared design tokens/components",
+        "provider name absent",
+        "no fake metrics",
+        "all current routes/actions preserved or intentionally migrated with verification"
+      ]
+    },
+    {
+      "id": "P4",
+      "name": "Truthful live owner data",
+      "status": "partially_implemented",
+      "weight": 11,
+      "goal": "Replace mock/static values with canonical owner-safe backend projections.",
+      "currentEvidence": {
+        "ownerApiBridgeImplemented": true,
+        "ownerApiBridgeTestsPassed": 8,
+        "ownerApiEdgeFunctionDeployed": true,
+        "ownerApiEdgeFunctionVersion": 2,
+        "pageLayerFullyWired": false
+      },
+      "tasks": [
+        {"id": "P4-T1", "name": "Home live data", "status": "not_proven"},
+        {"id": "P4-T2", "name": "Projects live data", "status": "not_proven"},
+        {"id": "P4-T3", "name": "Approvals live data", "status": "not_proven"},
+        {"id": "P4-T4", "name": "Activity live data", "status": "not_proven"},
+        {"id": "P4-T5", "name": "Safety live data", "status": "not_proven"},
+        {"id": "P4-T6", "name": "Ask Pandora live intent/results", "status": "not_proven"},
+        {"id": "P4-T7", "name": "Truthful freshness/stale/offline projections", "status": "not_proven"}
+      ],
+      "exitCriteria": [
+        "no mock value can be mistaken for live truth",
+        "unknown status is rendered as unknown/not verified",
+        "all owner API calls enforce authenticated project/org scope",
+        "page read-back + runtime tests prove live wiring"
+      ]
+    },
+    {
+      "id": "P5",
+      "name": "Governed app read/write operations",
+      "status": "partially_implemented",
+      "weight": 8,
+      "goal": "Make inspection, validation, safe editing, snapshots, and rollback first-class Pandora capabilities.",
+      "tasks": [
+        {"id": "P5-T1", "name": "Project inspection adapter", "status": "implemented_unpromoted"},
+        {"id": "P5-T2", "name": "Project validation adapter", "status": "implemented_unpromoted"},
+        {"id": "P5-T3", "name": "Minimal write adapter with exact project scope", "status": "implemented_unpromoted"},
+        {"id": "P5-T4", "name": "Provider snapshot + read-back verification", "status": "implemented_unpromoted"},
+        {"id": "P5-T5", "name": "Schema drift fail-closed handling", "status": "documented"},
+        {"id": "P5-T6", "name": "Ambiguous write no-auto-retry policy", "status": "documented"},
+        {"id": "P5-T7", "name": "Rollback restoration drill", "status": "not_tested"}
+      ],
+      "exitCriteria": [
+        "project-scoped reads work through governed runtime",
+        "invalid changes fail before write",
+        "writes re-read exact state",
+        "rollback drill passes",
+        "adapter source/deployment identities recorded"
+      ]
+    },
+    {
+      "id": "P6",
+      "name": "Automatic generated-source export and GitHub versioning",
+      "status": "documented",
+      "weight": 9,
+      "goal": "Remove manual code download from the owner workflow and preserve every release candidate as exact source.",
+      "tasks": [
+        {"id": "P6-T1", "name": "Server-side official code export", "status": "documented"},
+        {"id": "P6-T2", "name": "Export manifest and SHA-256 tree", "status": "documented"},
+        {"id": "P6-T3", "name": "Immutable Git candidate branch/commit", "status": "documented"},
+        {"id": "P6-T4", "name": "Parent lineage and supersession records", "status": "documented"},
+        {"id": "P6-T5", "name": "Secret-safe export verification", "status": "documented"}
+      ],
+      "exitCriteria": [
+        "owner never manually downloads code",
+        "exact source export is content-addressed",
+        "Git commit equals exported manifest",
+        "previous recovery/source evidence preserved"
+      ]
+    },
+    {
+      "id": "P7",
+      "name": "Flutter analyze, tests, builds, and visual QA",
+      "status": "documented",
+      "weight": 10,
+      "goal": "Verify the real generated Flutter app independently before any publish decision.",
+      "tasks": [
+        {"id": "P7-T1", "name": "Pin compatible Flutter toolchain", "status": "documented"},
+        {"id": "P7-T2", "name": "Dependency resolution", "status": "documented"},
+        {"id": "P7-T3", "name": "flutter analyze gate", "status": "documented"},
+        {"id": "P7-T4", "name": "unit/widget/integration tests", "status": "documented"},
+        {"id": "P7-T5", "name": "secret and terminology scans", "status": "documented"},
+        {"id": "P7-T6", "name": "flutter build web release artifact", "status": "documented"},
+        {"id": "P7-T7", "name": "Android build/device checks", "status": "documented"},
+        {"id": "P7-T8", "name": "Android-first visual/accessibility matrix", "status": "documented"}
+      ],
+      "exitCriteria": [
+        "exact candidate passes analyzer/tests",
+        "web build artifact hash recorded",
+        "Android-first visual/accessibility QA passes",
+        "forbidden user-facing term scan passes"
+      ]
+    },
+    {
+      "id": "P8",
+      "name": "Protected preview hosting",
+      "status": "documented",
+      "weight": 7,
+      "goal": "Deploy the exact tested artifact to a reversible preview using a host-agnostic adapter.",
+      "tasks": [
+        {"id": "P8-T1", "name": "Host adapter interface", "status": "documented"},
+        {"id": "P8-T2", "name": "Vercel web adapter", "status": "documented"},
+        {"id": "P8-T3", "name": "Protected preview deployment", "status": "documented"},
+        {"id": "P8-T4", "name": "Preview runtime verification", "status": "documented"},
+        {"id": "P8-T5", "name": "Preview artifact identity match", "status": "documented"}
+      ],
+      "exitCriteria": [
+        "preview is exact tested artifact",
+        "preview boot/auth/navigation checks pass",
+        "preview does not alter live domain",
+        "deployment identity recorded"
+      ]
+    },
+    {
+      "id": "P9",
+      "name": "Separate exact-candidate production approval",
+      "status": "documented",
+      "weight": 5,
+      "goal": "Make production release impossible without a current explicit owner decision for the exact verified candidate.",
+      "tasks": [
+        {"id": "P9-T1", "name": "Release summary UI", "status": "documented"},
+        {"id": "P9-T2", "name": "Bind approval to exact candidate manifest", "status": "documented"},
+        {"id": "P9-T3", "name": "Protected extra identity check", "status": "not_proven_in_app"},
+        {"id": "P9-T4", "name": "Approval expiry/supersession rules", "status": "documented"}
+      ],
+      "exitCriteria": [
+        "release promoter cannot run without exact candidate approval",
+        "approval cannot be reused after source/artifact change",
+        "protected identity flow verified in app"
+      ]
+    },
+    {
+      "id": "P10",
+      "name": "Exact live promotion, verification, and Undo",
+      "status": "documented",
+      "weight": 8,
+      "goal": "Promote only the approved artifact, verify it live, and recover automatically when allowed.",
+      "tasks": [
+        {"id": "P10-T1", "name": "Stage exact production candidate without changing live domain", "status": "documented"},
+        {"id": "P10-T2", "name": "Promote exact approved artifact", "status": "documented"},
+        {"id": "P10-T3", "name": "Live version identity verification", "status": "documented"},
+        {"id": "P10-T4", "name": "Live boot/auth/API/navigation checks", "status": "documented"},
+        {"id": "P10-T5", "name": "Automatic rollback to last verified release on failed live check when preauthorized", "status": "documented"},
+        {"id": "P10-T6", "name": "Version history/Undo UX", "status": "documented"}
+      ],
+      "exitCriteria": [
+        "exact candidate promoted",
+        "live checks pass",
+        "rollback target recorded",
+        "failed verification rollback drill passes",
+        "production verified status recorded only after proof"
+      ]
+    },
+    {
+      "id": "P11",
+      "name": "Android/iOS distribution paths",
+      "status": "documented",
+      "weight": 4,
+      "goal": "Extend the same source/evidence/release model to signed mobile distribution.",
+      "tasks": [
+        {"id": "P11-T1", "name": "Android signed App Bundle pipeline", "status": "documented"},
+        {"id": "P11-T2", "name": "Play testing/release workflow", "status": "documented"},
+        {"id": "P11-T3", "name": "iOS macOS archive/sign pipeline", "status": "documented"},
+        {"id": "P11-T4", "name": "TestFlight/App Store workflow", "status": "documented"}
+      ],
+      "exitCriteria": [
+        "signing secrets isolated",
+        "store candidates bind to exact source manifest",
+        "store release requires separate owner/public-release approval"
+      ]
+    },
+    {
+      "id": "P12",
+      "name": "Operational hardening and scale",
+      "status": "documented",
+      "weight": 5,
+      "goal": "Make the architecture resilient enough to operate many projects without hidden drift or single-provider dependency.",
+      "tasks": [
+        {"id": "P12-T1", "name": "Provider contract drift tests", "status": "documented"},
+        {"id": "P12-T2", "name": "Source/export recovery drill", "status": "documented"},
+        {"id": "P12-T3", "name": "Hosting migration adapter test", "status": "documented"},
+        {"id": "P12-T4", "name": "Independent review of release/security model", "status": "documented"},
+        {"id": "P12-T5", "name": "Release provenance and audit export", "status": "documented"},
+        {"id": "P12-T6", "name": "Multi-project reusable capability templates", "status": "documented"}
+      ],
+      "exitCriteria": [
+        "contract drift fails closed",
+        "source can be recovered without the visual builder",
+        "hosting can be changed without changing owner UX",
+        "independent review issues resolved or explicitly accepted"
+      ]
+    }
+  ],
+  "immediateNextAutonomousAction": "Implement P1 provider-invisibility lint/translation and P2/P3 premium shared UI system on the existing app work candidate, while P4 finishes truthful live owner API wiring. Stop before production release promotion.",
+  "currentBlockers": [
+    "Live Pandora Memory semantic write is not available through this ChatGPT session, so canonical Memory DB update cannot be independently proven from this run.",
+    "Current page layer is not yet proven fully wired to truthful live owner API data.",
+    "Android-first visual/navigation/accessibility verification is not yet recorded.",
+    "Protected approval/extra identity flow is not yet verified end-to-end in the app.",
+    "No generated-source release candidate has yet passed the new export/analyze/test/build/preview pipeline.",
+    "Production release is intentionally blocked pending a future separate exact-candidate owner approval."
+  ]
+}
