@@ -130,3 +130,14 @@ jobs:
           file_count="$(find /tmp/mcpmaster-recovery/source -type f | wc -l | tr -d ' ')"
           echo "recovered_source_files=${file_count}"
           test "$file_count" -ge 500
+
+          # DEP0169 source gate. The historical exact PR #171 runtime still emits
+          # Node DEP0169 from url.parse(). Once a complete canonical source archive
+          # is recovered, fail closed if direct application-source calls remain.
+          direct_url_parse="$(grep -RInE --include='*.js' --include='*.cjs' --include='*.mjs' --include='*.ts' --include='*.tsx' '(^|[^[:alnum:]_])url\.parse[[:space:]]*\(' /tmp/mcpmaster-recovery/source --exclude-dir=node_modules || true)"
+          if [ -n "$direct_url_parse" ]; then
+            echo 'BLOCKED: recovered application source still contains direct url.parse() calls:'
+            printf '%s\n' "$direct_url_parse"
+            exit 1
+          fi
+          echo 'direct_url_parse_calls=0'
