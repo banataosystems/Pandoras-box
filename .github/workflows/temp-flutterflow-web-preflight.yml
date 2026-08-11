@@ -1,4 +1,4 @@
-name: Temporary FlutterFlow Live Site Check
+name: Temporary FlutterFlow Error Diagnostic
 
 on:
   pull_request:
@@ -11,20 +11,12 @@ permissions:
   contents: read
 
 jobs:
-  livecheck:
+  diagnose:
     runs-on: ubuntu-latest
     steps:
-      - name: Check published FlutterFlow site
+      - name: Inspect current FlutterFlow validation and broken references
         run: |
           set -euo pipefail
-          url='https://pandoras-box-gj9hnb.flutterflow.app/'
-          status="$(curl --silent --show-error --location --output /tmp/site.html --write-out '%{http_code}' "$url" || true)"
-          echo "HTTP_STATUS=$status"
-          if [ -f /tmp/site.html ]; then
-            echo "BODY_BYTES=$(wc -c < /tmp/site.html)"
-            title="$(grep -o -m1 -E '<title[^>]*>[^<]*</title>' /tmp/site.html || true)"
-            echo "TITLE=$title"
-            if grep -Eqi 'flutter_bootstrap|main\.dart\.js|flutter\.js' /tmp/site.html; then echo 'FLUTTER_BOOTSTRAP=true'; else echo 'FLUTTER_BOOTSTRAP=false'; fi
-            if grep -Eqi 'pandora' /tmp/site.html; then echo 'PANDORA_MARKER=true'; else echo 'PANDORA_MARKER=false'; fi
-            head -c 300 /tmp/site.html | tr '\n' ' '; echo
-          fi
+          curl --silent --show-error --get \
+            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-error-diagnostic' \
+            --data-urlencode 'code=ffdiag-20260812-0330-8f4d1'
