@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.6.0",
+  "schemaVersion": "1.7.0",
   "projectKey": "mcpmaster",
   "artifact": "pandora-mobile-flutterflow-v1",
   "canonicalRepository": "banataosystems/Pandoras-box",
@@ -9,6 +9,9 @@
   "state": {
     "documented": true,
     "implementationPrepared": true,
+    "fullCapacityPlanDocumented": true,
+    "premiumUxPlanDocumented": true,
+    "providerInvisibilityPolicyDocumented": true,
     "flutterFlowApiClientOverlayImplemented": true,
     "flutterFlowApiClientTypeChecked": true,
     "flutterFlowApiClientRuntimeTestsPassed": 5,
@@ -30,6 +33,11 @@
     "liveMcpMasterOwnerApiWired": false,
     "androidVisualNavigationTested": false,
     "aal2ApprovalFlowVerifiedInApp": false,
+    "automaticSourceExportPipelineImplemented": false,
+    "generatedSourceVersioned": false,
+    "generatedSourceAnalyzeTestsPassed": false,
+    "protectedPreviewVerified": false,
+    "exactCandidateReleaseApprovalImplemented": false,
     "temporaryRepairToolingCleaned": true,
     "appTested": false,
     "deployed": false,
@@ -76,20 +84,47 @@
     "edgeFunction": "pandora-owner-api",
     "edgeFunctionBaseUrl": "https://jcyqixttuebxqqfkjonq.supabase.co/functions/v1/pandora-owner-api",
     "webOriginAllowlistPending": true,
-    "goal": "FlutterFlow talks to one governed Pandora owner API. The backend routes to connected MCPs/services; Simple mode does not expose raw MCP/provider jargon or client-side provider secrets."
+    "goal": "The hidden app-builder client talks to one governed Pandora owner API. The backend routes to connected services. No hidden builder name, raw MCP/provider jargon, or client-side provider secret may appear in the owner UI."
+  },
+  "fullCapacityPlan": {
+    "masterPlanPath": "docs/product/PANDORA_FULL_CAPACITY_MASTER_PLAN.md",
+    "uxSpecPath": "docs/product/PANDORA_PREMIUM_MOBILE_UX_SPEC.md",
+    "roadmapPath": "docs/product/PANDORA_FULL_CAPACITY_ROADMAP.json",
+    "userFacingLifecycle": [
+      "Build",
+      "Preview",
+      "Fix",
+      "Publish",
+      "Live",
+      "Undo"
+    ],
+    "hiddenProviderUserFacingNamePolicy": "The word FlutterFlow is prohibited from every user-visible Pandora surface, including Advanced mode.",
+    "sourceReleaseModel": "Export generated Flutter source automatically, content-address and version it in GitHub, run independent Flutter checks/builds, deploy an exact protected preview, then require separate exact-candidate owner approval before live promotion."
   },
   "remainingV1Work": [
+    "Apply the premium Pandora design system and current-screen redesign to the existing app project.",
+    "Enforce the zero-tolerance hidden-provider/user-jargon string firewall.",
     "Wire the owner API bridge to live governed MCPMaster endpoints for Home, projects, connections, approvals, activity, safety, and Ask Pandora.",
     "Replace remaining static/mock values with truthful canonical backend data.",
-    "Run Android-first visual, navigation, loading, empty, error, offline, and responsive tests.",
-    "Verify protected approval plus extra identity check/AAL2 flow from the app.",
-    "Keep deployment and production verification as separate owner-authorized gates."
+    "Implement automatic generated-source export, content-addressed manifest, and GitHub candidate versioning.",
+    "Run Flutter dependency resolution, analyze, automated tests, secret/terminology scans, web build, and Android-first visual/accessibility checks on the real generated source.",
+    "Deploy and verify a protected preview through the selected hosting adapter.",
+    "Implement exact-candidate release approval and protected extra identity check.",
+    "Keep live promotion and production verification blocked until a new separate owner approval is recorded for the exact tested candidate."
   ],
-  "productionReleaseAuthorized": true,
+  "productionReleaseAuthorized": false,
   "releaseAuthorization": {
-    "source": "Owner explicitly requested complete backend-to-frontend wiring and deployment in FlutterFlow.io on 2026-08-10.",
-    "scope": "Pandora's Box FlutterFlow project pandoras-box-gj9hnb only",
+    "status": "superseded",
+    "effectiveAt": "2026-08-12T07:32:53+08:00",
+    "currentRule": "No production/live release is authorized by the full-capacity planning instruction. Every production release requires a separate explicit owner approval bound to the exact tested candidate after preview verification.",
+    "supersedes": {
+      "source": "Owner explicitly requested complete backend-to-frontend wiring and deployment in FlutterFlow.io on 2026-08-10.",
+      "priorScope": "Pandora's Box FlutterFlow project pandoras-box-gj9hnb only",
+      "reason": "Newer explicit owner instruction requires a separate production release approval."
+    },
     "doesNotAuthorize": [
+      "production/live promotion",
+      "public store release",
       "weakened authentication or authorization",
       "new paid services or subscriptions",
       "destructive production data changes",
@@ -98,24 +133,31 @@
   },
   "unattendedExecution": {
     "status": "implementation_started",
-    "outcome": "Finish the existing FlutterFlow app without requiring the owner's browser session, using FlutterFlow's official Project API and signed AI SDK.",
+    "outcome": "Finish the existing app without requiring the owner's browser session. Keep the visual builder invisible to the owner, export the real Flutter source automatically, and move release ownership to Pandora's governed source/build/hosting pipeline.",
     "acceptanceCriteria": [
       "Supabase email authentication and logout are wired in the existing project.",
-      "FlutterFlow calls only the governed Pandora owner API and never contains service-role or provider credentials.",
-      "Home, projects, connections, approvals, activity, safety, and Ask Pandora use truthful live responses with loading, empty, error, and offline-safe behavior.",
-      "The approved monochrome Pandora's Box mark is used without recolor or reinterpretation.",
-      "The official FlutterFlow validator passes before provider mutation.",
-      "Android-first responsive, navigation, auth, API, and AAL2 approval checks pass before release.",
-      "Deployment and live verification are bound to an exact tested candidate with a recorded rollback point."
+      "The client calls only the governed Pandora owner API and never contains service-role or provider credentials.",
+      "No user-visible string contains the hidden app-builder name, MCP, YAML, CI, provider, token, or raw infrastructure jargon.",
+      "Home, projects, connections, approvals, activity, safety, and Ask Pandora use truthful live responses with loading, empty, error, stale, and offline-safe behavior.",
+      "The approved Pandora product mark is used without recolor or reinterpretation.",
+      "The official project validator passes before provider mutation.",
+      "Every consequential project write has a pre-change snapshot and exact read-back verification.",
+      "Generated Flutter source is exported automatically and preserved with exact manifest/hash and Git commit.",
+      "Generated source passes required Flutter analyze/tests/build checks and Android-first visual/accessibility verification before release.",
+      "A protected preview is verified before any live approval request.",
+      "Live promotion is bound to an exact tested candidate and requires a new explicit owner approval.",
+      "Deployment and live verification remain separate proof states with a recorded rollback point."
     ],
     "nonGoals": [
       "Direct client access to provider secrets or individual MCP services.",
+      "Exposing the hidden visual-builder/provider identity to Pandora users.",
       "Weakening owner/admin scope, RLS, MFA, approval, or audit controls.",
-      "Inventing completion, connection health, or production verification from placeholder data."
+      "Inventing completion, connection health, or production verification from placeholder data.",
+      "Using the visual builder's hosted publish button as the required production release path."
     ],
     "credentialBoundary": "A GitHub-hosted runner may receive the Vault token only through a signed GitHub OIDC JWT plus a single-use, exact-repository/ref/workflow/commit grant expiring within 15 minutes. The token is masked, never committed or uploaded, and the broker is retired after the final run.",
-    "risk": "FlutterFlow project mutation can affect the existing app; every apply is preceded by official validation and exact provider backup/read-back.",
-    "rollback": "Restore the last verified FlutterFlow snapshot/version and retire the OIDC broker to a verify_jwt=true 410 stub. Database grant records remain only as redacted audit evidence."
+    "risk": "Project mutation can affect the existing app; every apply is preceded by official validation and exact provider backup/read-back. Production release is additionally blocked behind exact-candidate approval.",
+    "rollback": "Restore the last verified provider snapshot for project-edit failures. For a released app, restore the last production-verified release artifact and verify it live under the release rollback policy."
   },
   "issueRepair": {
     "status": "provider_readback_verified",
