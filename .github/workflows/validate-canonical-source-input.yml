@@ -12,13 +12,20 @@ on:
 permissions:
   contents: read
 
+env:
+  EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ env.EXPECTED_SHA }}
           persist-credentials: false
+      - name: Prove exact recovery head
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Verify exact recovery archive and required source
         shell: bash
         run: |
