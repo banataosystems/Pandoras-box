@@ -32,6 +32,7 @@ jobs:
           import hashlib
           import io
           import itertools
+          import struct
           import zipfile
           from pathlib import Path
 
@@ -41,10 +42,55 @@ jobs:
               "source/src/http-server.ts",
               "source/SOURCE_AUTHORITY_POLICY.json",
           }
+          names = ("00", "01", "02", "03")
           parts = {
               name: Path(f"recovery/mcpmaster-source.part-{name}").read_bytes()
-              for name in ("00", "01", "02", "03")
+              for name in names
           }
+
+          # Read-only structural diagnostics. These make corruption geometry
+          # explicit without attempting to repair, reorder, or publish source.
+          print("archive_part_diagnostics_begin")
+          for name in names:
+              payload = parts[name]
+              print(
+                  f"part={name} bytes={len(payload)} "
+                  f"first16={payload[:16].hex()} last16={payload[-16:].hex()} "
+                  f"local_headers={payload.count(b'PK\\x03\\x04')} "
+                  f"central_headers={payload.count(b'PK\\x01\\x02')} "
+                  f"eocd_headers={payload.count(b'PK\\x05\\x06')}"
+              )
+
+          canonical = b"".join(parts[name] for name in names)
+          print(
+              f"canonical_bytes={len(canonical)} "
+              f"canonical_sha256={hashlib.sha256(canonical).hexdigest()} "
+              f"local_headers={canonical.count(b'PK\\x03\\x04')} "
+              f"central_headers={canonical.count(b'PK\\x01\\x02')} "
+              f"eocd_headers={canonical.count(b'PK\\x05\\x06')}"
+          )
+          eocd = canonical.rfind(b"PK\x05\x06")
+          if eocd >= 0 and len(canonical) >= eocd + 22:
+              sig, disk_no, cd_disk, disk_entries, total_entries, cd_size, cd_offset, comment_len = struct.unpack_from(
+                  "<4s4H2LH", canonical, eocd
+              )
+              expected_eof = eocd + 22 + comment_len
+              cd_end = cd_offset + cd_size
+              cd_signature_ok = canonical[cd_offset:cd_offset + 4] == b"PK\x01\x02" if cd_offset + 4 <= len(canonical) else False
+              print(
+                  "eocd_present=true "
+                  f"eocd_offset={eocd} disk_no={disk_no} cd_disk={cd_disk} "
+                  f"disk_entries={disk_entries} total_entries={total_entries} "
+                  f"cd_offset={cd_offset} cd_size={cd_size} cd_end={cd_end} "
+                  f"cd_signature_at_declared_offset={cd_signature_ok} "
+                  f"comment_len={comment_len} expected_eof={expected_eof} "
+                  f"actual_eof={len(canonical)} trailing_or_missing_bytes={len(canonical) - expected_eof} "
+                  f"cd_to_eocd_delta={eocd - cd_end}"
+              )
+          else:
+              print("eocd_present=false")
+          print("archive_part_diagnostics_end")
+
           exact_matches = []
           valid_zips = []
           for order in itertools.permutations(parts):
@@ -54,8 +100,8 @@ jobs:
               detail = ""
               if is_zip:
                   with zipfile.ZipFile(io.BytesIO(payload)) as zf:
-                      names = set(zf.namelist())
-                      detail = f" entries={len(names)} required_present={required.issubset(names)}"
+                      zip_names = set(zf.namelist())
+                      detail = f" entries={len(zip_names)} required_present={required.issubset(zip_names)}"
                   valid_zips.append((order, digest, payload, detail))
               print(f"order={','.join(order)} sha256={digest} valid_zip={is_zip}{detail}")
               if digest == expected:
