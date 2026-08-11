@@ -1,0 +1,10 @@
+# PR #171 DEP0169 diagnostic patch — preview only
+# Base SHA: 082cd6ec3e36cded5c3c2c8dcb90f5f3701868de
+# Exact deployed image: sha256:1033686a7198bd0b646a138c508ff56a3604c7308e2acc8b38257e82713d9d83
+# Build logs prove current production-stage command:
+# CMD ["node", "apps/meta-business-mcp/dist/remote-server.js"]
+# Diagnostic candidate changes only the preview command:
+- CMD ["node", "apps/meta-business-mcp/dist/remote-server.js"]
++ CMD ["node", "--trace-deprecation", "apps/meta-business-mcp/dist/remote-server.js"]
+
+Acceptance for a governed preview: build from exact base head or proven equivalent source; invoke /api/operator/auth/config; capture the DEP0169 stack without secrets; identify package/file/line; verify POS-SEC behavior unchanged; do not promote the diagnostic build to production; preserve rollback to dpl_8ibV3QGWGi9uBbQAXm69fhENs2fz.
