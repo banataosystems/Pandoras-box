@@ -1,4 +1,4 @@
-name: Temporary FlutterFlow Web Deployment Preflight
+name: Temporary FlutterFlow Live Site Check
 
 on:
   pull_request:
@@ -11,12 +11,12 @@ permissions:
   contents: read
 
 jobs:
-  preflight:
+  livecheck:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect FlutterFlow web publishing settings
+      - name: Check published FlutterFlow site
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --get \
-            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-web-deploy-preflight' \
-            --data-urlencode 'code=ec8d58b0f6966a7c14a2563a8c19740194f7ed48de4e73d8b96d4a883cc68826'
+            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-live-site-check' \
+            --data-urlencode 'code=pandora-live-check-20260812'
