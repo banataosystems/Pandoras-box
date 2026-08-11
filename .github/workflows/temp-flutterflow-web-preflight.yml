@@ -1,4 +1,4 @@
-name: Temporary FlutterFlow API Definition Diagnostic
+name: Temporary FlutterFlow Context Variable Diagnostic
 
 on:
   pull_request:
@@ -14,9 +14,9 @@ jobs:
   diagnose:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect FlutterFlow API endpoint variable definitions
+      - name: Inspect FlutterFlow page/list variable contexts
         run: |
           set -euo pipefail
           curl --silent --show-error --get \
-            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-api-definition-diagnostic' \
-            --data-urlencode 'code=ff-api-def-diag-20260812'
+            'https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-context-variable-diagnostic' \
+            --data-urlencode 'code=ff-context-diag-20260812'
