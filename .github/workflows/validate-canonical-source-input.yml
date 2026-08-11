@@ -47,6 +47,9 @@ jobs:
               name: Path(f"recovery/mcpmaster-source.part-{name}").read_bytes()
               for name in names
           }
+          local_sig = bytes.fromhex("504b0304")
+          central_sig = bytes.fromhex("504b0102")
+          eocd_sig = bytes.fromhex("504b0506")
 
           # Read-only structural diagnostics. These make corruption geometry
           # explicit without attempting to repair, reorder, or publish source.
@@ -56,27 +59,27 @@ jobs:
               print(
                   f"part={name} bytes={len(payload)} "
                   f"first16={payload[:16].hex()} last16={payload[-16:].hex()} "
-                  f"local_headers={payload.count(b'PK\\x03\\x04')} "
-                  f"central_headers={payload.count(b'PK\\x01\\x02')} "
-                  f"eocd_headers={payload.count(b'PK\\x05\\x06')}"
+                  f"local_headers={payload.count(local_sig)} "
+                  f"central_headers={payload.count(central_sig)} "
+                  f"eocd_headers={payload.count(eocd_sig)}"
               )
 
           canonical = b"".join(parts[name] for name in names)
           print(
               f"canonical_bytes={len(canonical)} "
               f"canonical_sha256={hashlib.sha256(canonical).hexdigest()} "
-              f"local_headers={canonical.count(b'PK\\x03\\x04')} "
-              f"central_headers={canonical.count(b'PK\\x01\\x02')} "
-              f"eocd_headers={canonical.count(b'PK\\x05\\x06')}"
+              f"local_headers={canonical.count(local_sig)} "
+              f"central_headers={canonical.count(central_sig)} "
+              f"eocd_headers={canonical.count(eocd_sig)}"
           )
-          eocd = canonical.rfind(b"PK\x05\x06")
+          eocd = canonical.rfind(eocd_sig)
           if eocd >= 0 and len(canonical) >= eocd + 22:
               sig, disk_no, cd_disk, disk_entries, total_entries, cd_size, cd_offset, comment_len = struct.unpack_from(
                   "<4s4H2LH", canonical, eocd
               )
               expected_eof = eocd + 22 + comment_len
               cd_end = cd_offset + cd_size
-              cd_signature_ok = canonical[cd_offset:cd_offset + 4] == b"PK\x01\x02" if cd_offset + 4 <= len(canonical) else False
+              cd_signature_ok = canonical[cd_offset:cd_offset + 4] == central_sig if cd_offset + 4 <= len(canonical) else False
               print(
                   "eocd_present=true "
                   f"eocd_offset={eocd} disk_no={disk_no} cd_disk={cd_disk} "
