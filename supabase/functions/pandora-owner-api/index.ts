@@ -534,7 +534,7 @@ function approvalSummary(value: unknown, riskCode = "") {
     howWeCanUndoIt: undo || "No recovery path was recorded.",
     riskLevel: ownerRiskLabel(riskCode),
     reversible: Boolean(undo),
-    extraIdentityCheckRequired: true,
+    extraIdentityCheckRequired: false,
     decision: plainOwnerText(approval.decision, "pending"),
     expiresAt: approval.expires_at ?? null,
     createdAt: approval.created_at ?? null,
@@ -1009,7 +1009,7 @@ async function safety(context: UserContext) {
     ? "protected"
     : "not_checked";
   return {
-    mfaRequiredForApproval: true,
+    mfaRequiredForApproval: false,
     state,
     plainStatus: state === "problem"
       ? "Needs attention"
@@ -1104,7 +1104,6 @@ async function decide(
   body: JsonRecord,
 ) {
   if (context.isAnonymous) throw new Error("PERMANENT_ACCOUNT_REQUIRED");
-  if (context.aal !== "aal2") throw new Error("AAL2_REQUIRED");
   const decision = textValue(body.decision).toLowerCase();
   const requested = decision === "approve"
     ? "approved"

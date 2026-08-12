@@ -2,5 +2,5 @@
   "schemaVersion": "1.0.0",
   "mode": "validate-owner",
   "projectId": "pandoras-box-gj9hnb",
-  "purpose": "Inspection-only owner API drift comparison with verified signed-SDK imports. Fetch the exact Pandora project, compile the desired owner API in memory, report only differing field names, and exit before any project mutation."
+  "purpose": "Exact-head read-only owner-app validation. Fetch the bound Pandora project through the signed SDK, apply only the narrowly approved in-memory rerun normalization, require byte-for-byte endpoint equality, validate the complete owner-app declaration, and exit without project mutation."
 }

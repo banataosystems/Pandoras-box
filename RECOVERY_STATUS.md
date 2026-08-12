@@ -1,6 +1,14 @@
 # Pandora's-box Recovery Status
 
-Last updated: 2026-08-08 23:20 (Asia/Manila)
+Last updated: 2026-08-12 (Asia/Manila)
+
+## 2026-08-12 verified runtime reconciliation candidate
+
+Branch `fix/remove-projectos-aal2-requirement` reconstructs a buildable Node 24 MCPMaster runtime from the exact authenticated Vercel OCI layers associated with historical revision `6faf1dd25cb12f6ff20aa4f9500658c285d3025f`, plus the exact deployed Supabase `pandora-owner-api` v3 bundle. The provenance and immutable hashes are recorded in `docs/recovery/VCR_RUNTIME_RECONCILIATION_2026-08-12.md`.
+
+This is a pull-request candidate, not a production release. It restores the provider runtime, operator bridge, Control Tower, OAuth consent, shared-security package, serverless entrypoints, durable-plan client, and tests needed for the owner-directed ProjectOS approval change. It does not claim recovery of every historical source, test, or auxiliary asset from the earlier 1,379-file tree. The original TypeScript sources were not present in the runtime image, so verified CommonJS runtime artifacts were promoted to reviewable JavaScript source and rebuilt with TypeScript `allowJs` under the repository's Node 24 engine.
+
+No production alias, Edge Function, or database migration has been changed by this candidate. Canonical designation and release remain subject to review, exact-head CI, and the separate production authorization gates below.
 
 ## Verified infrastructure
 

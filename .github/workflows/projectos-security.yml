@@ -1,0 +1,58 @@
+name: ProjectOS security regression
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/projectos-security.yml'
+      - 'api/**'
+      - 'apps/**'
+      - 'packages/**'
+      - 'public/**'
+      - 'scripts/**'
+      - 'src/**'
+      - 'supabase/**'
+      - 'test/**'
+      - 'Dockerfile'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - 'vercel.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/projectos-security.yml'
+      - 'api/**'
+      - 'apps/**'
+      - 'packages/**'
+      - 'public/**'
+      - 'scripts/**'
+      - 'src/**'
+      - 'supabase/**'
+      - 'test/**'
+      - 'Dockerfile'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - 'vercel.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: projectos-security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node24:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm audit --omit=dev --audit-level=high

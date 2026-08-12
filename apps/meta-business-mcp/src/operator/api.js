@@ -1,0 +1,279 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createOperatorApiApp = createOperatorApiApp;
+const node_crypto_1 = require("node:crypto");
+const node_path_1 = __importDefault(require("node:path"));
+const express_1 = __importDefault(require("express"));
+const OPERATOR_ROLES = new Set(['owner', 'admin', 'operator']);
+const APPROVER_ROLES = new Set(['owner', 'admin']);
+const EXECUTOR_ROLES = new Set(['owner', 'admin']);
+const OPERATOR_RATE_WINDOW_MS = 60000;
+const MAX_OPERATOR_RATE_BUCKETS = 10000;
+function defaultRuntimeFactory(config) {
+    const modulePath = process.env.MCPMASTER_RUNTIME_MODULE
+        ?? node_path_1.default.resolve(process.cwd(), 'dist/http-app.js');
+    const runtimeModule = require(modulePath);
+    if (typeof runtimeModule.createHttpApp !== 'function') {
+        throw new Error('The embedded MCPMaster runtime is unavailable');
+    }
+    return runtimeModule.createHttpApp(config);
+}
+function processLocalCredential() {
+    return (0, node_crypto_1.randomBytes)(48).toString('base64url');
+}
+function actor(response) {
+    return response.locals.operatorActor;
+}
+function noStore(response) {
+    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+}
+function operatorOriginAllowed(request, allowedOrigins) {
+    const origin = request.header('origin');
+    if (!origin)
+        return true;
+    try {
+        const parsed = new URL(origin);
+        const requestHost = request.header('host')?.toLowerCase();
+        const sameHost = Boolean(requestHost && parsed.host.toLowerCase() === requestHost);
+        const localHttp = parsed.protocol === 'http:'
+            && ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname);
+        const secureSameOrigin = sameHost && (parsed.protocol === 'https:' || localHttp);
+        return secureSameOrigin || allowedOrigins.includes(parsed.origin);
+    }
+    catch {
+        return false;
+    }
+}
+function createOperatorRateLimiter(limit) {
+    const buckets = new Map();
+    const safeLimit = Math.max(5, Math.min(limit, 300));
+    return (request, response, next) => {
+        const now = Date.now();
+        const key = request.ip || request.socket.remoteAddress || 'unknown';
+        const existing = buckets.get(key);
+        const state = !existing || existing.resetAt <= now
+            ? { count: 0, resetAt: now + OPERATOR_RATE_WINDOW_MS }
+            : existing;
+        state.count += 1;
+        buckets.set(key, state);
+        response.setHeader('RateLimit-Limit', safeLimit.toString());
+        response.setHeader('RateLimit-Remaining', Math.max(0, safeLimit - state.count).toString());
+        response.setHeader('RateLimit-Reset', Math.ceil(state.resetAt / 1000).toString());
+        if (state.count > safeLimit) {
+            noStore(response);
+            response.setHeader('Retry-After', Math.max(1, Math.ceil((state.resetAt - now) / 1000)).toString());
+            response.status(429).json({
+                ok: false,
+                error: {
+                    code: 'OPERATOR_RATE_LIMITED',
+                    message: 'Too many operator authentication requests. Try again after the current window resets.',
+                },
+            });
+            return;
+        }
+        if (buckets.size > MAX_OPERATOR_RATE_BUCKETS) {
+            for (const [bucketKey, bucket] of buckets.entries()) {
+                if (bucket.resetAt <= now)
+                    buckets.delete(bucketKey);
+            }
+        }
+        next();
+    };
+}
+function clearPrivilegedCallerHeaders(request) {
+    delete request.headers['x-approval-token'];
+    delete request.headers['x-approver-id'];
+    delete request.headers['x-vercel-oidc-token'];
+    delete request.headers['x-vercel-sc-headers'];
+}
+function requiredOperatorScope(request) {
+    if (request.method === 'POST' && request.path === '/tools/plan')
+        return 'projectos:plan';
+    if (request.method === 'POST' && request.path === '/tools/approve')
+        return 'projectos:approve';
+    if (request.method === 'POST'
+        && (request.path === '/tools/execute' || request.path === '/tools'))
+        return 'projectos:execute';
+    if (request.method === 'GET')
+        return 'projectos:read';
+    return undefined;
+}
+function oauthScopeAllowed(current, requiredScope) {
+    if (!current.identity.scopeClaimsPresent)
+        return true;
+    const granted = new Set(Array.isArray(current.identity.scopes) ? current.identity.scopes : []);
+    return Boolean(requiredScope
+        && granted.has('openid')
+        && (granted.has(requiredScope) || granted.has('projectos:*')));
+}
+function operatorAuthentication(options) {
+    return async (request, response, next) => {
+        if (!operatorOriginAllowed(request, options.allowedOrigins)) {
+            noStore(response);
+            response.status(403).json({
+                ok: false,
+                error: {
+                    code: 'OPERATOR_ORIGIN_FORBIDDEN',
+                    message: 'The operator API accepts only the same origin or an explicitly allowed origin.',
+                },
+            });
+            return;
+        }
+        const authorization = request.header('authorization');
+        clearPrivilegedCallerHeaders(request);
+        try {
+            const identity = await options.authenticator.authenticate(authorization);
+            const membership = await options.membershipResolver.resolve(options.organizationId, identity.userId, identity.accessToken);
+            if (!membership || !OPERATOR_ROLES.has(membership.role)) {
+                noStore(response);
+                response.status(403).json({
+                    ok: false,
+                    error: {
+                        code: 'OPERATOR_MEMBERSHIP_REQUIRED',
+                        message: 'An active owner, admin, or operator membership is required.',
+                    },
+                });
+                return;
+            }
+            if (membership.organizationId !== options.organizationId || membership.userId !== identity.userId) {
+                noStore(response);
+                response.status(403).json({
+                    ok: false,
+                    error: {
+                        code: 'OPERATOR_MEMBERSHIP_REQUIRED',
+                        message: 'The active membership must match the authenticated user and organization.',
+                    },
+                });
+                return;
+            }
+            response.locals.operatorActor = { identity, membership };
+            next();
+        }
+        catch (error) {
+            const status = typeof error === 'object' && error !== null && 'status' in error
+                && (error.status === 401 || error.status === 503)
+                ? error.status
+                : 503;
+            noStore(response);
+            if (status === 401)
+                response.setHeader('WWW-Authenticate', 'Bearer');
+            response.status(status).json({
+                ok: false,
+                error: {
+                    code: status === 401 ? 'OPERATOR_UNAUTHORIZED' : 'OPERATOR_AUTH_UNAVAILABLE',
+                    message: error instanceof Error ? error.message : 'Operator authentication failed.',
+                },
+            });
+        }
+    };
+}
+function createOperatorApiApp(options) {
+    const router = express_1.default.Router();
+    const runtimeFactory = options.runtimeFactory ?? defaultRuntimeFactory;
+    const internalAdminToken = processLocalCredential();
+    const internalApprovalToken = processLocalCredential();
+    const embeddedRuntime = runtimeFactory({
+        port: 3000,
+        adminToken: internalAdminToken,
+        approvalToken: internalApprovalToken,
+        allowedOrigins: options.allowedOrigins.join(','),
+        rateLimitRequests: options.requestsPerMinute,
+        rateLimitWindowMs: 60000,
+    });
+    router.use(createOperatorRateLimiter(options.requestsPerMinute));
+    router.get('/auth/config', (request, response) => {
+        if (!operatorOriginAllowed(request, options.allowedOrigins)) {
+            noStore(response);
+            response.status(403).json({
+                ok: false,
+                error: {
+                    code: 'OPERATOR_ORIGIN_FORBIDDEN',
+                    message: 'The operator API accepts only the same origin or an explicitly allowed origin.',
+                },
+            });
+            return;
+        }
+        noStore(response);
+        response.json({
+            supabaseUrl: options.supabaseUrl,
+            supabasePublishableKey: options.supabasePublishableKey,
+            organizationId: options.organizationId,
+            sessionStorage: 'memory-only',
+            mfaRequiredForApproval: false,
+        });
+    });
+    router.use(operatorAuthentication(options));
+    router.get('/session', (_request, response) => {
+        const current = actor(response);
+        noStore(response);
+        response.json({
+            ok: true,
+            user: {
+                id: current?.identity.userId,
+                email: current?.identity.email,
+                role: current?.membership.role,
+            },
+        });
+    });
+    router.use((request, response, next) => {
+        const current = actor(response);
+        if (!current) {
+            noStore(response);
+            response.status(401).json({
+                ok: false,
+                error: { code: 'OPERATOR_UNAUTHORIZED', message: 'Operator session is unavailable.' },
+            });
+            return;
+        }
+        const requiredScope = requiredOperatorScope(request);
+        if (!oauthScopeAllowed(current, requiredScope)) {
+            noStore(response);
+            response.setHeader('WWW-Authenticate', `Bearer error="insufficient_scope", scope="${requiredScope || 'projectos'}"`);
+            response.status(403).json({
+                ok: false,
+                error: {
+                    code: 'OPERATOR_SCOPE_REQUIRED',
+                    message: `OAuth scope ${requiredScope || 'projectos'} is required for this operator action.`,
+                },
+            });
+            return;
+        }
+        if (request.method === 'POST' && request.path === '/tools/approve') {
+            if (!APPROVER_ROLES.has(current.membership.role)) {
+                noStore(response);
+                response.status(403).json({
+                    ok: false,
+                    error: {
+                        code: 'APPROVER_ROLE_REQUIRED',
+                        message: 'Plan approval requires a ProjectOS owner or admin session.',
+                    },
+                });
+                return;
+            }
+            request.headers['x-approval-token'] = internalApprovalToken;
+            request.headers['x-approver-id'] = `supabase:${current.identity.userId}`;
+        }
+        if (request.method === 'POST'
+            && request.path === '/tools/execute'
+            && !EXECUTOR_ROLES.has(current.membership.role)) {
+            noStore(response);
+            response.status(403).json({
+                ok: false,
+                error: {
+                    code: 'EXECUTOR_ROLE_REQUIRED',
+                    message: 'Only an owner or admin may execute a provider operation.',
+                },
+            });
+            return;
+        }
+        request.headers.authorization = `Bearer ${internalAdminToken}`;
+        delete request.headers.origin;
+        next();
+    });
+    router.use(embeddedRuntime);
+    return router;
+}

@@ -2,6 +2,8 @@
 
 Date: 2026-08-08 (Asia/Manila)
 
+> Superseded for ordinary ProjectOS approvals on 2026-08-12. This document records the historical incident and its then-current response. The current owner decision is documented in `docs/PROJECTOS_APPROVAL_SECURITY_MODEL.md`: authenticated owners and admins may approve without AAL2/TOTP. Supabase MFA may remain available, and separately classified destructive or connection operations may retain independent controls.
+
 ## Verified root cause
 
 The OAuth application is reachable and executes in the observed mobile authorization flow. Supabase authentication evidence showed successful TOTP challenges for `markjohnsonbanatao888@gmail.com` at 15:37:01Z, 15:37:15Z, and 15:38:06Z. The later failing authorization flow around 15:45Z authenticated as `lawbatalla@gmail.com` and created three challenges against that separate TOTP factor, none verified.
