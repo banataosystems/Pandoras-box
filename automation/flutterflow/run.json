@@ -2,5 +2,5 @@
   "schemaVersion": "1.0.0",
   "mode": "validate-owner",
   "projectId": "pandoras-box-gj9hnb",
-  "purpose": "Inspection-only signed SDK project-access recovery. Read the verified App/FFProject access contract needed for rerun-safe endpoint updates, then exit before any Pandora project operation."
+  "purpose": "Inspection-only signed SDK runtime recovery. Read the verified client fetch, compile, validate, and push signatures needed for fail-closed rerun repair, then exit before any Pandora project operation."
 }
