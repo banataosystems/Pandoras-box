@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "mode": "validate-owner",
+  "mode": "inspect",
   "projectId": "pandoras-box-gj9hnb",
-  "purpose": "Dry-run the rerun-safe neutral design system, verified-only progress, password confirmation, honest safety refresh, protected audit summary, resilient retry states, and narrow-phone-safe owner interface before a corrective apply."
+  "purpose": "Read the exact current Pandora owner app and signed project SDK before repairing the rerun-safe owner interface validator. This operation is inspection-only and must not mutate the app."
 }
