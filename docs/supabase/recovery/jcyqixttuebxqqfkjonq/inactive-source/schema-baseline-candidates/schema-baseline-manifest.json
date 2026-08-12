@@ -22,9 +22,11 @@
       "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/schema-baseline-candidates/20260724010000_control_plane_foundation.recovered.sql",
       "sha256": "15733a9714e81fb0689438b8c92eec1490310c7476a45d5144902c09c9ec3fd5",
       "bytes": 27160,
-      "source_commit": "cb811a30cc325567ce1ecbbc01cbf03a5715085c",
-      "canonical_source_blob": "dbc9b03511423e2eba4defe7b6d2fd051dab9cda",
-      "original_byte_equivalence": true,
+      "recovery_container_commit": "cb811a30cc325567ce1ecbbc01cbf03a5715085c",
+      "recovery_container_path": "recovery/mcpmaster-source.part-02",
+      "recovery_container_blob": "dbc9b03511423e2eba4defe7b6d2fd051dab9cda",
+      "recovered_archive_member_byte_equivalence": true,
+      "live_applied_migration_byte_equivalence": "unproven",
       "live_schema_equivalence": false
     },
     {
@@ -35,7 +37,8 @@
       "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/schema-baseline-candidates/20260724030000_meta_remote_mcp_persistence.reconstructed.sql",
       "sha256": "e9f8be2167c49c9e28a09d8daf23289e481914d618a0ddb247a254f5050e9f25",
       "bytes": 7908,
-      "original_byte_equivalence": false,
+      "recovered_archive_member_byte_equivalence": false,
+      "live_applied_migration_byte_equivalence": "unproven",
       "live_schema_equivalence": false
     }
   ],
@@ -120,20 +123,30 @@
     "credential_literals_found": 0,
     "static_contract_test": "test/schema-foundation-baseline.test.js",
     "portable_foundation_replay": {
-      "status": "passed",
+      "status": "historical_attestation_not_reproduced_by_this_candidate",
+      "claimed_result": "passed",
       "engine": "PostgreSQL 18.3 via PGlite 0.5.4",
       "provider_extensions": ["pgcrypto"],
-      "production_network_used": false
+      "production_network_used": false,
+      "replay_runner_committed": false,
+      "machine_readable_result_committed": false
     },
-    "portable_catalog_contract_parity": "passed_for_meta_foundation_surface",
+    "portable_catalog_contract_parity": {
+      "status": "historical_attestation_not_reproduced_by_this_candidate",
+      "claimed_scope": "passed_for_meta_foundation_surface",
+      "machine_readable_diff_committed": false
+    },
     "extension_stubbed_full_chain_replay": {
-      "status": "passed",
+      "status": "historical_attestation_not_reproduced_by_this_candidate",
+      "claimed_result": "passed",
       "later_migration_count": 48,
       "later_evidence_head": "f73c477d6eb2e287c59c895bc1c5017ab4b17980",
       "aal1_candidate_identity": "20260812034825_remove_projectos_approval_aal2",
       "aal1_candidate_sha256": "8e9acf74b5ee5ea552697989768afc5aac938b92947e3495c2deecde30dadd31",
       "supabase_services_stubbed": ["auth", "http", "vault", "pg_net", "pg_cron"],
-      "production_network_used": false
+      "production_network_used": false,
+      "replay_runner_committed": false,
+      "machine_readable_result_committed": false
     },
     "isolated_supabase_replay": "pending",
     "pgtap_approval_and_rollback": "pending",

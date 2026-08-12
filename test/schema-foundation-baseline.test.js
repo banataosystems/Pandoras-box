@@ -34,9 +34,15 @@ test('schema foundation candidates are content-addressed and inactive', () => {
     assert.equal(sha256(payload), foundation.sha256, foundation.identity);
   }
 
-  assert.equal(manifest.foundations[0].original_byte_equivalence, true);
+  assert.equal(manifest.foundations[0].recovered_archive_member_byte_equivalence, true);
+  assert.equal(
+    manifest.foundations[0].recovery_container_path,
+    'recovery/mcpmaster-source.part-02',
+  );
+  assert.equal(manifest.foundations[0].live_applied_migration_byte_equivalence, 'unproven');
   assert.equal(manifest.foundations[0].live_schema_equivalence, false);
-  assert.equal(manifest.foundations[1].original_byte_equivalence, false);
+  assert.equal(manifest.foundations[1].recovered_archive_member_byte_equivalence, false);
+  assert.equal(manifest.foundations[1].live_applied_migration_byte_equivalence, 'unproven');
   assert.equal(manifest.foundations[1].live_schema_equivalence, false);
 
   assert.equal(manifest.replay_fixtures.length, 2);
@@ -94,7 +100,23 @@ test('Meta schema reconstruction encodes the observed catalog boundary', () => {
     ].normalized_definition_sha256,
     '8819fcb068647307172b91717561279e559bf953e7ea2653f5feaf878a5d4444',
   );
-  assert.equal(manifest.validation.portable_foundation_replay.status, 'passed');
+  assert.equal(
+    manifest.validation.portable_foundation_replay.status,
+    'historical_attestation_not_reproduced_by_this_candidate',
+  );
+  assert.equal(manifest.validation.portable_foundation_replay.replay_runner_committed, false);
+  assert.equal(
+    manifest.validation.portable_catalog_contract_parity.machine_readable_diff_committed,
+    false,
+  );
+  assert.equal(
+    manifest.validation.extension_stubbed_full_chain_replay.status,
+    'historical_attestation_not_reproduced_by_this_candidate',
+  );
+  assert.equal(
+    manifest.validation.extension_stubbed_full_chain_replay.machine_readable_result_committed,
+    false,
+  );
   assert.equal(
     manifest.validation.extension_stubbed_full_chain_replay.later_migration_count,
     48,
