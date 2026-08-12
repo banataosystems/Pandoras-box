@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0.0",
+  "engine": {
+    "name": "pglite",
+    "package_version": "0.5.4",
+    "postgres_server_version_num": "180003"
+  },
+  "provider_equivalence": false,
+  "migration_count": 51,
+  "chain_sha256": "e93cec23e645cde9337dbb27c86ffdd7f897780a3985d24c37d147374954f7c7",
+  "provider_extension_substitutions": [
+    {
+      "filename": "20260728150403_enable_http_for_supabase_account_discovery.sql",
+      "statement": "create extension if not exists http with schema extensions;"
+    },
+    {
+      "filename": "20260807083337_projectos_memory_lifecycle_enforcement.sql",
+      "statement": "create extension if not exists pg_net;"
+    },
+    {
+      "filename": "20260807083337_projectos_memory_lifecycle_enforcement.sql",
+      "statement": "create extension if not exists pg_cron;"
+    }
+  ],
+  "fixtures": [
+    "after-foundations.sql",
+    "after-20260731122011.sql"
+  ],
+  "assertions": {
+    "meta_table_column_counts": {
+      "webhook_events": 14,
+      "meta_drafts": 11,
+      "meta_webhook_health": 9
+    },
+    "meta_rls_enabled": true,
+    "meta_drafts_policy_count": 2,
+    "final_decide_approval": "AAL1 permanent owner/admin; anon/operator/session dependency denied",
+    "replay_credentials": "four database-generated 256-bit values; no source literals",
+    "authorization_smoke": {
+      "aal1_owner_without_session": "approved",
+      "operator": "denied",
+      "anonymous_owner": "denied",
+      "high_risk_requester_as_approver": "denied",
+      "audit_event_appended": true
+    },
+    "database_rollback_smoke": {
+      "restore_previous_aal2_definition": "pass",
+      "reapply_aal1_definition": "pass"
+    }
+  }
+}
