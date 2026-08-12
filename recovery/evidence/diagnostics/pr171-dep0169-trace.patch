@@ -1,23 +1,10 @@
-# PR #171 DEP0169 diagnostic patch — historical container-only evidence; NOT current trace target
-# Historical base SHA: 082cd6ec3e36cded5c3c2c8dcb90f5f3701868de
-# Historical deployed image: sha256:1033686a7198bd0b646a138c508ff56a3604c7308e2acc8b38257e82713d9d83
-# This preserved patch changes only the Docker/container command:
+# PR #171 DEP0169 diagnostic patch — preview only
+# Base SHA: 082cd6ec3e36cded5c3c2c8dcb90f5f3701868de
+# Exact deployed image: sha256:1033686a7198bd0b646a138c508ff56a3604c7308e2acc8b38257e82713d9d83
+# Build logs prove current production-stage command:
+# CMD ["node", "apps/meta-business-mcp/dist/remote-server.js"]
+# Diagnostic candidate changes only the preview command:
 - CMD ["node", "apps/meta-business-mcp/dist/remote-server.js"]
 + CMD ["node", "--trace-deprecation", "apps/meta-business-mcp/dist/remote-server.js"]
 
-# Current production runtime authority:
-# deployment dpl_8ZyJBv7oR4gC4krdo2eYfj6DKVMX
-# Git SHA 6faf1dd25cb12f6ff20aa4f9500658c285d3025f
-# topology: 12 Node.js lambdas + 1 container
-#
-# Fresh Vercel runtime evidence classifies DEP0169-affected MCP/operator/OAuth/ProjectOS requests as source=serverless.
-# Therefore this container-only patch MUST NOT be used to claim current DEP0169 trace coverage or resolution.
-#
-# Current governed trace acceptance:
-# 1. Recover the authentic complete MCPMaster source archive with SHA-256
-#    dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83.
-# 2. Build a safe non-production diagnostic from that exact source.
-# 3. Apply --trace-deprecation to the exact Vercel Node-function/shared-bootstrap execution surface that serves an affected route.
-# 4. Invoke an affected route and capture the deprecation stack without secrets.
-# 5. Identify the exact package/file/line and verify the authorization/POS-SEC contract is unchanged.
-# 6. Do not promote the diagnostic build to production and preserve rollback provenance.
+Acceptance for a governed preview: build from exact base head or proven equivalent source; invoke /api/operator/auth/config; capture the DEP0169 stack without secrets; identify package/file/line; verify POS-SEC behavior unchanged; do not promote the diagnostic build to production; preserve rollback to dpl_8ibV3QGWGi9uBbQAXm69fhENs2fz.
