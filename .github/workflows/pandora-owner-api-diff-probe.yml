@@ -1,0 +1,33 @@
+name: Pandora Owner API Diff Probe
+
+on:
+  push:
+    branches:
+      - feature/flutterflow-pandora-mobile-v1
+    paths:
+      - .github/workflows/pandora-owner-api-diff-probe.yml
+
+permissions:
+  contents: write
+
+jobs:
+  install-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Install read-only owner API diff probe
+        run: |
+          python3 -m py_compile automation/flutterflow/install_owner_api_diff_probe.py
+          python3 automation/flutterflow/install_owner_api_diff_probe.py
+          git diff --check
+      - name: Commit temporary diff probe
+        run: |
+          git config user.name 'Pandora API Diff Probe'
+          git config user.email 'pandora-api-diff-probe@users.noreply.github.com'
+          git add automation/flutterflow/dsl/10_owner_api_state_navigation.dart
+          git commit -m 'Temporarily inspect owner API field drift'
+          git push origin HEAD:feature/flutterflow-pandora-mobile-v1
