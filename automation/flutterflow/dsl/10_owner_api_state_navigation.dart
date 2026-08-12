@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutterflow_ai/flutterflow_ai.dart';
 import 'package:flutterflow_ai/src/client/flutterflow_ai_client.dart' show FlutterFlowAI;
+import 'package:flutterflow_ai/src/dsl/runtime.dart' show runFlutterFlowAIDsl;
 import 'package:flutterflow_ai/src/helpers/api_helpers.dart' show findApiEndpoint, findApiGroup;
 import 'package:flutterflow_ai/src/internal_sdk.dart'
     show addNavBarPage, setNavBarEnabled;
@@ -305,100 +306,110 @@ abstract final class _PlansState {
   );
 }
 
-Future<void> main(List<String> args) async {
-  // PANDORA_OWNER_API_DIFF_PROBE_BEGIN
-  // Read-only exact-project comparison. This fetches the current project and
-  // compiles the desired owner API in memory. It never invokes run/push.
-  final probeApiKey = Platform.environment['FF_API_KEY'];
-  if (probeApiKey == null || probeApiKey.isEmpty) {
-    stderr.writeln('PANDORA_OWNER_API_DIFF: credential unavailable');
-    exit(88);
+bool _sameProtoBytes(dynamic left, dynamic right) {
+  final leftBytes = left.writeToBuffer() as List<int>;
+  final rightBytes = right.writeToBuffer() as List<int>;
+  if (leftBytes.length != rightBytes.length) return false;
+  for (var i = 0; i < leftBytes.length; i++) {
+    if (leftBytes[i] != rightBytes[i]) return false;
   }
-  final probeSdk = FlutterFlowAI(apiKey: probeApiKey);
-  final fetched = await probeSdk.getProject(_projectId);
+  return true;
+}
+
+void _repairExistingPandoraOwnerApi(dynamic project) {
   final desiredApp = App();
   final desiredSchemas = _declareSchemas(desiredApp);
   _declareOwnerApi(desiredApp, desiredSchemas);
   final desiredProject = compileAppDeclarations(desiredApp).project;
 
-  bool bytesEqual(List<int> left, List<int> right) {
-    if (left.length != right.length) return false;
-    for (var i = 0; i < left.length; i++) {
-      if (left[i] != right[i]) return false;
-    }
-    return true;
-  }
-
-  final currentGroup = findApiGroup(fetched.proto, name: 'PandoraOwnerApi');
+  final currentGroup = findApiGroup(project, name: 'PandoraOwnerApi');
   final desiredGroup = findApiGroup(desiredProject, name: 'PandoraOwnerApi');
   if (desiredGroup == null) {
-    stderr.writeln('PANDORA_OWNER_API_DIFF: desired group compilation failed');
-    exit(89);
+    throw StateError('Pandora owner API declaration did not compile.');
   }
   if (currentGroup == null) {
-    stdout.writeln('PANDORA_OWNER_API_DIFF GROUP missing');
-    exit(86);
+    // A genuinely missing group is left to the normal declaration compiler.
+    return;
   }
-  final groupDiffs = <String>[];
-  if (currentGroup.baseUrl != desiredGroup.baseUrl) groupDiffs.add('baseUrl');
-  if (currentGroup.sharedHeaders.join('\n') != desiredGroup.sharedHeaders.join('\n')) {
-    groupDiffs.add('sharedHeaders');
+
+  if (currentGroup.baseUrl != desiredGroup.baseUrl ||
+      currentGroup.sharedHeaders.join('\n') !=
+          desiredGroup.sharedHeaders.join('\n')) {
+    throw StateError(
+      'Pandora owner API group drift is outside the approved rerun repair.',
+    );
   }
-  stdout.writeln(
-    'PANDORA_OWNER_API_DIFF GROUP ${groupDiffs.isEmpty ? 'MATCH' : groupDiffs.join(',')}',
-  );
 
   for (final desiredEndpoint in desiredGroup.endpoints) {
     final name = desiredEndpoint.identifier.name;
     final currentEndpoint = findApiEndpoint(
-      fetched.proto,
+      project,
       name: name,
       groupName: 'PandoraOwnerApi',
     );
     if (currentEndpoint == null) {
-      stdout.writeln('PANDORA_OWNER_API_DIFF ENDPOINT $name missing');
+      // Missing endpoints are safe for ensure* create-if-missing semantics.
       continue;
     }
-    final diffs = <String>[];
-    if (currentEndpoint.url != desiredEndpoint.url) diffs.add('url');
-    if (currentEndpoint.callType != desiredEndpoint.callType) diffs.add('method');
-    if (currentEndpoint.bodyType != desiredEndpoint.bodyType) diffs.add('bodyType');
-    if (currentEndpoint.body != desiredEndpoint.body) diffs.add('body');
-    if (currentEndpoint.headers.join('\n') != desiredEndpoint.headers.join('\n')) {
-      diffs.add('headers');
+
+    // The signed read-only drift probe proved these fields already matched on
+    // 2026-08-12. Any new structural drift is therefore a new condition and
+    // must fail closed rather than being silently normalized.
+    if (currentEndpoint.url != desiredEndpoint.url ||
+        currentEndpoint.callType != desiredEndpoint.callType ||
+        currentEndpoint.bodyType != desiredEndpoint.bodyType ||
+        currentEndpoint.headers.join('\n') !=
+            desiredEndpoint.headers.join('\n')) {
+      throw StateError(
+        'Pandora owner API endpoint $name has unsupported structural drift.',
+      );
     }
-    final currentVariables = currentEndpoint.variables
-        .map((value) => value.writeToBuffer())
-        .toList();
-    final desiredVariables = desiredEndpoint.variables
-        .map((value) => value.writeToBuffer())
-        .toList();
-    if (currentVariables.length != desiredVariables.length) {
-      diffs.add('variables');
-    } else {
-      for (var i = 0; i < currentVariables.length; i++) {
-        if (!bytesEqual(currentVariables[i], desiredVariables[i])) {
-          diffs.add('variables');
-          break;
-        }
+
+    if (currentEndpoint.body != desiredEndpoint.body) {
+      if (name != 'PandoraRunAction') {
+        throw StateError(
+          'Pandora owner API endpoint $name has unexpected body drift.',
+        );
       }
+      currentEndpoint.body = desiredEndpoint.body;
     }
-    if (!bytesEqual(
-      currentEndpoint.responseDataStructParam.writeToBuffer(),
-      desiredEndpoint.responseDataStructParam.writeToBuffer(),
+
+    if (!_sameProtoBytes(currentEndpoint.variables, desiredEndpoint.variables)) {
+      currentEndpoint.variables
+        ..clear()
+        ..addAll(desiredEndpoint.variables.map((value) => value.deepCopy()));
+    }
+
+    if (!_sameProtoBytes(
+      currentEndpoint.responseDataStructParam,
+      desiredEndpoint.responseDataStructParam,
     )) {
-      diffs.add('response');
+      currentEndpoint.responseDataStructParam =
+          desiredEndpoint.responseDataStructParam.deepCopy();
     }
-    if (!bytesEqual(currentEndpoint.writeToBuffer(), desiredEndpoint.writeToBuffer())) {
-      diffs.add('other');
+
+    // This catches settings, unknown fields, or any other unsupported drift.
+    if (!_sameProtoBytes(currentEndpoint, desiredEndpoint)) {
+      throw StateError(
+        'Pandora owner API endpoint $name still differs after the approved '
+        'rerun repair; refusing to continue.',
+      );
     }
-    stdout.writeln(
-      'PANDORA_OWNER_API_DIFF ENDPOINT $name ${diffs.isEmpty ? 'MATCH' : diffs.join(',')}',
-    );
   }
-  stdout.writeln('PANDORA_OWNER_API_DIFF COMPLETE');
-  exit(86);
-  // PANDORA_OWNER_API_DIFF_PROBE_END
+}
+
+final class _PandoraRerunSafeSdk extends FlutterFlowAI {
+  _PandoraRerunSafeSdk({required String apiKey}) : super(apiKey: apiKey);
+
+  @override
+  getProject(String projectId) async {
+    final fetched = await super.getProject(projectId);
+    _repairExistingPandoraOwnerApi(fetched.proto);
+    return fetched;
+  }
+}
+
+Future<void> main(List<String> args) async {
   final options = _CliOptions.parse(args);
   final targetProjectId = options.projectId ?? _projectId;
   if (targetProjectId != _projectId) {
@@ -414,7 +425,13 @@ Future<void> main(List<String> args) async {
   final installGlobalNavigation =
       Platform.environment['FF_PANDORA_INSTALL_GLOBAL_NAV'] != 'false';
 
-  await flutterFlowAI(
+  final adapterApiKey =
+      options.apiKey ?? Platform.environment['FF_API_KEY'];
+  if (adapterApiKey == null || adapterApiKey.isEmpty) {
+    throw StateError('Pandora project access could not be verified.');
+  }
+
+  await runFlutterFlowAIDsl(
     (app) => buildPandoraOwnerApp(
       app,
       installGlobalNavigation: installGlobalNavigation,
@@ -424,6 +441,7 @@ Future<void> main(List<String> args) async {
     projectId: targetProjectId,
     dryRun: options.dryRun,
     commitMessage: options.commitMessage,
+    sdk: _PandoraRerunSafeSdk(apiKey: adapterApiKey),
   );
 }
 
