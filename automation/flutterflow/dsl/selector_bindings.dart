@@ -774,7 +774,6 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
           Text('Where we are', style: Styles.labelMedium),
           Text(State(spec.projectData)['plainStatus'], style: Styles.titleMedium),
           Text(State(spec.projectData)['phase'], style: Styles.bodyMedium),
-          Text(State(spec.projectData)['repository'], style: Styles.bodySmall),
         ],
       ),
     ),
@@ -855,7 +854,7 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
           spacing: 4,
           children: [
             Text(item['title'], style: Styles.titleSmall),
-            Text(item['status'], style: Styles.labelMedium),
+            Text(item['plainStatus'], style: Styles.labelMedium),
             Text(item['description'], style: Styles.bodySmall),
           ],
         ),
@@ -875,7 +874,6 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
           children: [
             Text(item['title'], style: Styles.titleSmall),
             Text(item['plainStatus'], style: Styles.labelMedium),
-            Text(item['environment'], style: Styles.bodySmall),
             Text(item['observedAt'], style: Styles.bodySmall),
             Text(
               'A recovery version is recorded.',
@@ -898,10 +896,9 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
           crossAxis: CrossAxis.start,
           spacing: 4,
           children: [
-            Text(item['evidence_type'], style: Styles.titleSmall),
-            Text(item['provider'], style: Styles.bodySmall),
-            Text(item['verdict'], style: Styles.labelMedium),
-            Text(item['observed_at'], style: Styles.bodySmall),
+            Text(item['title'], style: Styles.titleSmall),
+            Text(item['plainStatus'], style: Styles.labelMedium),
+            Text(item['observedAt'], style: Styles.bodySmall),
           ],
         ),
       ),
@@ -913,7 +910,7 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
       onTap: Navigate(ff.Pages.approvalCenter),
     ),
     Button(
-      'Set up work for this project',
+      'Choose an action for this project',
       name: 'PandoraProjectWorkButton',
       onTap: Navigate(
         ff.Pages.actionsCatalog,
@@ -930,10 +927,10 @@ DslWidget _actionsCatalogBody(PandoraBindingSpec spec) => Column(
   padding: const EdgeInsets.all(16),
   scrollable: true,
   children: [
-    _brandHeader('Work', 'Choose a governed action'),
+    _brandHeader('Actions', 'Choose what you want Pandora to do'),
     ..._loadingAndError(spec.actionsLoading, spec.actionsError, 'Actions'),
     Button(
-      'Try loading work again',
+      'Try loading actions again',
       name: 'PandoraActionsRetryButton',
       variant: ButtonVariant.outlined,
       visible: Not(Equals(State(spec.actionsError), '')),
@@ -964,7 +961,6 @@ DslWidget _actionsCatalogBody(PandoraBindingSpec spec) => Column(
           children: [
             Text(item['title'], style: Styles.titleMedium),
             Text(item['description'], style: Styles.bodyMedium),
-            Text(item['provider'], style: Styles.labelSmall),
             Text(
               'Extra identity check required',
               style: Styles.labelMedium,
@@ -1048,7 +1044,7 @@ DslWidget _approvalCenterBody(PandoraBindingSpec spec) => Column(
   padding: const EdgeInsets.all(16),
   scrollable: true,
   children: [
-    _brandHeader('Approve', 'Only items that need you'),
+    _brandHeader('Approvals', 'Only decisions that need you'),
     ..._loadingAndError(
       spec.approvalsLoading,
       spec.approvalsError,
@@ -1198,8 +1194,8 @@ DslWidget _plansExecutionBody(PandoraBindingSpec spec) => Column(
       ),
     ),
     Text(
-      'Pandora plans first. The backend still enforces approval and the extra '
-      'identity check before protected changes.',
+      'Pandora plans first. Approval and an extra identity check still apply '
+      'before protected changes.',
       style: Styles.bodyMedium,
     ),
     Button(
@@ -1259,7 +1255,7 @@ DslWidget _activityBody(PandoraBindingSpec spec) => Column(
   padding: const EdgeInsets.all(16),
   scrollable: true,
   children: [
-    _brandHeader('Memory & updates', 'Continue from verified records'),
+    _brandHeader('Activity', 'Recent changes and verified records'),
     Text('What Pandora remembers', style: Styles.titleLarge),
     TextField(
       label: 'Search Memory',
@@ -1304,7 +1300,7 @@ DslWidget _activityBody(PandoraBindingSpec spec) => Column(
             State(spec.memoryData)['plainSource'],
             style: Styles.bodyMedium,
           ),
-          Text('Direct Memory connection', style: Styles.labelMedium),
+          Text('Record status', style: Styles.labelMedium),
           Text(
             State(spec.memoryData)['directMemoryStatus'],
             style: Styles.bodySmall,
@@ -1573,13 +1569,13 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
         crossAxis: CrossAxis.start,
         spacing: 4,
         children: [
-          Text('Audit integrity', style: Styles.titleMedium),
+          Text('Protected activity', style: Styles.titleMedium),
           Text(
-            'Pandora checks the audit chain on the governed backend.',
+            'Pandora checks that protected activity records remain intact.',
             style: Styles.bodyMedium,
           ),
           Text(
-            'Technical hashes stay hidden in simple mode.',
+            'Detailed verification data stays out of the way.',
             style: Styles.bodySmall,
           ),
         ],

@@ -124,7 +124,7 @@ function failure(
   corsOrigin?: string | null,
 ) {
   return response(
-    { code, plainMessage, requestId },
+    { plainMessage },
     status,
     requestId,
     corsOrigin,
@@ -139,6 +139,31 @@ function asRecord(value: unknown): JsonRecord {
 
 function textValue(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function plainOwnerText(value: unknown, fallback = "") {
+  let text = textValue(value, fallback);
+  const replacements: Array<[RegExp, string]> = [
+    [/flutter\s*flow/gi, "app builder"],
+    [/\bmcp\b/gi, "connection layer"],
+    [/\byaml\b/gi, "project configuration"],
+    [/\bci\b/gi, "automated checks"],
+    [/\bprovider\b/gi, "service"],
+    [/bearer\s+token/gi, "access credential"],
+    [/service\s+role/gi, "protected server access"],
+    [/schema\s+fingerprint/gi, "data structure check"],
+    [/\baal2\b/gi, "extra identity check"],
+    [/\btotp\b/gi, "security code"],
+    [/\bgithub\b/gi, "source workspace"],
+    [/\bvercel\b/gi, "live hosting"],
+    [/\bsupabase\b/gi, "project data service"],
+    [/https?:\/\/\S+/gi, "a protected link"],
+    [/\b[0-9a-f]{40,64}\b/gi, "a recorded version"],
+  ];
+  for (const [pattern, replacement] of replacements) {
+    text = text.replace(pattern, replacement);
+  }
+  return text;
 }
 
 function intValue(value: string | null, fallback: number, max: number) {
@@ -298,18 +323,19 @@ function projectSummary(value: unknown) {
     : "not_checked";
   return {
     id: textValue(project.key ?? project.project_key ?? project.id),
-    name: textValue(project.name, "Unnamed project"),
-    plainPurpose: textValue(project.objective ?? projectionProject.objective),
-    phase: textValue(
+    name: plainOwnerText(project.name, "Unnamed project"),
+    plainPurpose: plainOwnerText(
+      project.objective ?? projectionProject.objective,
+    ),
+    phase: plainOwnerText(
       project.currentPhaseKey ?? project.current_phase_key ??
         currentPhase.name ?? currentPhase.key,
     ),
     progressPercent: Number.isFinite(progress) ? progress : null,
     progressVerified: Number.isFinite(progress) && dataFreshness === "fresh",
-    plainStatus: textValue(project.status, "Not verified yet"),
-    whatIsStoppingUs: textValue(blockedTask?.title) || null,
-    whatIWillDoNext: textValue(nextTask.title) || null,
-    repository: textValue(project.repository) || null,
+    plainStatus: plainOwnerText(project.status, "Not verified yet"),
+    whatIsStoppingUs: plainOwnerText(blockedTask?.title) || null,
+    whatIWillDoNext: plainOwnerText(nextTask.title) || null,
     dataFreshness,
     lastVerifiedAt: computedAt || (project.lastReconciledAt ??
       project.last_reconciled_at ?? projection.observedThrough ?? null),
@@ -320,14 +346,16 @@ function plainEvidenceSummary(value: unknown) {
   const evidence = asRecord(value);
   return {
     id: textValue(evidence.id),
-    task_id: textValue(evidence.task_id) || null,
-    evidence_type: textValue(evidence.evidence_type),
-    provider: textValue(evidence.provider),
-    status: textValue(evidence.status),
-    verdict: textValue(evidence.verdict) || null,
-    source_url: textValue(evidence.source_url) || null,
-    head_sha: textValue(evidence.head_sha) || null,
-    observed_at: evidence.observed_at ?? null,
+    taskId: textValue(evidence.task_id) || null,
+    title: plainOwnerText(evidence.evidence_type, "Project proof").replace(
+      /[._-]+/g,
+      " ",
+    ),
+    plainStatus: plainOwnerText(
+      evidence.verdict,
+      plainOwnerText(evidence.status, "Not checked yet"),
+    ).replace(/[._-]+/g, " "),
+    observedAt: evidence.observed_at ?? null,
   };
 }
 
@@ -343,19 +371,15 @@ function releaseSummary(value: unknown) {
     payload.previousDeployment ?? payload.previous_deployment ?? payload.rollback;
   return {
     id: textValue(evidence.id),
-    title: textValue(
+    title: plainOwnerText(
       payload.plainTitle ?? payload.title ?? payload.name,
-      "Live version evidence",
+      "Live version",
     ),
     plainStatus: verified
       ? "Verified"
-      : textValue(verdict, textValue(status, "Not checked yet"))
+      : plainOwnerText(verdict, plainOwnerText(status, "Not checked yet"))
         .replace(/[._-]+/g, " "),
     verified,
-    environment: textValue(payload.environment) || null,
-    releaseId: textValue(evidence.external_id) || null,
-    sourceUrl: textValue(evidence.source_url) || null,
-    headSha: textValue(evidence.head_sha) || null,
     rollbackAvailable: rollbackReference !== null &&
       rollbackReference !== undefined && rollbackReference !== "",
     observedAt: evidence.observed_at ?? null,
@@ -438,9 +462,18 @@ function connectionSummary(value: unknown, healthRows: JsonRecord[] = []) {
     : status === "pending"
     ? "needs_permission"
     : "not_checked";
+  const names: Record<string, string> = {
+    github: "Source workspace",
+    supabase: "Project data",
+    vercel: "Live web",
+    google_drive: "Files",
+    gmail: "Email",
+    posthog: "Product insights",
+    resend: "Email delivery",
+  };
   const purposes: Record<string, string> = {
     github: "Code, issues, and proposed changes",
-    supabase: "Database, sign-in, and safe server functions",
+    supabase: "Project data, sign-in, and protected functions",
     vercel: "Live web versions and service health",
     google_drive: "Shared files and documents",
     gmail: "Owner-authorized email workflows",
@@ -452,7 +485,7 @@ function connectionSummary(value: unknown, healthRows: JsonRecord[] = []) {
     : [];
   return {
     id: textValue(connection.id),
-    name: textValue(connection.display_name, provider),
+    name: names[provider.toLowerCase()] || "Connected service",
     plainPurpose: purposes[provider.toLowerCase()] || "Connected service",
     state,
     plainStatus: ready
@@ -465,38 +498,36 @@ function connectionSummary(value: unknown, healthRows: JsonRecord[] = []) {
       ? "Needs permission"
       : "Not checked yet",
     canRead: ready,
-    canChange: ready &&
-      scopes.some((scope) => /write|admin|manage/i.test(scope)),
+    canChange: ready && scopes.some((scope) => /write|admin|manage/i.test(scope)),
     canConnect: connectionActionAllowed("connect", state),
     canReconnect: connectionActionAllowed("reconnect", state),
     canTest: connectionActionAllowed("test", state),
     canDisconnect: connectionActionAllowed("disconnect", state),
     needsOwnerApprovalForChanges: true,
     lastCheckedAt: connection.last_health_check_at ?? null,
-    advanced: { provider, scopes, observedStatus: status },
   };
 }
 
 function approvalSummary(value: unknown, riskCode = "") {
   const approval = asRecord(value);
   const preview = asRecord(approval.preview_redacted);
-  const undo = textValue(preview.howWeCanUndoIt ?? preview.rollback);
+  const undo = plainOwnerText(preview.howWeCanUndoIt ?? preview.rollback);
   return {
     id: textValue(approval.id),
     projectId: textValue(preview.projectId ?? preview.project_id) || null,
-    whatWillHappen: textValue(
+    whatWillHappen: plainOwnerText(
       preview.whatWillHappen ?? preview.summary ?? preview.title,
       "A protected change is waiting for review.",
     ),
-    whyINeedYou: textValue(
+    whyINeedYou: plainOwnerText(
       approval.request_reason,
       "Pandora needs your decision before it can continue.",
     ),
-    whatWillChange: textValue(
+    whatWillChange: plainOwnerText(
       preview.whatWillChange ?? preview.changes ?? preview.details,
       "No additional change details were recorded.",
     ),
-    whatCouldGoWrong: textValue(
+    whatCouldGoWrong: plainOwnerText(
       preview.whatCouldGoWrong ?? preview.risk,
       "No specific risk explanation was recorded.",
     ),
@@ -504,15 +535,9 @@ function approvalSummary(value: unknown, riskCode = "") {
     riskLevel: ownerRiskLabel(riskCode),
     reversible: Boolean(undo),
     extraIdentityCheckRequired: true,
-    decision: textValue(approval.decision, "pending"),
+    decision: plainOwnerText(approval.decision, "pending"),
     expiresAt: approval.expires_at ?? null,
     createdAt: approval.created_at ?? null,
-    advanced: {
-      riskCode: riskCode || null,
-      actionHash: approval.action_hash ?? null,
-      runId: approval.run_id ?? null,
-      stepId: approval.step_id ?? null,
-    },
   };
 }
 
@@ -604,26 +629,23 @@ async function project(context: UserContext, identifier: string) {
   if (!projectRow) throw new Error("PROJECT_NOT_FOUND");
   const [phases, tasks, evidence, projection] = await Promise.all([
     context.client.from("projectos_phases").select(
-      "id, phase_key, name, sequence, status, exit_criteria, started_at, completed_at",
-    )
-      .eq("organization_id", context.organizationId).eq(
-        "project_id",
-        projectRow.id,
-      ).order("sequence"),
+      "id, name, sequence, status, started_at, completed_at",
+    ).eq("organization_id", context.organizationId).eq(
+      "project_id",
+      projectRow.id,
+    ).order("sequence"),
     context.client.from("projectos_tasks").select(
-      "id, task_key, title, description, sequence, priority, status, risk_class, completion_criteria, current_head_sha, result_summary, updated_at",
-    )
-      .eq("organization_id", context.organizationId).eq(
-        "project_id",
-        projectRow.id,
-      ).order("sequence"),
+      "id, title, description, status, updated_at",
+    ).eq("organization_id", context.organizationId).eq(
+      "project_id",
+      projectRow.id,
+    ).order("sequence"),
     context.client.from("projectos_evidence").select(
-      "id, task_id, evidence_type, provider, external_id, status, verdict, source_url, head_sha, payload_redacted, observed_at",
-    )
-      .eq("organization_id", context.organizationId).eq(
-        "project_id",
-        projectRow.id,
-      ).is("invalidated_at", null).order("observed_at", { ascending: false })
+      "id, task_id, evidence_type, status, verdict, payload_redacted, observed_at",
+    ).eq("organization_id", context.organizationId).eq(
+      "project_id",
+      projectRow.id,
+    ).is("invalidated_at", null).order("observed_at", { ascending: false })
       .limit(50),
     context.client.from("projectos_projections")
       .select("projection, computed_at, stale_after")
@@ -642,16 +664,27 @@ async function project(context: UserContext, identifier: string) {
       projection_computed_at: projection.data?.computed_at,
       projection_stale_after: projection.data?.stale_after,
     }),
-    objective: projectRow.objective,
-    roadmapVersion: projectRow.roadmap_version,
-    phases: phases.data || [],
-    tasks: tasks.data || [],
+    objective: plainOwnerText(projectRow.objective),
+    phases: ((phases.data || []) as JsonRecord[]).map((item) => ({
+      id: textValue(item.id),
+      name: plainOwnerText(item.name, "Project phase"),
+      sequence: Number(item.sequence) || 0,
+      plainStatus: plainOwnerText(item.status, "Not checked yet").replace(/[._-]+/g, " "),
+      startedAt: item.started_at ?? null,
+      completedAt: item.completed_at ?? null,
+    })),
+    tasks: ((tasks.data || []) as JsonRecord[]).map((item) => ({
+      id: textValue(item.id),
+      title: plainOwnerText(item.title, "Project work"),
+      description: plainOwnerText(item.description, "No summary was recorded."),
+      plainStatus: plainOwnerText(item.status, "Not checked yet").replace(/[._-]+/g, " "),
+      updatedAt: item.updated_at ?? null,
+    })),
     evidence: evidenceRows.map(plainEvidenceSummary),
     recentReleases: evidenceRows
       .filter((item) => isReleaseEvidenceType(textValue(item.evidence_type)))
       .map(releaseSummary)
       .slice(0, 10),
-    currentState: projection.data?.projection || null,
   };
 }
 
@@ -672,7 +705,13 @@ async function connections(
     throw new Error("BACKEND_READ_FAILED");
   }
   const healthRows = (healthResult.data || []) as JsonRecord[];
-  return (connectionsResult.data || []).map((item: JsonRecord) =>
+  const visibleConnections = (connectionsResult.data || []).filter(
+    (item: JsonRecord) =>
+      !/flutter\s*flow/i.test(
+        `${textValue(item.provider)} ${textValue(item.display_name)}`,
+      ),
+  );
+  return visibleConnections.map((item: JsonRecord) =>
     connectionSummary(item, healthRows)
   );
 }
@@ -705,16 +744,16 @@ async function connectionAction(
     throw new Error("AAL2_REQUIRED");
   }
 
-  const provider = textValue(asRecord(item.advanced).provider, item.name);
+  const serviceName = item.name;
   const requests: Record<GovernedConnectionAction, string> = {
     connect:
-      `Prepare to finish connecting ${provider}. Verify the owner-approved account, requested permissions, and rollback before changing access.`,
+      `Prepare to finish connecting ${serviceName}. Verify the owner-approved account, requested permissions, and rollback before changing access.`,
     reconnect:
-      `Prepare to reconnect ${provider}. Diagnose the expired or unhealthy authorization first, request only the required permissions, and preserve rollback.`,
+      `Prepare to reconnect ${serviceName}. Diagnose the expired or unhealthy authorization first, request only the required permissions, and preserve rollback.`,
     test:
-      `Check the ${provider} connection without changing its permissions or configuration. Record fresh health evidence and explain any owner action in plain language.`,
+      `Check the ${serviceName} connection without changing its permissions or configuration. Record fresh health evidence and explain any owner action in plain language.`,
     disconnect:
-      `Prepare to disconnect ${provider}. Show what will stop working, verify recovery and rollback, and do not remove access until the protected approval is valid.`,
+      `Prepare to disconnect ${serviceName}. Show what will stop working, verify recovery and rollback, and do not remove access until the protected approval is valid.`,
   };
   return acceptIntake(
     context,
@@ -764,27 +803,18 @@ async function approvals(context: UserContext, limit: number) {
 
 async function activity(context: UserContext, limit: number) {
   const { data, error } = await context.client.from("audit_events")
-    .select(
-      "id, event_type, actor_type, payload_redacted, run_id, step_id, created_at",
-    )
+    .select("id, event_type, payload_redacted, created_at")
     .eq("organization_id", context.organizationId).order("created_at", {
       ascending: false,
     }).limit(limit);
   if (error) throw new Error("BACKEND_READ_FAILED");
   return (data || []).map((event: JsonRecord) => ({
     id: String(event.id),
-    type: event.event_type,
-    actor: event.actor_type,
-    summary: textValue(
+    summary: plainOwnerText(
       asRecord(event.payload_redacted).summary,
       String(event.event_type).replace(/[._-]+/g, " "),
     ),
     happenedAt: event.created_at,
-    advanced: {
-      runId: event.run_id,
-      stepId: event.step_id,
-      details: event.payload_redacted,
-    },
   }));
 }
 
@@ -861,8 +891,8 @@ async function memory(
       id: textValue(item.id),
       projectId: textValue(item.project_id) || null,
       kind: "Decision",
-      title: textValue(item.statement, "Recorded decision"),
-      summary: textValue(item.rationale, "No reason was recorded."),
+      title: plainOwnerText(item.statement, "Recorded decision"),
+      summary: plainOwnerText(item.rationale, "No reason was recorded."),
       plainStatus: Number(item.confidence) >= 0.8
         ? "High-confidence record"
         : "Recorded",
@@ -872,9 +902,9 @@ async function memory(
       id: textValue(item.id),
       projectId: textValue(item.project_id) || null,
       kind: "Work",
-      title: textValue(item.title, "Project work"),
-      summary: textValue(item.description, "No summary was recorded."),
-      plainStatus: textValue(item.status, "Not checked yet").replace(
+      title: plainOwnerText(item.title, "Project work"),
+      summary: plainOwnerText(item.description, "No summary was recorded."),
+      plainStatus: plainOwnerText(item.status, "Not checked yet").replace(
         /[._-]+/g,
         " ",
       ),
@@ -888,7 +918,7 @@ async function memory(
         /[._-]+/g,
         " ",
       ),
-      summary: textValue(item.lesson, "No summary was recorded."),
+      summary: plainOwnerText(item.lesson, "No summary was recorded."),
       plainStatus: Number(item.confidence) >= 0.8
         ? "High-confidence record"
         : "Recorded",
@@ -898,15 +928,15 @@ async function memory(
       id: textValue(item.id),
       projectId: textValue(item.project_id) || null,
       kind: "Proof",
-      title: textValue(item.evidence_type, "Project proof").replace(
+      title: plainOwnerText(item.evidence_type, "Project proof").replace(
         /[._-]+/g,
         " ",
       ),
-      summary: `${textValue(item.provider, "Recorded service")}: ${
-        textValue(item.verdict, textValue(item.status, "not checked yet"))
-          .replace(/[._-]+/g, " ")
-      }`,
-      plainStatus: textValue(item.status, "Not checked yet").replace(
+      summary: plainOwnerText(
+        item.verdict,
+        plainOwnerText(item.status, "Not checked yet"),
+      ).replace(/[._-]+/g, " "),
+      plainStatus: plainOwnerText(item.status, "Not checked yet").replace(
         /[._-]+/g,
         " ",
       ),
@@ -928,7 +958,7 @@ async function memory(
   return {
     query: queryText,
     projectId: projectId || null,
-    plainSource: "Governed project record",
+    plainSource: "Project record",
     directMemoryStatus: "Not checked yet",
     items: filtered.slice(0, limit),
   };
@@ -943,10 +973,9 @@ async function safety(context: UserContext) {
       "organization_id",
       context.organizationId,
     ).maybeSingle(),
-    context.client.from("projectos_integration_health").select(
-      "project_id, provider, status, last_event_at, last_success_at, stale_after, details, updated_at",
-    )
-      .eq("organization_id", context.organizationId).order("provider"),
+    context.client.from("projectos_integration_health")
+      .select("status, last_success_at, stale_after")
+      .eq("organization_id", context.organizationId),
     admin.rpc("verify_execution_audit_chain", {
       p_organization_id: context.organizationId,
     }),
@@ -980,17 +1009,7 @@ async function safety(context: UserContext) {
     ? "protected"
     : "not_checked";
   return {
-    policy: policy.data,
-    integrations: healthRows.map((item) => ({
-      ...item,
-      freshness: textValue(item.stale_after) &&
-          Date.parse(textValue(item.stale_after)) > now
-        ? "fresh"
-        : "not_checked",
-    })),
-    auditIntegrity,
     mfaRequiredForApproval: true,
-    currentAssuranceLevel: context.aal,
     state,
     plainStatus: state === "problem"
       ? "Needs attention"
@@ -1063,7 +1082,7 @@ async function acceptIntake(
   const acceptedProject = asRecord(result.project);
   return {
     reply:
-      "I saved that request and sent it into Pandora's governed planning flow.",
+      "I saved that request and sent it into Pandora's safe planning flow.",
     needsApproval: false,
     actionId: textValue(intake.id) || null,
     approvalId: null,
@@ -1075,14 +1094,6 @@ async function acceptIntake(
         "Current state and required approvals will be checked next.",
       whatIsStoppingUs: null,
       whatIWillDoNext: "Show you the plan before any protected change runs.",
-    },
-    advanced: {
-      intakeId: intake.id ?? null,
-      projectKey: acceptedProject.project_key ?? null,
-      idempotencyKey: idempotency,
-      duplicateProtection: providedKey
-        ? "client_key"
-        : "ten_minute_retry_window",
     },
   };
 }
@@ -1197,10 +1208,10 @@ Deno.serve(async (req: Request) => {
       return send(
         Object.entries(ACTION_CATALOG).map(([id, action]) => ({
           id,
-          ...action,
+          title: action.title,
+          description: action.description,
           extraIdentityCheckRequired: action.risk === "CRITICAL" ||
             id === "pause-service" || id === "apply-approved-code-change",
-          executionMode: "plan_first",
         })),
       );
     }

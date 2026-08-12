@@ -791,11 +791,15 @@ def patch_ui(text: str) -> str:
         text = replace_once(text, old, new, label)
     text = replace_once(
         text,
-        '''      'Pandora plans first. The backend still enforces approval and the extra '
-      'identity check before protected changes.', ''',
-        '''      'Pandora plans first. Approval and an extra identity check still apply '
-      'before protected changes.', ''',
-        "plan copy",
+        "'Pandora plans first. The backend still enforces approval and the extra '",
+        "'Pandora plans first. Approval and an extra identity check still apply '",
+        "plan copy first line",
+    )
+    text = replace_once(
+        text,
+        "'identity check before protected changes.'",
+        "'before protected changes.'",
+        "plan copy second line",
     )
     return text
 

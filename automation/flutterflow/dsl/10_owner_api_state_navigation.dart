@@ -465,54 +465,36 @@ _PandoraSchemas _declareSchemas(App app) {
     'plainStatus': string,
     'whatIsStoppingUs': string,
     'whatIWillDoNext': string,
-    'repository': string,
     'dataFreshness': string,
     'lastVerifiedAt': dateTime,
   });
   final projectPhase = app.struct('PandoraProjectPhase', {
     'id': string,
-    'phase_key': string,
     'name': string,
     'sequence': int_,
-    'status': string,
-    'exit_criteria': json,
-    'started_at': dateTime,
-    'completed_at': dateTime,
+    'plainStatus': string,
+    'startedAt': dateTime,
+    'completedAt': dateTime,
   });
   final projectTask = app.struct('PandoraProjectTask', {
     'id': string,
-    'task_key': string,
     'title': string,
     'description': string,
-    'sequence': int_,
-    'priority': int_,
-    'status': string,
-    'risk_class': string,
-    'completion_criteria': json,
-    'current_head_sha': string,
-    'result_summary': json,
-    'updated_at': dateTime,
+    'plainStatus': string,
+    'updatedAt': dateTime,
   });
   final projectEvidence = app.struct('PandoraProjectEvidence', {
     'id': string,
-    'task_id': string,
-    'evidence_type': string,
-    'provider': string,
-    'status': string,
-    'verdict': string,
-    'source_url': string,
-    'head_sha': string,
-    'observed_at': dateTime,
+    'taskId': string,
+    'title': string,
+    'plainStatus': string,
+    'observedAt': dateTime,
   });
   final release = app.struct('PandoraRelease', {
     'id': string,
     'title': string,
     'plainStatus': string,
     'verified': bool_,
-    'environment': string,
-    'releaseId': string,
-    'sourceUrl': string,
-    'headSha': string,
     'rollbackAvailable': bool_,
     'observedAt': dateTime,
   });
@@ -526,16 +508,13 @@ _PandoraSchemas _declareSchemas(App app) {
     'plainStatus': string,
     'whatIsStoppingUs': string,
     'whatIWillDoNext': string,
-    'repository': string,
     'dataFreshness': string,
     'lastVerifiedAt': dateTime,
     'objective': string,
-    'roadmapVersion': string,
     'phases': listOf(projectPhase),
     'tasks': listOf(projectTask),
     'evidence': listOf(projectEvidence),
     'recentReleases': listOf(release),
-    'currentState': json,
   });
   final systemHealth = app.struct('PandoraSystemHealth', {
     'state': string,
@@ -561,15 +540,11 @@ _PandoraSchemas _declareSchemas(App app) {
     'decision': string,
     'expiresAt': dateTime,
     'createdAt': dateTime,
-    'advanced': json,
   });
   final activity = app.struct('PandoraActivity', {
     'id': string,
-    'type': string,
-    'actor': string,
     'summary': string,
     'happenedAt': dateTime,
-    'advanced': json,
   });
   final memoryItem = app.struct('PandoraMemoryItem', {
     'id': string,
@@ -589,8 +564,6 @@ _PandoraSchemas _declareSchemas(App app) {
   });
   final home = app.struct('PandoraHomePayload', {
     'systemHealth': systemHealth,
-    // The API's no-priority fallback is a partial approval-shaped object;
-    // omitted fields deserialize as null.
     'priority': approval,
     'counters': counters,
     'topProjects': listOf(projectSummary),
@@ -610,14 +583,9 @@ _PandoraSchemas _declareSchemas(App app) {
     'canDisconnect': bool_,
     'needsOwnerApprovalForChanges': bool_,
     'lastCheckedAt': dateTime,
-    'advanced': json,
   });
   final safety = app.struct('PandoraSafety', {
-    'policy': json,
-    'integrations': listOf(json),
-    'auditIntegrity': json,
     'mfaRequiredForApproval': bool_,
-    'currentAssuranceLevel': string,
     'state': string,
     'plainStatus': string,
   });
@@ -625,11 +593,7 @@ _PandoraSchemas _declareSchemas(App app) {
     'id': string,
     'title': string,
     'description': string,
-    'provider': string,
-    'risk': string,
-    'request': string,
     'extraIdentityCheckRequired': bool_,
-    'executionMode': string,
   });
   final askStatus = app.struct('PandoraAskStatus', {
     'whatChanged': string,
@@ -645,7 +609,6 @@ _PandoraSchemas _declareSchemas(App app) {
     'actionId': string,
     'approvalId': string,
     'status': askStatus,
-    'advanced': json,
   });
   final decisionResponse = app.struct('PandoraApprovalDecision', {
     'ok': bool_,
@@ -1302,19 +1265,19 @@ void _installGlobalBottomNavigation(App app) {
       project,
       pageName: 'ActionsCatalog',
       iconName: 'bolt',
-      label: 'Work',
+      label: 'Actions',
     );
     _addLabeledNavPage(
       project,
       pageName: 'ApprovalCenter',
       iconName: 'approval',
-      label: 'Approve',
+      label: 'Approvals',
     );
     _addLabeledNavPage(
       project,
       pageName: 'ActivityAuditTrail',
       iconName: 'history',
-      label: 'Memory',
+      label: 'Activity',
     );
     _addLabeledNavPage(
       project,
