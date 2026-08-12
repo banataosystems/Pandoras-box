@@ -304,49 +304,99 @@ abstract final class _PlansState {
 }
 
 Future<void> main(List<String> args) async {
-  // PANDORA_SIGNED_SDK_CONTRACT_PROBE_BEGIN
-  // Inspection-only recovery aid. It reads only the already verified vendored
-  // SDK source and exits before flutterFlowAI() or any project operation.
-  final sdkRoot = Directory('.flutterflow/sdk/flutterflow_ai/lib');
-  if (!sdkRoot.existsSync()) {
-    stderr.writeln('PANDORA_SDK_CONTRACT_PROBE: signed SDK source is missing');
+  // PANDORA_OWNER_API_DIFF_PROBE_BEGIN
+  // Read-only exact-project comparison. This fetches the current project and
+  // compiles the desired owner API in memory. It never invokes run/push.
+  final probeApiKey = Platform.environment['FF_API_KEY'];
+  if (probeApiKey == null || probeApiKey.isEmpty) {
+    stderr.writeln('PANDORA_OWNER_API_DIFF: credential unavailable');
+    exit(88);
+  }
+  final probeSdk = FlutterFlowAI(apiKey: probeApiKey);
+  final fetched = await probeSdk.getProject(_projectId);
+  final desiredApp = App();
+  final desiredSchemas = _declareSchemas(desiredApp);
+  _declareOwnerApi(desiredApp, desiredSchemas);
+  final desiredProject = compileAppDeclarations(desiredApp).project;
+
+  bool bytesEqual(List<int> left, List<int> right) {
+    if (left.length != right.length) return false;
+    for (var i = 0; i < left.length; i++) {
+      if (left[i] != right[i]) return false;
+    }
+    return true;
+  }
+
+  final currentGroup = findApiGroup(fetched.proto, name: 'PandoraOwnerApi');
+  final desiredGroup = findApiGroup(desiredProject, name: 'PandoraOwnerApi');
+  if (desiredGroup == null) {
+    stderr.writeln('PANDORA_OWNER_API_DIFF: desired group compilation failed');
+    exit(89);
+  }
+  if (currentGroup == null) {
+    stdout.writeln('PANDORA_OWNER_API_DIFF GROUP missing');
     exit(86);
   }
-  var hits = 0;
-  for (final entity in sdkRoot.listSync(recursive: true, followLinks: false)) {
-    if (entity is! File || !entity.path.endsWith('.dart')) continue;
-    final source = entity.readAsStringSync();
-    final lines = source.split('\n');
-    for (var i = 0; i < lines.length; i++) {
-      final probeLine = lines[i];
-      final runtimeContractHit =
-          probeLine.contains('class FlutterFlowAIClient') ||
-          probeLine.contains('runFlutterFlowAIDsl') ||
-          probeLine.contains('compileAppDeclarations') ||
-          probeLine.contains('validateProject') ||
-          probeLine.contains('fetchProject') ||
-          probeLine.contains('getProject') ||
-          probeLine.contains('pushProject') ||
-          probeLine.contains('FlutterFlowAIClient(');
-      if (!runtimeContractHit) {
-        continue;
-      }
-      hits += 1;
-      final start = i - 8 < 0 ? 0 : i - 8;
-      final end = i + 40 >= lines.length ? lines.length - 1 : i + 40;
-      stdout.writeln('PANDORA_SDK_CONTRACT_BEGIN ${entity.path} ${i + 1}');
-      for (var j = start; j <= end; j++) {
-        stdout.writeln('${j + 1}: ${lines[j]}');
-      }
-      stdout.writeln('PANDORA_SDK_CONTRACT_END');
+  final groupDiffs = <String>[];
+  if (currentGroup.baseUrl != desiredGroup.baseUrl) groupDiffs.add('baseUrl');
+  if (currentGroup.sharedHeaders.join('\n') != desiredGroup.sharedHeaders.join('\n')) {
+    groupDiffs.add('sharedHeaders');
+  }
+  stdout.writeln(
+    'PANDORA_OWNER_API_DIFF GROUP ${groupDiffs.isEmpty ? 'MATCH' : groupDiffs.join(',')}',
+  );
+
+  for (final desiredEndpoint in desiredGroup.endpoints) {
+    final name = desiredEndpoint.identifier.name;
+    final currentEndpoint = findApiEndpoint(
+      fetched.proto,
+      name: name,
+      groupName: 'PandoraOwnerApi',
+    );
+    if (currentEndpoint == null) {
+      stdout.writeln('PANDORA_OWNER_API_DIFF ENDPOINT $name missing');
+      continue;
     }
+    final diffs = <String>[];
+    if (currentEndpoint.url != desiredEndpoint.url) diffs.add('url');
+    if (currentEndpoint.callType != desiredEndpoint.callType) diffs.add('method');
+    if (currentEndpoint.bodyType != desiredEndpoint.bodyType) diffs.add('bodyType');
+    if (currentEndpoint.body != desiredEndpoint.body) diffs.add('body');
+    if (currentEndpoint.headers.join('\n') != desiredEndpoint.headers.join('\n')) {
+      diffs.add('headers');
+    }
+    final currentVariables = currentEndpoint.variables
+        .map((value) => value.writeToBuffer())
+        .toList();
+    final desiredVariables = desiredEndpoint.variables
+        .map((value) => value.writeToBuffer())
+        .toList();
+    if (currentVariables.length != desiredVariables.length) {
+      diffs.add('variables');
+    } else {
+      for (var i = 0; i < currentVariables.length; i++) {
+        if (!bytesEqual(currentVariables[i], desiredVariables[i])) {
+          diffs.add('variables');
+          break;
+        }
+      }
+    }
+    if (!bytesEqual(
+      currentEndpoint.responseDataStructParam.writeToBuffer(),
+      desiredEndpoint.responseDataStructParam.writeToBuffer(),
+    )) {
+      diffs.add('response');
+    }
+    if (!bytesEqual(currentEndpoint.writeToBuffer(), desiredEndpoint.writeToBuffer())) {
+      diffs.add('other');
+    }
+    stdout.writeln(
+      'PANDORA_OWNER_API_DIFF ENDPOINT $name ${diffs.isEmpty ? 'MATCH' : diffs.join(',')}',
+    );
   }
-  stdout.writeln('PANDORA_SDK_CONTRACT_HITS=$hits');
-  if (hits == 0) {
-    stderr.writeln('PANDORA_SDK_CONTRACT_PROBE: update declarations not found');
-  }
-  exit(hits == 0 ? 87 : 86);
-  // PANDORA_SIGNED_SDK_CONTRACT_PROBE_END
+  stdout.writeln('PANDORA_OWNER_API_DIFF COMPLETE');
+  exit(86);
+  // PANDORA_OWNER_API_DIFF_PROBE_END
   final options = _CliOptions.parse(args);
   final targetProjectId = options.projectId ?? _projectId;
   if (targetProjectId != _projectId) {
