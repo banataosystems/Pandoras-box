@@ -319,12 +319,16 @@ Future<void> main(List<String> args) async {
     final lines = source.split('\n');
     for (var i = 0; i < lines.length; i++) {
       final probeLine = lines[i];
-      if (!probeLine.contains('updateApiEndpoint') &&
-          !probeLine.contains('updateApiGroup') &&
-          !probeLine.contains('class App') &&
-          !probeLine.contains('FFProject get project') &&
-          !probeLine.contains('final FFProject project') &&
-          !probeLine.contains('flutterFlowAI')) {
+      final runtimeContractHit =
+          probeLine.contains('class FlutterFlowAIClient') ||
+          probeLine.contains('runFlutterFlowAIDsl') ||
+          probeLine.contains('compileAppDeclarations') ||
+          probeLine.contains('validateProject') ||
+          probeLine.contains('fetchProject') ||
+          probeLine.contains('getProject') ||
+          probeLine.contains('pushProject') ||
+          probeLine.contains('FlutterFlowAIClient(');
+      if (!runtimeContractHit) {
         continue;
       }
       hits += 1;
