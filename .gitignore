@@ -1,0 +1,9 @@
+node_modules/
+dist/
+apps/meta-business-mcp/dist/
+packages/shared-security/dist/
+coverage/
+*.log
+.env
+.env.*
+!.env.example

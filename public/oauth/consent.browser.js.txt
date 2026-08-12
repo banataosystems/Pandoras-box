@@ -1,0 +1,313 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.106.2?bundle';
+
+const authorizationId = new URLSearchParams(window.location.search).get('authorization_id');
+const status = document.querySelector('#status');
+const loginForm = document.querySelector('#login');
+const githubButton = document.querySelector('#github');
+const consent = document.querySelector('#consent');
+const clientCopy = document.querySelector('#client-copy');
+const requestedScopes = document.querySelector('#requested-scopes');
+const approveButton = document.querySelector('#approve');
+const denyButton = document.querySelector('#deny');
+
+const GITHUB_VERIFIER_KEY = 'pandoras-box-consent-github-verifier';
+const GITHUB_COOKIE_NAME = 'pandoras_box_consent_pkce';
+const GITHUB_CALLBACK_MARKER = 'github-consent';
+const GITHUB_MAX_AGE_MS = 10 * 60 * 1000;
+
+let supabase;
+let authConfig;
+
+function show(element) {
+  for (const candidate of [loginForm, consent]) candidate.hidden = candidate !== element;
+}
+
+function setStatus(message, danger = false) {
+  status.hidden = false;
+  status.textContent = message;
+  status.classList.toggle('danger', danger);
+}
+
+function hideStatus() {
+  status.hidden = true;
+}
+
+function errorMessage(error) {
+  return error?.message || error?.error_description || 'Authorization failed';
+}
+
+function encodeBase64Url(bytes) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function createVerifier() {
+  const bytes = new Uint8Array(64);
+  crypto.getRandomValues(bytes);
+  return encodeBase64Url(bytes);
+}
+
+async function createChallenge(verifier) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return encodeBase64Url(new Uint8Array(digest));
+}
+
+function cookieValue(name) {
+  const prefix = `${encodeURIComponent(name)}=`;
+  for (const part of document.cookie.split(';')) {
+    const value = part.trim();
+    if (value.startsWith(prefix)) return decodeURIComponent(value.slice(prefix.length));
+  }
+  return '';
+}
+
+function verifierRecord(raw) {
+  try {
+    const record = JSON.parse(raw || '');
+    const verifier = typeof record?.verifier === 'string' ? record.verifier : '';
+    const requestId = typeof record?.authorizationId === 'string' ? record.authorizationId : '';
+    const createdAt = Number(record?.createdAt);
+    if (verifier.length < 43 || verifier.length > 128) return null;
+    if (!requestId || requestId !== authorizationId) return null;
+    if (!Number.isFinite(createdAt) || Date.now() - createdAt > GITHUB_MAX_AGE_MS || createdAt > Date.now() + 30_000) return null;
+    return { verifier, authorizationId: requestId, createdAt };
+  } catch {
+    return null;
+  }
+}
+
+function clearGitHubState() {
+  try {
+    sessionStorage.removeItem(GITHUB_VERIFIER_KEY);
+  } catch {
+    // The short-lived same-site cookie is still cleared below.
+  }
+  document.cookie = `${encodeURIComponent(GITHUB_COOKIE_NAME)}=; Max-Age=0; Path=/; SameSite=Lax; Secure`;
+}
+
+function storeVerifier(verifier) {
+  const record = JSON.stringify({ verifier, authorizationId, createdAt: Date.now() });
+  let stored = false;
+  try {
+    sessionStorage.setItem(GITHUB_VERIFIER_KEY, record);
+    stored = sessionStorage.getItem(GITHUB_VERIFIER_KEY) === record;
+  } catch {
+    // Mobile process restoration uses the secure same-site cookie fallback.
+  }
+  document.cookie = `${encodeURIComponent(GITHUB_COOKIE_NAME)}=${encodeURIComponent(record)}; Max-Age=600; Path=/; SameSite=Lax; Secure`;
+  stored = stored || cookieValue(GITHUB_COOKIE_NAME) === record;
+  if (!stored) throw new Error('This browser blocked the temporary GitHub sign-in verifier. Allow cookies for Pandoras-Box and try again.');
+}
+
+function readVerifier() {
+  let stored = '';
+  try {
+    stored = sessionStorage.getItem(GITHUB_VERIFIER_KEY) || '';
+  } catch {
+    // Fall back to the short-lived same-site cookie.
+  }
+  return verifierRecord(stored) || verifierRecord(cookieValue(GITHUB_COOKIE_NAME));
+}
+
+function cleanCallbackUrl() {
+  const url = new URL(window.location.href);
+  ['code', 'error', 'error_code', 'error_description', 'oauth_callback'].forEach((key) => url.searchParams.delete(key));
+  const query = url.searchParams.toString();
+  window.history.replaceState({}, document.title, `${url.pathname}${query ? `?${query}` : ''}${url.hash}`);
+}
+
+async function beginGitHubSignIn() {
+  clearGitHubState();
+  if (!authConfig?.supabaseUrl) throw new Error('Pandoras-Box authentication configuration is unavailable');
+  const verifier = createVerifier();
+  const challenge = await createChallenge(verifier);
+  storeVerifier(verifier);
+
+  const redirectTo = new URL('/oauth/consent', window.location.origin);
+  redirectTo.searchParams.set('authorization_id', authorizationId);
+  redirectTo.searchParams.set('oauth_callback', GITHUB_CALLBACK_MARKER);
+
+  const authorizationUrl = new URL('/auth/v1/authorize', authConfig.supabaseUrl);
+  authorizationUrl.searchParams.set('provider', 'github');
+  authorizationUrl.searchParams.set('redirect_to', redirectTo.toString());
+  authorizationUrl.searchParams.set('code_challenge', challenge);
+  authorizationUrl.searchParams.set('code_challenge_method', 's256');
+  window.location.assign(authorizationUrl.toString());
+}
+
+async function exchangeGitHubCode(code, verifier) {
+  const response = await fetch(`${authConfig.supabaseUrl}/auth/v1/token?grant_type=pkce`, {
+    method: 'POST',
+    redirect: 'error',
+    headers: {
+      apikey: authConfig.supabasePublishableKey,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify({ auth_code: code, code_verifier: verifier }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.msg || payload?.message || payload?.error_description || 'GitHub authentication could not be completed');
+  }
+  if (typeof payload?.access_token !== 'string' || typeof payload?.refresh_token !== 'string') {
+    throw new Error('Supabase did not return an authenticated GitHub session');
+  }
+  const { error } = await supabase.auth.setSession({
+    access_token: payload.access_token,
+    refresh_token: payload.refresh_token,
+  });
+  if (error) throw error;
+}
+
+async function consumeGitHubCallback() {
+  const url = new URL(window.location.href);
+  const marker = url.searchParams.get('oauth_callback');
+  const code = url.searchParams.get('code');
+  const providerError = url.searchParams.get('error_description') || url.searchParams.get('error');
+  if (marker !== GITHUB_CALLBACK_MARKER && !code && !providerError) return false;
+
+  try {
+    if (providerError) throw new Error(providerError);
+    if (marker !== GITHUB_CALLBACK_MARKER || !code) throw new Error('GitHub authentication returned an incomplete callback');
+    const record = readVerifier();
+    if (!record) throw new Error('GitHub sign-in could not be resumed on this browser. Tap Continue with GitHub again.');
+    await exchangeGitHubCode(code, record.verifier);
+    return true;
+  } finally {
+    cleanCallbackUrl();
+    clearGitHubState();
+  }
+}
+
+async function session() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session;
+}
+
+async function verifyMembership() {
+  const current = await session();
+  if (!current?.access_token) throw new Error('Pandoras-Box session is unavailable');
+  const response = await fetch('/api/operator/session', {
+    headers: {
+      authorization: `Bearer ${current.access_token}`,
+      accept: 'application/json',
+    },
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error('Active Pandoras-Box organization membership is required');
+  return response.json();
+}
+
+async function showConsent() {
+  await verifyMembership();
+  const { data, error } = await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+  if (error) throw error;
+  if (!data) throw new Error('Supabase returned no authorization details');
+  if (!('authorization_id' in data)) {
+    window.location.assign(data.redirect_url);
+    return;
+  }
+
+  const name = data.client?.name || 'Claude';
+  const redirectUri = data.redirect_uri || 'the registered Claude callback';
+  clientCopy.textContent = `${name} is requesting secure access to Pandoras-Box. After approval, it will return to ${redirectUri}.`;
+  const scopes = String(data.scope || '').trim();
+  requestedScopes.textContent = scopes
+    ? `Requested OAuth scopes: ${scopes.split(/\s+/).join(', ')}`
+    : 'Requested OAuth scopes: Pandoras-Box membership and RLS-controlled access.';
+  hideStatus();
+  show(consent);
+}
+
+async function decide(decision) {
+  approveButton.disabled = true;
+  denyButton.disabled = true;
+  setStatus(decision === 'approve' ? 'Authorizing Claude…' : 'Denying access…');
+  try {
+    const operation = decision === 'approve'
+      ? supabase.auth.oauth.approveAuthorization(authorizationId)
+      : supabase.auth.oauth.denyAuthorization(authorizationId);
+    const { data, error } = await operation;
+    if (error) throw error;
+    window.location.assign(data.redirect_url);
+  } catch (error) {
+    setStatus(errorMessage(error), true);
+    approveButton.disabled = false;
+    denyButton.disabled = false;
+  }
+}
+
+githubButton.addEventListener('click', async () => {
+  githubButton.disabled = true;
+  githubButton.textContent = 'Opening GitHub…';
+  setStatus('Opening secure GitHub sign-in…');
+  try {
+    await beginGitHubSignIn();
+  } catch (error) {
+    setStatus(errorMessage(error), true);
+    githubButton.disabled = false;
+    githubButton.textContent = 'Continue with GitHub';
+  }
+});
+
+loginForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = loginForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  setStatus('Signing in securely…');
+  try {
+    const values = new FormData(loginForm);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: String(values.get('email') || '').trim(),
+      password: String(values.get('password') || ''),
+    });
+    if (error) throw error;
+    await showConsent();
+  } catch (error) {
+    setStatus(errorMessage(error), true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+approveButton.addEventListener('click', () => decide('approve'));
+denyButton.addEventListener('click', () => decide('deny'));
+
+async function boot() {
+  if (!authorizationId || authorizationId.length > 2048) {
+    setStatus('This authorization link is invalid or incomplete.', true);
+    return;
+  }
+  try {
+    const response = await fetch('/api/operator/auth/config', {
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+    });
+    if (!response.ok) throw new Error('Pandoras-Box authentication configuration is unavailable');
+    authConfig = await response.json();
+    supabase = createClient(authConfig.supabaseUrl, authConfig.supabasePublishableKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+
+    if (await consumeGitHubCallback()) {
+      setStatus('GitHub identity verified. Checking authorization request…');
+      await showConsent();
+      return;
+    }
+
+    hideStatus();
+    show(loginForm);
+  } catch (error) {
+    setStatus(errorMessage(error), true);
+    show(loginForm);
+  }
+}
+
+boot();

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#090b0e" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Authorize Claude · Pandoras-Box</title>
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/mbanatao/Battle/c3594e4721097714118a3e1a6854e9836410b00a/public/brand/banatao/red-apple-mark-96.png" />
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background:#090b0e; color:#f5f7fa; }
+      * { box-sizing:border-box; }
+      body { margin:0; min-height:100svh; display:grid; place-items:center; padding:20px; background:radial-gradient(circle at top,#1c2229 0,#0b0e12 45%,#07090b 100%); }
+      main { width:min(100%,460px); }
+      .brand { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+      .brand img { width:48px; height:48px; object-fit:contain; }
+      .eyebrow { color:#9ca8b7; font-size:12px; letter-spacing:.16em; text-transform:uppercase; }
+      h1 { margin:2px 0 0; font-size:24px; }
+      .card { border:1px solid #2a313a; border-radius:20px; background:rgba(17,21,26,.94); box-shadow:0 24px 80px rgba(0,0,0,.45); overflow:hidden; }
+      .body { padding:22px; }
+      p { color:#bcc5d0; line-height:1.55; }
+      label { display:block; margin:16px 0 7px; color:#d8dee6; font-size:14px; }
+      input { width:100%; border:1px solid #39434f; border-radius:12px; background:#0d1116; color:white; padding:14px; font-size:16px; }
+      button { width:100%; border:0; border-radius:12px; padding:14px 16px; font-size:16px; font-weight:700; cursor:pointer; }
+      button.primary { margin-top:18px; color:white; background:linear-gradient(135deg,#d62828,#9f111c); }
+      button.github { margin-top:18px; color:#111; background:#f4f6f8; }
+      button.secondary { margin-top:10px; color:#e6ebf0; background:#252c35; }
+      button:disabled { opacity:.55; cursor:wait; }
+      .notice { padding:13px 14px; border:1px solid #39434f; border-radius:12px; background:#11161c; color:#c6ced8; font-size:14px; line-height:1.45; }
+      .danger { border-color:#73333a; background:#251215; color:#ffc7cd; }
+      .divider { display:flex; align-items:center; gap:10px; margin:18px 0 2px; color:#7f8996; font-size:12px; text-transform:uppercase; letter-spacing:.12em; }
+      .divider::before,.divider::after { content:""; height:1px; flex:1; background:#2a313a; }
+      .scope { display:flex; justify-content:space-between; gap:16px; padding:12px 0; border-bottom:1px solid #262d35; }
+      .scope:last-child { border-bottom:0; }
+      [hidden] { display:none !important; }
+      footer { margin-top:14px; color:#75808d; font-size:12px; text-align:center; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="brand">
+        <img src="https://raw.githubusercontent.com/mbanatao/Battle/c3594e4721097714118a3e1a6854e9836410b00a/public/brand/banatao/red-apple-mark-96.png" alt="Red Apple mark" />
+        <div><div class="eyebrow">Banatao Systems</div><h1>Pandoras-Box authorization</h1></div>
+      </div>
+      <section class="card">
+        <div class="body">
+          <div id="status" class="notice">Preparing the secure authorization request…</div>
+
+          <form id="login" hidden>
+            <h2>Sign in</h2>
+            <p>Use the GitHub identity linked to your active Pandoras-Box owner or operator account.</p>
+            <button id="github" class="github" type="button">Continue with GitHub</button>
+            <div class="divider">or use email</div>
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="username" required />
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+            <button class="primary" type="submit">Continue securely</button>
+          </form>
+
+          <section id="consent" hidden>
+            <h2>Allow Claude to use Pandoras-Box?</h2>
+            <p id="client-copy"></p>
+            <div class="scope"><span>Read</span><strong>Project status and governed tools</strong></div>
+            <div class="scope"><span>Write</span><strong>Durable plans, approvals, and execution</strong></div>
+            <div class="scope"><span>Safety</span><strong>Audit, account allowlists, destructive gate</strong></div>
+            <div id="requested-scopes" class="notice" style="margin-top:16px"></div>
+            <button id="approve" class="primary" type="button">Authorize Claude</button>
+            <button id="deny" class="secondary" type="button">Deny access</button>
+          </section>
+        </div>
+      </section>
+      <footer>OAuth 2.1 + PKCE · GitHub via Supabase Auth · Pandoras-Box governed execution</footer>
+    </main>
+    <script type="module" src="/oauth/consent.js?v=github-pkce-1"></script>
+  </body>
+</html>

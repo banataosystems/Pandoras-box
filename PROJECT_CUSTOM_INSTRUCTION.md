@@ -29,7 +29,7 @@ This instruction does not upgrade the project’s implementation status. Documen
 - durable plans, dependencies, claims, approvals, and execution;
 - provider adapters for GitHub, Vercel, Supabase, analytics, email, documents, deployment, and future services;
 - one-time execution claims and idempotency;
-- AAL2 approval boundary;
+- authenticated owner/admin approval boundary;
 - exact-source and exact-deployment evidence;
 - independent review routing;
 - release and rollback orchestration;
@@ -75,7 +75,7 @@ Use AI for planning, decomposition, evidence synthesis, anomaly detection, revie
 
 ## 10. Security, privacy, and governance
 
-Fail closed. Require workload identity, scoped project grants, AAL2 for owner/admin approvals, durable plans before writes, one-time claims, tamper-evident audit, replay protection, no secret exposure, environment separation, provider allowlists, and negative authorization tests. Public connector access must not expose privileged tools; machine access should use protected workload identity rather than broad public access.
+Fail closed. Require workload identity, scoped project grants, authenticated owner/admin authorization for ProjectOS approvals, durable plans before writes, one-time claims, tamper-evident audit, replay protection, no secret exposure, environment separation, provider allowlists, and negative authorization tests. Supabase MFA may remain available at the identity provider, but MCPMaster/ProjectOS does not require AAL2/TOTP for ordinary plan approval. Public connector access must not expose privileged tools; machine access should use protected workload identity rather than broad public access.
 
 ## 11. Dependencies and integration boundaries
 
