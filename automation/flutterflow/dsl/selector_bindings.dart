@@ -454,6 +454,7 @@ DslWidget _signInBody(PandoraBindingSpec spec) => Column(
       'Sign in',
       name: 'PandoraSignInButton',
       width: double.infinity,
+      height: 48,
       visible: Not(const Global(GlobalProperty.isUserLoggedIn)),
       onTap: LoginEmailPassword(
         State(spec.signInEmail),
@@ -528,7 +529,7 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
   padding: const EdgeInsets.all(PandoraUi.pagePadding),
   scrollable: true,
   children: [
-    _brandHeader('Pandora\'s Box', 'Owner command center'),
+    _brandHeader('Pandora\'s Box', 'Build, fix, publish, and restore in plain language'),
     _panel(
       name: 'PandoraOwnerCommandPanel',
       child: Column(
@@ -553,6 +554,8 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
           Button(
             'Ask Pandora',
             name: 'PandoraOwnerCommandButton',
+            width: double.infinity,
+            height: 48,
             visible: Not(State(spec.homeCommandSubmitting)),
             onTap: _submitHomeCommand(
               spec,
@@ -919,12 +922,14 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
     Button(
       'Review all approvals',
       name: 'PandoraProjectApprovalsButton',
+      height: 48,
       variant: ButtonVariant.outlined,
       onTap: Navigate(ff.Pages.approvalCenter),
     ),
     Button(
       'Choose an action for this project',
       name: 'PandoraProjectWorkButton',
+      height: 48,
       onTap: Navigate(
         ff.Pages.actionsCatalog,
         params: {'projectId': Param(spec.projectId)},
@@ -1018,7 +1023,7 @@ DslWidget _actionBuilderBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraActionPlanFirstPanel',
       child: Column(
         crossAxis: CrossAxis.start,
-        spacing: 5,
+        spacing: PandoraUi.compactGap,
         children: [
           Text('How it will run', style: Styles.titleSmall),
           Text(
@@ -1188,7 +1193,7 @@ DslWidget _plansExecutionBody(PandoraBindingSpec spec) => Column(
           variant: ButtonVariant.text,
           onTap: const NavigateBack(),
         ),
-        Text('Action plan', style: Styles.titleLarge),
+        Text('Preview', style: Styles.titleLarge),
       ],
     ),
     _panel(
@@ -1197,12 +1202,12 @@ DslWidget _plansExecutionBody(PandoraBindingSpec spec) => Column(
         crossAxis: CrossAxis.start,
         spacing: PandoraUi.compactGap,
         children: [
-          Text('Action', style: Styles.labelMedium),
-          Text(Param(spec.planActionId), style: Styles.titleMedium),
-          Text('Project', style: Styles.labelMedium),
-          Text(Param(spec.planProjectId), style: Styles.bodyMedium),
           Text('Requested outcome', style: Styles.labelMedium),
           Text(Param(spec.planRequestMessage), style: Styles.bodyMedium),
+          Text(
+            'Pandora will use the project and action you selected.',
+            style: Styles.bodySmall,
+          ),
         ],
       ),
     ),
