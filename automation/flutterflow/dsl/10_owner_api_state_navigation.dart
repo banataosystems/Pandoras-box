@@ -324,7 +324,7 @@ Future<void> main(List<String> args) async {
       }
       hits += 1;
       final start = i - 8 < 0 ? 0 : i - 8;
-      final end = i + 12 >= lines.length ? lines.length - 1 : i + 12;
+      final end = i + 40 >= lines.length ? lines.length - 1 : i + 40;
       stdout.writeln('PANDORA_SDK_CONTRACT_BEGIN ${entity.path} ${i + 1}');
       for (var j = start; j <= end; j++) {
         stdout.writeln('${j + 1}: ${lines[j]}');
