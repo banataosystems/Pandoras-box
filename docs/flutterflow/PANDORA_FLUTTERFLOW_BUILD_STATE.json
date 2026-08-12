@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.8.0",
+  "schemaVersion": "1.9.0",
   "projectKey": "mcpmaster",
   "artifact": "pandora-mobile-flutterflow-v1",
   "canonicalRepository": "banataosystems/Pandoras-box",
@@ -172,10 +172,22 @@
     ]
   },
   "unattendedExecution": {
-    "status": "source_candidate_tested_provider_validation_blocked",
-    "currentCandidate": "c7744689da37bdb099505f43c8f4a2f526888083",
-    "currentProviderValidationRun": 31582149316,
-    "currentBlocker": "The exact-head read-only owner-app validation failed before project access because no matching one-time broker grant existed. Durable grant plan e4bbab48-7495-4734-a2f4-aa9a2c11003a was created but the live control plane still requires an AAL2 owner/admin session for approval. No grant or owner-app mutation occurred.",
+    "status": "source_candidate_tested_exact_grant_and_denial_audit_blocked",
+    "currentCandidate": "a9bbfa63d80fd814cda89db7970dc5390dd8f45e",
+    "currentProviderValidationRun": 31586020676,
+    "currentBlocker": "The exact-head read-only owner-app validation failed before project access because no matching one-time broker grant existed. Live logs proved the atomic grant consumer returned 200 with no matching row, then the denial-audit RPC returned 403 and persisted no attempt. Source now fails closed on denial-audit persistence and reports only bounded error codes, but neither source repair is deployed. The governed grant approval path still requires the live AAL2 owner/admin control plane. No grant or owner-app mutation occurred.",
+    "latestFailureEvidence": {
+      "runId": 31586020676,
+      "runAttempt": 1,
+      "jobId": 94079921635,
+      "durableManifestArtifactId": 9137131062,
+      "durableManifestDigest": "sha256:d0438377a8a072785394b82c341ff83b91fc38eff16cee103a7f794eb4987a8d",
+      "matchingGrantRows": 0,
+      "grantConsumerHttpStatus": 200,
+      "denialAuditHttpStatus": 403,
+      "ownerAppReached": false,
+      "ownerAppMutated": false
+    },
     "outcome": "Finish the existing app without requiring the owner's browser session. Keep the visual builder invisible to the owner, export the real Flutter source automatically, and move release ownership to Pandora's governed source/build/hosting pipeline.",
     "acceptanceCriteria": [
       "Supabase email authentication and logout are wired in the existing project.",

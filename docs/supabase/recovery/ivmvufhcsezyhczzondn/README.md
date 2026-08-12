@@ -14,3 +14,7 @@ Exact archived-to-live identity, byte-count, and SHA-256 mappings are recorded
 in `migration-provenance-manifest.json`. The control-project segregation
 record remains in
 `../jcyqixttuebxqqfkjonq/migration-reconciliation-manifest.json`.
+
+`inactive-source/remediation-candidates/` contains separately reviewed source
+candidates only. The denial-audit repair there is not part of this incomplete
+history and is not authorized for provider application.

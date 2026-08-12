@@ -1921,11 +1921,18 @@
       "status": "unrecoverable_from_live_history",
       "candidate_source": {
         "path_in_recovery_archive": "source/supabase/migrations/20260724010000_control_plane_foundation.sql",
+        "inactive_repository_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/foundation-candidates/20260724010000_control_plane_foundation.sql",
         "bytes": 27160,
         "crc32": "90b2694f",
         "sha256": "15733a9714e81fb0689438b8c92eec1490310c7476a45d5144902c09c9ec3fd5",
-        "authority": "candidate_only",
-        "limitation": "The committed archive parts do not match their manifest hash and lack a valid ZIP central directory."
+        "git_blob_sha1_if_stored_as_plain_sql": "fe15cc45125984b388ec47d5a4c0bf5f0bed2b4c",
+        "canonical_source_commit": "cb811a30cc325567ce1ecbbc01cbf03a5715085c",
+        "canonical_source_path": "recovery/mcpmaster-source.part-02",
+        "canonical_source_blob": "dbc9b03511423e2eba4defe7b6d2fd051dab9cda",
+        "zip_local_header_offset": 2129,
+        "compressed_bytes": 4548,
+        "authority": "recovered_executable_candidate_live_equivalence_unverified",
+        "limitation": "The complete ZIP local header, deflate stream, and CRC-verified SQL entry are wholly contained in one immutable canonical Git blob, but the live migration row retained only a provenance placeholder and does not cryptographically prove that these exact executable bytes were applied."
       },
       "archive_integrity": {
         "manifest_declared_sha256": "dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83",
@@ -1939,8 +1946,8 @@
       "live_recorded_statement_sha256": "492d24c88fa906b3b1567aaa3679e1cbd49967542f340f0238e36bca8748a45f",
       "live_recorded_statement_bytes": 37,
       "status": "unrecoverable_from_live_history",
-      "candidate_source": null,
-      "blocker": "No authoritative executable source was found in the canonical repository evidence inspected."
+    "candidate_source": null,
+    "blocker": "No executable source was found across canonical branches, PRs, commits, Git objects, retained workflow artifacts, code/discussion search, or durable provider evidence. The content-addressed external source candidate is Library artifact mcpmaster-main (3).zip, 1467203 bytes, SHA-256 d124682c4989617611269792a9215ed6ac2a67545dc49ecbe9bfe0b834223684; it is not readable in this conversation."
     }
   ],
   "foreign_flutterflow_oidc_migrations": [

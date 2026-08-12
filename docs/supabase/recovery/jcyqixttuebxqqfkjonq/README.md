@@ -10,11 +10,11 @@ This directory preserves read-only reconciliation evidence for Supabase project 
 - `recorded-payloads/` contains 48 exact provider-recorded SQL payloads encoded as Base64. Base64 whitespace is insignificant; decoding each file reproduces the exact byte count and SHA-256 in the manifest.
 - `recorded-sql/` contains 48 inactive replay previews. Each is the corresponding provider payload plus exactly one terminal LF added by the repository patch writer; its normalized hash is recorded separately in the manifest.
 - `inactive-source/misstamped/` contains the four exact-content files removed from the active stream because their local timestamps do not equal the live migration identities.
-- The two earliest live rows are not materialized because their recorded payloads are non-SQL provenance placeholders.
+- The two earliest live rows are not materialized because their recorded payloads are non-SQL provenance placeholders. Immutable canonical Git evidence now yields one CRC-verified executable candidate for `20260724010000`, but exact live equivalence remains unproven. No executable source was found for `20260724030000` in the exhaustive canonical evidence search.
 
 ## Safety boundary
 
-Do not copy these payloads wholesale into `supabase/migrations`, apply them to a provider, repair remote migration history, or infer that the pending AAL1 change is deployed. The historical chain has no recorded rollback or idempotency keys, one foundational source is only an unverified recovery candidate, and one foundational source remains missing.
+Do not copy these payloads wholesale into `supabase/migrations`, apply them to a provider, repair remote migration history, or infer that the pending AAL1 change is deployed. The historical chain has no recorded rollback or idempotency keys, one foundational source is an authentic canonical recovery candidate whose exact live equivalence remains unverified, and one foundational source remains missing.
 
 Four wrong-timestamp files on the feature branch duplicate live SQL under different migration identities. Four additional FlutterFlow/OIDC files belong to the separately recorded `ivmvufhcsezyhczzondn` target overlay and are absent from this project's live history and schema. Both classes must remain out of this project's active repair stream.
 

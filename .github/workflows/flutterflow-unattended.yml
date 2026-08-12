@@ -89,7 +89,10 @@ jobs:
             if [[ -n "${after_snapshot:-}" && "${after_snapshot}" == "${RUNNER_TEMP}/"* ]]; then
               rm -f "${after_snapshot}"
             fi
-            unset oidc_json oidc_token broker_json ff_token broker_project_id
+            if [[ -n "${broker_response:-}" && "${broker_response}" == "${RUNNER_TEMP}/"* ]]; then
+              rm -f "${broker_response}"
+            fi
+            unset oidc_json oidc_token broker_json broker_status broker_error_code ff_token broker_project_id
           }
           trap cleanup EXIT
 
@@ -105,16 +108,49 @@ jobs:
           )"
           printf '::add-mask::%s\n' "${oidc_token}"
 
-          broker_json="$(
+          broker_response="${RUNNER_TEMP}/pandora-flutterflow-broker-response.json"
+          if ! broker_status="$(
             curl --proto '=https' --tlsv1.2 \
-              --fail --silent --show-error --max-time 20 \
+              --silent --max-time 20 \
               -X POST \
               -H "Authorization: Bearer ${oidc_token}" \
               -H 'Content-Type: application/json' \
               --data "{\"project_id\":\"${FLUTTERFLOW_PROJECT_ID}\"}" \
+              --output "${broker_response}" \
+              --write-out '%{http_code}' \
               "${BROKER_URL}"
-          )"
+          )"; then
+            unset oidc_json oidc_token
+            rm -f "${broker_response}"
+            broker_response=""
+            printf 'FlutterFlow broker request failed: BROKER_REQUEST_FAILED (HTTP 000)\n' >&2
+            exit 22
+          fi
           unset oidc_json oidc_token
+          if [[ "${broker_status}" != "200" ]]; then
+            broker_error_code="$(
+              python3 - "${broker_response}" <<'PY'
+          import json
+          import pathlib
+          import re
+          import sys
+
+          try:
+              code = json.loads(pathlib.Path(sys.argv[1]).read_text()).get("code")
+          except Exception:
+              code = None
+          if not isinstance(code, str) or not re.fullmatch(r"[A-Z0-9_]{1,64}", code):
+              code = "UNREADABLE_BROKER_ERROR"
+          print(code, end="")
+          PY
+            )"
+            printf 'FlutterFlow broker denied request: %s (HTTP %s)\n' \
+              "${broker_error_code}" "${broker_status}" >&2
+            exit 22
+          fi
+          broker_json="$(<"${broker_response}")"
+          rm -f "${broker_response}"
+          broker_response=""
 
           ff_token="$(
             python3 -c 'import json,sys; data=json.load(sys.stdin); token=data["token"]; assert isinstance(token,str) and len(token)>=20; print(token,end="")' \

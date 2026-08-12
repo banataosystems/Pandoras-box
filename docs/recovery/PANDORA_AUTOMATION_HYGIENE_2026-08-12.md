@@ -42,10 +42,14 @@ owner rerun adapter remains in the durable unattended workflow path.
 
 ## Verified limitation
 
-Exact-head owner-app validation remains blocked before project access because
-the candidate run has no matching one-time broker grant. No owner-app write or
-read-back occurred. This cleanup must not be described as provider validation,
-deployment, or production verification.
+Exact-head run `31586020676` at
+`a9bbfa63d80fd814cda89db7970dc5390dd8f45e` remained blocked before project
+access because it had no matching one-time broker grant. Its atomic grant
+consumer returned HTTP 200 with no grant, and its separate denial-audit RPC
+returned HTTP 403 and persisted no row. The source-only repair now makes that
+audit failure explicit and fail-closed; it is not deployed. No owner-app write
+or read-back occurred. This cleanup must not be described as provider
+validation, deployment, or production verification.
 
 The retained split recovery archive also fails its declared SHA-256 check; see
 `recovery/SOURCE_RECOVERY_MANIFEST.md`. It remains forensic evidence only.

@@ -78,6 +78,24 @@ test("recorded Supabase migration evidence is content-addressed and inactive", (
   assert.equal(manifest.validation.decoded_payload_hash_matches, 48);
   assert.equal(manifest.validation.preview_normalization_matches, 48);
 
+  const foundation = manifest.non_replayable_foundations.find(
+    (item: any) => item.identity === "20260724010000_control_plane_foundation",
+  );
+  assert.ok(foundation);
+  assert.equal(
+    foundation.candidate_source.authority,
+    "recovered_executable_candidate_live_equivalence_unverified",
+  );
+  const foundationPayload = repositoryFile(
+    foundation.candidate_source.inactive_repository_path,
+  );
+  assert.equal(foundationPayload.length, foundation.candidate_source.bytes);
+  assert.equal(sha256(foundationPayload), foundation.candidate_source.sha256);
+  assert.equal(
+    foundation.candidate_source.canonical_source_blob,
+    "dbc9b03511423e2eba4defe7b6d2fd051dab9cda",
+  );
+
   for (const item of manifest.wrong_timestamp_exact_content_duplicates) {
     assert.equal(existsSync(new URL(item.local_path, repositoryRoot)), false);
     const inactive = repositoryFile(item.inactive_path);
@@ -163,4 +181,12 @@ test("FlutterFlow migration evidence is mapped to exact live identities and stay
     "20260810055928_flutterflow_private_snapshot_reader_v1",
     "20260810060747_flutterflow_private_snapshot_files_reader_v1",
   ]);
+
+  for (const candidate of manifest.sourceOnlyRemediationCandidates) {
+    const payload = repositoryFile(candidate.path);
+    assert.match(candidate.path, /\/inactive-source\/remediation-candidates\//);
+    assert.equal(candidate.status, "inactive_not_deployed");
+    assert.equal(payload.length, candidate.bytes);
+    assert.equal(sha256(payload), candidate.sha256);
+  }
 });

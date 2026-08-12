@@ -80,7 +80,7 @@
   },
   "sourceOnlyRemediationState": {
     "ordinaryApprovalAal1OwnerAdminOnly": "implemented_and_tested_not_deployed",
-    "migrationHistory": "50 live identities documented; 48 exact SQL payloads recovered; two foundational executable sources remain unproven",
+    "migrationHistory": "50 live identities documented; 48 exact live-recorded SQL payloads recovered; one additional executable foundation candidate was recovered from immutable canonical Git evidence but exact live equivalence remains unverified; the other foundation remains missing",
     "searchPathAndRegistryHardening": "blocked_from_active_migrations_pending_complete_history_and_disposable_replay",
     "providerApplyAuthorized": false
   },

@@ -168,6 +168,154 @@ async function verifyGithubJwt(
   return claims;
 }
 
+type WorkloadGrantRequest = {
+  repository: string;
+  repositoryId: string;
+  repositoryOwnerId: string;
+  workflowRef: string;
+  ref: string;
+  commitSha: string;
+  actorId: string;
+  jtiSha256: string;
+  runId: string;
+  runAttempt: number;
+};
+
+type GrantProvider = {
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  fetchImpl?: typeof fetch;
+};
+
+export async function resolveFlutterFlowGrant(
+  workload: WorkloadGrantRequest,
+  provider: GrantProvider,
+): Promise<Response> {
+  const fetchImpl = provider.fetchImpl ?? fetch;
+  const providerHeaders = {
+    apikey: provider.serviceRoleKey,
+    authorization: `Bearer ${provider.serviceRoleKey}`,
+    "content-type": "application/json",
+  };
+
+  let grantResponse: Response;
+  try {
+    grantResponse = await fetchImpl(
+      `${provider.supabaseUrl}/rest/v1/rpc/consume_flutterflow_github_oidc_grant`,
+      {
+        method: "POST",
+        headers: providerHeaders,
+        signal: AbortSignal.timeout(10_000),
+        body: JSON.stringify({
+          p_repository: workload.repository,
+          p_repository_id: workload.repositoryId,
+          p_repository_owner_id: workload.repositoryOwnerId,
+          p_workflow_ref: workload.workflowRef,
+          p_ref: workload.ref,
+          p_sha: workload.commitSha,
+          p_audience: audience,
+          p_actor_id: workload.actorId,
+          p_jti_sha256: workload.jtiSha256,
+          p_run_id: workload.runId,
+          p_run_attempt: workload.runAttempt,
+        }),
+      },
+    );
+  } catch {
+    return response(
+      503,
+      "GRANT_CHECK_FAILED",
+      "The one-time grant could not be checked.",
+    );
+  }
+  if (!grantResponse.ok) {
+    return response(
+      503,
+      "GRANT_CHECK_FAILED",
+      "The one-time grant could not be checked.",
+    );
+  }
+
+  let rows: unknown;
+  try {
+    rows = await grantResponse.json();
+  } catch {
+    return response(
+      503,
+      "GRANT_CHECK_FAILED",
+      "The one-time grant could not be checked.",
+    );
+  }
+  const grant = Array.isArray(rows) ? rows[0] : undefined;
+  if (
+    typeof grant?.token !== "string" || grant.token.length === 0 ||
+    grant.project_id !== expectedProjectId
+  ) {
+    let auditResponse: Response;
+    try {
+      auditResponse = await fetchImpl(
+        `${provider.supabaseUrl}/rest/v1/rpc/record_flutterflow_github_oidc_attempt`,
+        {
+          method: "POST",
+          headers: providerHeaders,
+          signal: AbortSignal.timeout(10_000),
+          body: JSON.stringify({
+            p_repository: workload.repository,
+            p_ref: workload.ref,
+            p_sha: workload.commitSha,
+            p_workflow_ref: workload.workflowRef,
+            p_actor_id: workload.actorId,
+            p_run_id: workload.runId,
+            p_run_attempt: workload.runAttempt,
+            p_outcome: "grant_miss",
+          }),
+        },
+      );
+    } catch {
+      return response(
+        503,
+        "GRANT_MISS_AUDIT_FAILED",
+        "The denied workload could not be audited.",
+      );
+    }
+    if (!auditResponse.ok) {
+      return response(
+        503,
+        "GRANT_MISS_AUDIT_FAILED",
+        "The denied workload could not be audited.",
+      );
+    }
+    console.info(
+      "flutterflow_oidc_grant_miss",
+      JSON.stringify({
+        repository: workload.repository,
+        ref: workload.ref,
+        sha: workload.commitSha,
+        workflow_ref: workload.workflowRef,
+        actor_id: workload.actorId,
+        run_id: workload.runId,
+        run_attempt: workload.runAttempt,
+      }),
+    );
+    return response(
+      403,
+      "GRANT_NOT_AVAILABLE",
+      "No matching one-time grant is available.",
+    );
+  }
+
+  return new Response(
+    JSON.stringify({
+      token: grant.token,
+      project_id: grant.project_id,
+      project_name: grant.project_name,
+      verified_at: grant.verified_at,
+      grant_id: grant.grant_id,
+    }),
+    { status: 200, headers: jsonHeaders },
+  );
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") {
     return response(405, "METHOD_NOT_ALLOWED", "POST is required.");
@@ -281,94 +429,20 @@ Deno.serve(async (request: Request) => {
       "supabase_url",
     );
     const serviceRoleKey = adminKey();
-    const grantResponse = await fetch(
-      `${supabaseUrl}/rest/v1/rpc/consume_flutterflow_github_oidc_grant`,
+    return await resolveFlutterFlowGrant(
       {
-        method: "POST",
-        headers: {
-          apikey: serviceRoleKey,
-          authorization: `Bearer ${serviceRoleKey}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          p_repository: repository,
-          p_repository_id: repositoryId,
-          p_repository_owner_id: repositoryOwnerId,
-          p_workflow_ref: workflowRef,
-          p_ref: ref,
-          p_sha: commitSha,
-          p_audience: audience,
-          p_actor_id: actorId,
-          p_jti_sha256: await sha256(jti),
-          p_run_id: runId,
-          p_run_attempt: runAttempt,
-        }),
+        repository,
+        repositoryId,
+        repositoryOwnerId,
+        workflowRef,
+        ref,
+        commitSha,
+        actorId,
+        jtiSha256: await sha256(jti),
+        runId,
+        runAttempt,
       },
-    );
-
-    if (!grantResponse.ok) {
-      return response(
-        503,
-        "GRANT_CHECK_FAILED",
-        "The one-time grant could not be checked.",
-      );
-    }
-    const rows = await grantResponse.json();
-    const grant = Array.isArray(rows) ? rows[0] : undefined;
-    if (!grant?.token || grant.project_id !== expectedProjectId) {
-      try {
-        await fetch(
-          `${supabaseUrl}/rest/v1/rpc/record_flutterflow_github_oidc_attempt`,
-          {
-            method: "POST",
-            headers: {
-              apikey: serviceRoleKey,
-              authorization: `Bearer ${serviceRoleKey}`,
-              "content-type": "application/json",
-            },
-            body: JSON.stringify({
-              p_repository: repository,
-              p_ref: ref,
-              p_sha: commitSha,
-              p_workflow_ref: workflowRef,
-              p_actor_id: actorId,
-              p_run_id: runId,
-              p_run_attempt: runAttempt,
-              p_outcome: "grant_miss",
-            }),
-          },
-        );
-      } catch {
-        // The denied workload remains denied even if audit persistence fails.
-      }
-      console.info(
-        "flutterflow_oidc_grant_miss",
-        JSON.stringify({
-          repository,
-          ref,
-          sha: commitSha,
-          workflow_ref: workflowRef,
-          actor_id: actorId,
-          run_id: runId,
-          run_attempt: runAttempt,
-        }),
-      );
-      return response(
-        403,
-        "GRANT_NOT_AVAILABLE",
-        "No matching one-time grant is available.",
-      );
-    }
-
-    return new Response(
-      JSON.stringify({
-        token: grant.token,
-        project_id: grant.project_id,
-        project_name: grant.project_name,
-        verified_at: grant.verified_at,
-        grant_id: grant.grant_id,
-      }),
-      { status: 200, headers: jsonHeaders },
+      { supabaseUrl, serviceRoleKey },
     );
   } catch {
     return response(

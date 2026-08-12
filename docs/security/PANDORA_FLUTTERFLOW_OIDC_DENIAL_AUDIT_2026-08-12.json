@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "observedAt": "2026-08-12T10:08:03.653Z",
+  "projectRef": "ivmvufhcsezyhczzondn",
+  "productionMutationPerformed": false,
+  "exactWorkflowEvidence": {
+    "candidateSha": "a9bbfa63d80fd814cda89db7970dc5390dd8f45e",
+    "runId": 31586020676,
+    "runAttempt": 1,
+    "jobId": 94079921635,
+    "mode": "validate-owner",
+    "conclusion": "failure",
+    "brokerHttpStatus": 403,
+    "durableManifestArtifactId": 9137131062,
+    "durableManifestDigest": "sha256:d0438377a8a072785394b82c341ff83b91fc38eff16cee103a7f794eb4987a8d",
+    "ownerAppReached": false,
+    "ownerAppMutated": false
+  },
+  "liveProviderEvidence": {
+    "brokerVersion": 3,
+    "brokerBundleSha256": "b5485af15ca175a8a222e76e923fec135bd7d758d91d346289c9041d5ccec1ca",
+    "brokerRequestLogId": "b3a5ed92-f3e7-4259-a9e1-09d0fb636cbd",
+    "consumeGrantApiLogId": "9d52781e-5140-43f6-acd3-f9cb05463d1e",
+    "consumeGrantHttpStatus": 200,
+    "recordAttemptApiLogId": "c59e287d-6787-4cfe-b775-4560c8f5b676",
+    "recordAttemptHttpStatus": 403,
+    "matchingGrantRows": 0,
+    "matchingUsableGrantRows": 0,
+    "persistedAttemptRows": 0,
+    "conclusion": "The workload identity reached the atomic grant consumer, but no exact grant existed. The broker denied access as intended, while its separate denial-audit RPC failed with HTTP 403 and persisted no attempt row."
+  },
+  "classification": {
+    "grantDenial": "correct_fail_closed_behavior",
+    "denialAuditPersistence": "must_fix_before_owner_app_apply",
+    "workflowErrorSpecificity": "must_fix_for_exact_diagnostics"
+  },
+  "sourceOnlyRemediation": {
+    "brokerSource": "supabase/functions/flutterflow-github-oidc-broker/index.ts",
+    "brokerBehavior": "A grant miss now returns a 503 audit failure unless the denial-audit RPC succeeds; it returns GRANT_NOT_AVAILABLE only after audit persistence succeeds.",
+    "inactiveDatabaseCandidate": "docs/supabase/recovery/ivmvufhcsezyhczzondn/inactive-source/remediation-candidates/fix_flutterflow_oidc_attempt_audit_acl.sql",
+    "inactiveDatabaseCandidateSha256": "447904e400d14dd76449e03759e8aaaa9851d54577d63e13a9120b2254e81901",
+    "inactiveDatabaseCandidateBytes": 21943,
+    "authorizationBoundary": "The replacement is one explicit transaction, uses a shared function-writer advisory lock plus an ACCESS EXCLUSIVE table lock, and refuses unknown drift through exact old/new function hashes, complete ACL and effective-access assertions, permanent-table and replica-identity assertions, exact table/column/constraint/index hashes, and policy/trigger/rule checks. It retains the postgres-owned SECURITY DEFINER function with empty search_path, revokes public/anon/authenticated execution, and grants execution only to service_role. It removes the redundant request JWT claim test that rejected the modern secret-key call even though the function ACL already admitted only service_role/postgres.",
+    "workflowDiagnostics": "For broker HTTP denials the unattended workflow prints only a bounded uppercase error code and HTTP status. For broker transport failure it prints the fixed BROKER_REQUEST_FAILED code and HTTP 000. It never prints the response message or success token.",
+    "status": "implemented_and_bounded_source_tested_not_deployed"
+  },
+  "deploymentGate": {
+    "authorized": false,
+    "requirements": [
+      "complete or separately governed ivmv forward-migration path",
+      "exact source and bundle hashes",
+      "isolated or rollback-aware database proof",
+      "proof that every governed writer for this object shares the candidate advisory-lock convention and that the apply path supports explicit transaction control",
+      "broker deployment rollback target",
+      "separate live-backend authorization",
+      "post-deployment grant-miss readback proving one persisted row and no credential disclosure"
+    ]
+  }
+}
