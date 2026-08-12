@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "status": "inactive_review_candidate",
+  "project_ref": "jcyqixttuebxqqfkjonq",
+  "captured_at": "2026-08-12T12:27:42Z",
+  "production_mutation_performed": false,
+  "active_migration_directory_modified": false,
+  "evidence_authority": {
+    "ledger": "live read-only supabase_migrations.schema_migrations",
+    "catalog": "live read-only PostgreSQL information_schema and pg_catalog",
+    "application_contracts": [
+      "apps/meta-business-mcp/src/drafts/supabase-store.js",
+      "apps/meta-business-mcp/src/webhooks/supabase-stores.js"
+    ]
+  },
+  "foundations": [
+    {
+      "identity": "20260724010000_control_plane_foundation",
+      "live_recorded_payload": "applied verbatim from repository main in transaction-safe chunks",
+      "live_recorded_statement_sha256": "09e313f5d1e32f3994d57e00e46d227d2b386279a7917f23ccaac0e4081815b8",
+      "candidate_kind": "recovered_executable_source_live_equivalence_unverified",
+      "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/schema-baseline-candidates/20260724010000_control_plane_foundation.recovered.sql",
+      "sha256": "15733a9714e81fb0689438b8c92eec1490310c7476a45d5144902c09c9ec3fd5",
+      "bytes": 27160,
+      "source_commit": "cb811a30cc325567ce1ecbbc01cbf03a5715085c",
+      "canonical_source_blob": "dbc9b03511423e2eba4defe7b6d2fd051dab9cda",
+      "original_byte_equivalence": true,
+      "live_schema_equivalence": false
+    },
+    {
+      "identity": "20260724030000_meta_remote_mcp_persistence",
+      "live_recorded_payload": "applied verbatim from repository main",
+      "live_recorded_statement_sha256": "492d24c88fa906b3b1567aaa3679e1cbd49967542f340f0238e36bca8748a45f",
+      "candidate_kind": "independent_schema_only_reconstruction",
+      "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/schema-baseline-candidates/20260724030000_meta_remote_mcp_persistence.reconstructed.sql",
+      "sha256": "e9f8be2167c49c9e28a09d8daf23289e481914d618a0ddb247a254f5050e9f25",
+      "bytes": 7908,
+      "original_byte_equivalence": false,
+      "live_schema_equivalence": false
+    }
+  ],
+  "live_catalog_contract": {
+    "captured_rows": {
+      "meta_drafts": 0,
+      "meta_webhook_health": 0,
+      "webhook_events": 0
+    },
+    "tables": {
+      "meta_drafts": {
+        "column_count": 11,
+        "primary_key": ["id"],
+        "rls_enabled": true,
+        "rls_forced": false,
+        "authenticated_privileges": ["INSERT", "SELECT"],
+        "service_role_privileges": "ALL",
+        "policies": ["meta_drafts_insert_staff", "meta_drafts_select_member"],
+        "triggers": ["meta_drafts_set_updated_at"]
+      },
+      "meta_webhook_health": {
+        "column_count": 9,
+        "primary_key": ["organization_id", "page_id"],
+        "rls_enabled": true,
+        "rls_forced": false,
+        "authenticated_privileges": [],
+        "service_role_privileges": "ALL",
+        "policies": [],
+        "triggers": ["meta_webhook_health_set_updated_at"]
+      },
+      "webhook_events": {
+        "column_count": 14,
+        "added_column": "expires_at",
+        "unique_key": ["organization_id", "provider", "delivery_id"],
+        "added_index": "webhook_events_expires_at_idx"
+      }
+    },
+    "functions": {
+      "claim_meta_webhook_delivery(uuid,uuid,text,text,timestamptz)": {
+        "result": "boolean",
+        "language": "plpgsql",
+        "security_definer": true,
+        "search_path": "",
+        "execute_roles": ["postgres", "service_role"],
+        "normalized_definition_sha256": "b6ac6f8de7d9dc73b5710eed0e8a795148d23c422b7ba44ff780e30358f171a0"
+      },
+      "record_meta_webhook_health(uuid,text,boolean,timestamptz)": {
+        "result": "void",
+        "language": "plpgsql",
+        "security_definer": true,
+        "search_path": "",
+        "execute_roles": ["postgres", "service_role"],
+        "normalized_definition_sha256": "8819fcb068647307172b91717561279e559bf953e7ea2653f5feaf878a5d4444"
+      }
+    },
+    "comments_present": false
+  },
+  "uncertainties": [
+    "The original second-foundation bytes, formatting, statement order, transaction boundaries, and idempotency clauses are unavailable.",
+    "The old webhook uniqueness constraint name in the DROP CONSTRAINT clause is inferred from the recovered first-foundation candidate.",
+    "Live function semantics are catalog-exact at capture time, but catalog state cannot prove no later out-of-band replacement occurred.",
+    "Later migrations changed effective ACLs, so original grant wording cannot be inferred solely from current privileges."
+  ],
+  "replay_fixtures": [
+    {
+      "checkpoint": "after_foundations",
+      "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/schema-baseline-candidates/replay-fixtures/after-foundations.sql",
+      "sha256": "aff1f31ecf25172fc779ca8a1dcd5513688b7ca3cd304b40ed670bb596f1d20b",
+      "bytes": 837,
+      "purpose": "Supply the owner, organization, and membership rows assumed by later historical migrations."
+    },
+    {
+      "checkpoint": "after_20260731122011",
+      "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/schema-baseline-candidates/replay-fixtures/after-20260731122011.sql",
+      "sha256": "5409eb95d389be6622ce6bb2f879a6dc5e1043148c012518c0e4e452f8f935b9",
+      "bytes": 464,
+      "purpose": "Supply the FXPass registry row assumed by the later growth-contract migration."
+    }
+  ],
+  "validation": {
+    "content_addressed": true,
+    "credential_literals_found": 0,
+    "static_contract_test": "test/schema-foundation-baseline.test.js",
+    "portable_foundation_replay": {
+      "status": "passed",
+      "engine": "PostgreSQL 18.3 via PGlite 0.5.4",
+      "provider_extensions": ["pgcrypto"],
+      "production_network_used": false
+    },
+    "portable_catalog_contract_parity": "passed_for_meta_foundation_surface",
+    "extension_stubbed_full_chain_replay": {
+      "status": "passed",
+      "later_migration_count": 48,
+      "later_evidence_head": "f73c477d6eb2e287c59c895bc1c5017ab4b17980",
+      "aal1_candidate_identity": "20260812034825_remove_projectos_approval_aal2",
+      "aal1_candidate_sha256": "8e9acf74b5ee5ea552697989768afc5aac938b92947e3495c2deecde30dadd31",
+      "supabase_services_stubbed": ["auth", "http", "vault", "pg_net", "pg_cron"],
+      "production_network_used": false
+    },
+    "isolated_supabase_replay": "pending",
+    "pgtap_approval_and_rollback": "pending",
+    "distinct_vendor_review": "pending"
+  }
+}
