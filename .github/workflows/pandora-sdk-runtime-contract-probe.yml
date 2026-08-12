@@ -27,20 +27,21 @@ jobs:
           text = path.read_text()
           start = text.index('      final probeLine = lines[i];')
           end = text.index('      hits += 1;', start)
-          replacement = '''      final probeLine = lines[i];
-      final runtimeContractHit =
-          probeLine.contains('class FlutterFlowAIClient') ||
-          probeLine.contains('runFlutterFlowAIDsl') ||
-          probeLine.contains('compileAppDeclarations') ||
-          probeLine.contains('validateProject') ||
-          probeLine.contains('fetchProject') ||
-          probeLine.contains('getProject') ||
-          probeLine.contains('pushProject') ||
-          probeLine.contains('FlutterFlowAIClient(');
-      if (!runtimeContractHit) {
-        continue;
-      }
-'''
+          replacement = ''.join([
+              "      final probeLine = lines[i];\n",
+              "      final runtimeContractHit =\n",
+              "          probeLine.contains('class FlutterFlowAIClient') ||\n",
+              "          probeLine.contains('runFlutterFlowAIDsl') ||\n",
+              "          probeLine.contains('compileAppDeclarations') ||\n",
+              "          probeLine.contains('validateProject') ||\n",
+              "          probeLine.contains('fetchProject') ||\n",
+              "          probeLine.contains('getProject') ||\n",
+              "          probeLine.contains('pushProject') ||\n",
+              "          probeLine.contains('FlutterFlowAIClient(');\n",
+              "      if (!runtimeContractHit) {\n",
+              "        continue;\n",
+              "      }\n",
+          ])
           path.write_text(text[:start] + replacement + text[end:])
           PY
           git diff --check
