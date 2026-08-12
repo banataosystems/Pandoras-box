@@ -304,6 +304,40 @@ abstract final class _PlansState {
 }
 
 Future<void> main(List<String> args) async {
+  // PANDORA_SIGNED_SDK_CONTRACT_PROBE_BEGIN
+  // Inspection-only recovery aid. It reads only the already verified vendored
+  // SDK source and exits before flutterFlowAI() or any project operation.
+  final sdkRoot = Directory('.flutterflow/sdk/flutterflow_ai/lib');
+  if (!sdkRoot.existsSync()) {
+    stderr.writeln('PANDORA_SDK_CONTRACT_PROBE: signed SDK source is missing');
+    exit(86);
+  }
+  var hits = 0;
+  for (final entity in sdkRoot.listSync(recursive: true, followLinks: false)) {
+    if (entity is! File || !entity.path.endsWith('.dart')) continue;
+    final source = entity.readAsStringSync();
+    final lines = source.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      if (!lines[i].contains('updateApiEndpoint') &&
+          !lines[i].contains('updateApiGroup')) {
+        continue;
+      }
+      hits += 1;
+      final start = i - 8 < 0 ? 0 : i - 8;
+      final end = i + 12 >= lines.length ? lines.length - 1 : i + 12;
+      stdout.writeln('PANDORA_SDK_CONTRACT_BEGIN ${entity.path} ${i + 1}');
+      for (var j = start; j <= end; j++) {
+        stdout.writeln('${j + 1}: ${lines[j]}');
+      }
+      stdout.writeln('PANDORA_SDK_CONTRACT_END');
+    }
+  }
+  stdout.writeln('PANDORA_SDK_CONTRACT_HITS=$hits');
+  if (hits == 0) {
+    stderr.writeln('PANDORA_SDK_CONTRACT_PROBE: update declarations not found');
+  }
+  exit(hits == 0 ? 87 : 86);
+  // PANDORA_SIGNED_SDK_CONTRACT_PROBE_END
   final options = _CliOptions.parse(args);
   final targetProjectId = options.projectId ?? _projectId;
   if (targetProjectId != _projectId) {
