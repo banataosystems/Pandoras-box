@@ -3,6 +3,8 @@ library;
 import 'dart:io';
 
 import 'package:flutterflow_ai/flutterflow_ai.dart';
+import 'package:flutterflow_ai/src/client/flutterflow_ai_client.dart' show FlutterFlowAI;
+import 'package:flutterflow_ai/src/helpers/api_helpers.dart' show findApiEndpoint, findApiGroup;
 import 'package:flutterflow_ai/src/internal_sdk.dart'
     show addNavBarPage, setNavBarEnabled;
 import 'package:pandora_flutterflow_ai/flutterflow_project.dart' as ff;
