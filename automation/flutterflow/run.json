@@ -2,5 +2,5 @@
   "schemaVersion": "1.0.0",
   "mode": "validate-owner",
   "projectId": "pandoras-box-gj9hnb",
-  "purpose": "Exact-head read-only owner-app validation. Fetch the bound Pandora project through the signed SDK, apply only the narrowly approved in-memory rerun normalization, require byte-for-byte endpoint equality, validate the complete owner-app declaration, and exit without project mutation."
+  "purpose": "Exact-head read-only release-candidate validation after automation hygiene consolidation. Fetch the bound Pandora project through the signed SDK, apply only the narrowly approved in-memory rerun normalization, require byte-for-byte endpoint equality, validate the complete owner-app declaration, and exit without project mutation."
 }

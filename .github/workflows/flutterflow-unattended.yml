@@ -6,6 +6,7 @@ on:
       - feature/flutterflow-pandora-mobile-v1
     paths:
       - .github/workflows/flutterflow-unattended.yml
+      - automation/flutterflow/dsl/**
       - automation/flutterflow/run.json
       - assets/brand/pandoras-box/product-mark/**
 
@@ -25,7 +26,7 @@ jobs:
 
     steps:
       - name: Check out exact candidate
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
           fetch-depth: 1
@@ -61,6 +62,7 @@ jobs:
           printf 'mode=%s\n' "${mode}" >> "${GITHUB_OUTPUT}"
 
       - name: Operate exact FlutterFlow project through one-time OIDC grant
+        id: operate
         shell: bash
         env:
           BROKER_URL: https://ivmvufhcsezyhczzondn.supabase.co/functions/v1/flutterflow-github-oidc-broker
@@ -83,6 +85,9 @@ jobs:
             fi
             if [[ -n "${rollback_snapshot:-}" && "${rollback_snapshot}" == "${RUNNER_TEMP}/"* ]]; then
               rm -f "${rollback_snapshot}"
+            fi
+            if [[ -n "${after_snapshot:-}" && "${after_snapshot}" == "${RUNNER_TEMP}/"* ]]; then
+              rm -f "${after_snapshot}"
             fi
             unset oidc_json oidc_token broker_json ff_token broker_project_id
           }
@@ -367,6 +372,53 @@ jobs:
                   > "${output}/codegen-status-owner.txt"
                 FF_API_KEY="${ff_token}" flutterflow ai inspect "${FLUTTERFLOW_PROJECT_ID}" \
                   > "${output}/post-owner-summary.txt"
+                after_snapshot="${RUNNER_TEMP}/pandora-post-owner-project-yamls.json"
+                curl --proto '=https' --tlsv1.2 \
+                  --fail --silent --show-error --max-time 120 \
+                  -H "Authorization: Bearer ${ff_token}" \
+                  "https://api.flutterflow.io/v2/projectYamls?projectId=${FLUTTERFLOW_PROJECT_ID}" \
+                  > "${after_snapshot}"
+                python3 - \
+                  "${rollback_snapshot}" \
+                  "${after_snapshot}" \
+                  "${output}/owner-readback-manifest.json" \
+                  "${GITHUB_SHA}" \
+                  "${mode}" <<'PY'
+          import base64
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          def project_bytes(path_arg):
+              path = pathlib.Path(path_arg)
+              raw = path.read_bytes()
+              payload = json.loads(raw)
+              value = payload.get("value")
+              encoded = value.get("project_yaml_bytes") if isinstance(value, dict) else None
+              if not isinstance(encoded, str):
+                  encoded = value.get("projectYamlBytes") if isinstance(value, dict) else None
+              if not isinstance(encoded, str) or len(encoded) < 100:
+                  raise SystemExit(f"{path.name} has no project YAML bytes")
+              return raw, base64.b64decode(encoded, validate=True)
+
+          before_raw, before_project = project_bytes(sys.argv[1])
+          after_raw, after_project = project_bytes(sys.argv[2])
+          evidence = {
+              "schema_version": "1.0.0",
+              "candidate_sha": sys.argv[4],
+              "mode": sys.argv[5],
+              "project_id": "pandoras-box-gj9hnb",
+              "before_response_sha256": hashlib.sha256(before_raw).hexdigest(),
+              "before_project_sha256": hashlib.sha256(before_project).hexdigest(),
+              "after_response_sha256": hashlib.sha256(after_raw).hexdigest(),
+              "after_project_sha256": hashlib.sha256(after_project).hexdigest(),
+              "after_project_bytes": len(after_project),
+          }
+          pathlib.Path(sys.argv[3]).write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + "\n"
+          )
+          PY
                 ;;
               validate-mfa-action)
                 FF_API_KEY="${ff_token}" flutterflow ai validate \
@@ -1006,8 +1058,65 @@ jobs:
           PY
           unset ff_token broker_project_id
 
-      - name: Upload non-secret operation evidence
+      - name: Create redacted content-addressed evidence manifest
         if: always()
+        shell: bash
+        env:
+          OPERATION_OUTCOME: ${{ steps.operate.outcome }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+
+          temp = pathlib.Path(os.environ["RUNNER_TEMP"])
+          root = temp / "pandora-flutterflow-result"
+          durable_root = temp / "pandora-flutterflow-durable-evidence"
+          durable_root.mkdir(parents=True, exist_ok=True)
+          files = []
+          if root.is_dir():
+              for path in sorted(root.rglob("*")):
+                  if not path.is_file():
+                      continue
+                  payload = path.read_bytes()
+                  files.append({
+                      "path": path.relative_to(root).as_posix(),
+                      "bytes": len(payload),
+                      "sha256": hashlib.sha256(payload).hexdigest(),
+                  })
+          run = json.loads(pathlib.Path("automation/flutterflow/run.json").read_text())
+          evidence = {
+              "schema_version": "1.0.0",
+              "candidate_sha": os.environ["GITHUB_SHA"],
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "workflow_run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "operation_outcome": os.environ["OPERATION_OUTCOME"],
+              "mode": run["mode"],
+              "project_id": run["projectId"],
+              "files": files,
+          }
+          readback_path = root / "owner-readback-manifest.json"
+          if (
+              os.environ["OPERATION_OUTCOME"] == "success"
+              and run["mode"] == "apply-owner"
+          ):
+              if not readback_path.is_file():
+                  raise SystemExit("Successful apply-owner has no readback manifest")
+              readback = json.loads(readback_path.read_text())
+              if readback.get("candidate_sha") != os.environ["GITHUB_SHA"]:
+                  raise SystemExit("Owner readback candidate does not match workflow SHA")
+              if readback.get("project_id") != run["projectId"]:
+                  raise SystemExit("Owner readback project does not match run declaration")
+              evidence["owner_readback"] = readback
+          (durable_root / "operation-evidence-manifest.json").write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + "\n"
+          )
+          PY
+
+      - name: Upload short-lived operation evidence
+        if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: pandora-flutterflow-operation-${{ github.sha }}-${{ github.run_attempt }}
@@ -1015,11 +1124,20 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
+      - name: Upload durable redacted evidence manifest
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pandora-flutterflow-manifest-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pandora-flutterflow-durable-evidence/operation-evidence-manifest.json
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Upload verified Flutter release web build
-        if: always() && steps.operation-mode.outputs.mode == 'export-build'
+        if: success() && steps.operation-mode.outputs.mode == 'export-build'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: pandora-flutter-web-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/pandora-flutter-export/build/web
           if-no-files-found: ignore
-          retention-days: 1
+          retention-days: 30

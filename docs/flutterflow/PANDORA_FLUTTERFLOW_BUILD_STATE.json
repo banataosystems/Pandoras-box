@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.7.0",
+  "schemaVersion": "1.8.0",
   "projectKey": "mcpmaster",
   "artifact": "pandora-mobile-flutterflow-v1",
   "canonicalRepository": "banataosystems/Pandoras-box",
@@ -20,15 +20,33 @@
     "exactFlutterFlowProjectId": "pandoras-box-gj9hnb",
     "partitionerVersion": 9,
     "projectSchemaFingerprint": "f237da5d53110b3aa14501753ed13f6687ce0033",
-    "plainLanguageScreensVerified": 10,
-    "plainLanguageScreensTotal": 10,
-    "plainLanguageRepairComplete": true,
+    "historicalPlainLanguageRepairScreens": 10,
+    "historicalPlainLanguageRepairTotal": 10,
+    "plainLanguageRepairComplete": false,
+    "p1SourceImplemented": true,
+    "p1SourceTested": true,
+    "p1AppliedToOwnerApp": false,
+    "p1ProductionVerified": false,
+    "p2SourceImplemented": true,
+    "p2SourceTested": true,
+    "p2AppliedToOwnerApp": false,
+    "p2ProductionVerified": false,
+    "p3SourceImplemented": true,
+    "p3SourceTested": true,
+    "p3AppliedToOwnerApp": false,
+    "p3ProductionVerified": false,
     "ownerApiBridgeImplemented": true,
-    "ownerApiBridgeTestsPassed": 8,
+    "ownerApiOverlayTestsPassed": 25,
     "ownerApiEdgeFunctionDeployed": true,
-    "ownerApiEdgeFunctionVersion": 2,
+    "ownerApiEdgeFunctionVersion": 3,
     "ownerApiJwtRequired": true,
+    "ownerApiDeployedP1SanitizerVerified": false,
+    "ownerApiDeployedAal1ApprovalVerified": false,
+    "ownerApiDeployedStillRequiresAal2": true,
     "databaseAal2ApprovalBoundaryVerified": true,
+    "databaseAal1ApprovalSourceImplemented": true,
+    "databaseAal1ApprovalSourceTested": true,
+    "databaseAal1ApprovalDeployed": false,
     "preExistingFlutterFlowIssuesRepaired": true,
     "liveMcpMasterOwnerApiWired": false,
     "androidVisualNavigationTested": false,
@@ -52,7 +70,8 @@
     "vaultSecretName": "pandora_flutterflow_project_api"
   },
   "plainLanguageRepair": {
-    "verifiedPages": [
+    "status": "historical_partial_repair_superseded_by_p1_source_candidate",
+    "historicallyInspectedPages": [
       "SplashConnection",
       "SignIn",
       "CommandCenter",
@@ -64,6 +83,21 @@
       "ActivityAuditTrail",
       "SecurityOperations"
     ],
+    "currentLiveP1ComplianceVerified": false,
+    "liveCounterEvidence": [
+      "Work",
+      "Approve",
+      "governed",
+      "backend",
+      "technical proof"
+    ],
+    "p1SourceEvidence": {
+      "implementationCommit": "ad3e40506db72faba09385b97dae92855ae9c604",
+      "containedInSourceTestedCandidate": "c7744689da37bdb099505f43c8f4a2f526888083",
+      "sourceGuard": "automation/pandora_p1_source_guard.py",
+      "sourceGuardResult": "pass",
+      "providerApplied": false
+    },
     "verificationRule": "Every changed widget/component leaf partition validates before write; aggregate page read-back must show required simple-language terms and zero forbidden old/demo terms.",
     "finalSerializedWorkflowRun": 31361615229,
     "workflowConclusion": "success",
@@ -80,8 +114,13 @@
   "connectionsBridge": {
     "source": "recovery/overlay/pandora-owner-api-client.ts",
     "tests": "recovery/overlay/pandora-owner-api-client.test.ts",
-    "testsPassed": 8,
+    "overlayTestsPassed": 25,
     "edgeFunction": "pandora-owner-api",
+    "deployedVersion": 3,
+    "deployedBundleSha256": "d435fcde46c86dc7afa5c52f1e2160e476750a900aad87444d9beb527777ec81",
+    "deployedP1SanitizerPresent": false,
+    "deployedOrdinaryApprovalAal1Present": false,
+    "deployedOrdinaryApprovalStillRequiresAal2": true,
     "edgeFunctionBaseUrl": "https://jcyqixttuebxqqfkjonq.supabase.co/functions/v1/pandora-owner-api",
     "webOriginAllowlistPending": true,
     "goal": "The hidden app-builder client talks to one governed Pandora owner API. The backend routes to connected services. No hidden builder name, raw MCP/provider jargon, or client-side provider secret may appear in the owner UI."
@@ -102,8 +141,9 @@
     "sourceReleaseModel": "Export generated Flutter source automatically, content-address and version it in GitHub, run independent Flutter checks/builds, deploy an exact protected preview, then require separate exact-candidate owner approval before live promotion."
   },
   "remainingV1Work": [
-    "Apply the premium Pandora design system and current-screen redesign to the existing app project.",
-    "Enforce the zero-tolerance hidden-provider/user-jargon string firewall.",
+    "Validate and apply the source-tested P1 provider-invisibility firewall, P2 design system, and P3 current-screen migration to the existing owner app through the exact one-time governed path.",
+    "Read the owner app back and prove the locked language, navigation, design system, screen states, snapshots, and rollback target; source tests alone do not establish deployment.",
+    "Deploy the tested P1 owner-API sanitizer and ordinary-approval AAL1 source only under a separately authorized production release, then verify the exact deployed bundle.",
     "Wire the owner API bridge to live governed MCPMaster endpoints for Home, projects, connections, approvals, activity, safety, and Ask Pandora.",
     "Replace remaining static/mock values with truthful canonical backend data.",
     "Implement automatic generated-source export, content-addressed manifest, and GitHub candidate versioning.",
@@ -132,7 +172,10 @@
     ]
   },
   "unattendedExecution": {
-    "status": "implementation_started",
+    "status": "source_candidate_tested_provider_validation_blocked",
+    "currentCandidate": "c7744689da37bdb099505f43c8f4a2f526888083",
+    "currentProviderValidationRun": 31582149316,
+    "currentBlocker": "The exact-head read-only owner-app validation failed before project access because no matching one-time broker grant existed. Durable grant plan e4bbab48-7495-4734-a2f4-aa9a2c11003a was created but the live control plane still requires an AAL2 owner/admin session for approval. No grant or owner-app mutation occurred.",
     "outcome": "Finish the existing app without requiring the owner's browser session. Keep the visual builder invisible to the owner, export the real Flutter source automatically, and move release ownership to Pandora's governed source/build/hosting pipeline.",
     "acceptanceCriteria": [
       "Supabase email authentication and logout are wired in the existing project.",

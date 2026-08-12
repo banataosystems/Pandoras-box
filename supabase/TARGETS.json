@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0.0",
+  "bulkDeployAllowed": false,
+  "reason": "This source tree contains Edge Functions for two distinct Supabase projects and config.toml intentionally binds neither project. Every deployment must name exactly one function and exactly one verified project ref.",
+  "functions": {
+    "mcpmaster-supabase-control": {
+      "projectRef": "jcyqixttuebxqqfkjonq",
+      "liveVersionObserved": 9,
+      "verifyJwt": false,
+      "authenticationBoundary": "verifies the private workload identity inside the function"
+    },
+    "pandora-owner-api": {
+      "projectRef": "jcyqixttuebxqqfkjonq",
+      "liveVersionObserved": 3,
+      "verifyJwt": true,
+      "liveBundleSha256Observed": "d435fcde46c86dc7afa5c52f1e2160e476750a900aad87444d9beb527777ec81"
+    },
+    "flutterflow-credential-handoff": {
+      "projectRef": "ivmvufhcsezyhczzondn",
+      "liveVersionObserved": 5,
+      "verifyJwt": true
+    },
+    "flutterflow-github-oidc-broker": {
+      "projectRef": "ivmvufhcsezyhczzondn",
+      "liveVersionObserved": 3,
+      "verifyJwt": false,
+      "authenticationBoundary": "verifies GitHub OIDC and consumes an exact one-time grant inside the function"
+    }
+  },
+  "deploymentRule": {
+    "requiredInputs": [
+      "exact function slug",
+      "exact project ref",
+      "exact source commit",
+      "source bundle hash",
+      "verify_jwt expectation",
+      "rollback target",
+      "governed approval when the deployment changes a live backend"
+    ],
+    "forbidden": [
+      "supabase functions deploy without a function slug",
+      "implicit linked-project deployment",
+      "using the jcy migration stream for ivmv objects",
+      "using the ivmv migration stream for jcy objects"
+    ]
+  },
+  "observedAt": "2026-08-12",
+  "productionMutationPerformed": false
+}

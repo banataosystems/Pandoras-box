@@ -1,0 +1,1 @@
+drop policy if exists projectos_integration_secrets_deny_clients on private.integration_secrets; create policy projectos_integration_secrets_deny_clients on private.integration_secrets for all to anon,authenticated using(false) with check(false);

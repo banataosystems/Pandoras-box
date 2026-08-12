@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "1.0.0",
+  "observedAt": "2026-08-12",
+  "projectRef": "jcyqixttuebxqqfkjonq",
+  "projectStatus": "ACTIVE_HEALTHY",
+  "releaseClean": false,
+  "productionMutationPerformed": false,
+  "advisor": {
+    "totalFindings": 55,
+    "source": "live Supabase security advisor plus read-only catalog verification",
+    "classes": [
+      {
+        "name": "rls_enabled_no_policy",
+        "count": 12,
+        "classification": "informational_acceptable_with_intended_service_role_verification",
+        "releaseBlocker": false,
+        "evidence": "RLS is enabled and no client policy exists; this is fail-closed. Eight affected tables are private and four public tables require intended service-role-only verification.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+      },
+      {
+        "name": "extension_in_public",
+        "count": 1,
+        "classification": "must_fix_hardening",
+        "releaseBlocker": true,
+        "evidence": "pg_net 0.20.4 is installed in public and extrelocatable=false. A simple ALTER EXTENSION SET SCHEMA is not safe.",
+        "nextGate": "Map dependencies and prepare a tested rollback-aware relocation/reinstall design in isolation.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0014_extension_in_public"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "count": 11,
+        "classification": "mixed_two_release_blockers_eight_additional_must_fix_hardening_one_acceptable",
+        "releaseBlocker": true,
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+        "exactEvidence": {
+          "shared": "All 11 functions are owned by postgres, SECURITY DEFINER, executable by authenticated/postgres/service_role, and not executable by anon or PUBLIC.",
+          "decideApproval": "Direct authenticated RPC permits owner/admin/operator and still requires AAL2. This bypasses the locked owner/admin approval contract. The reviewed AAL1 owner/admin-only replacement is source-tested but not deployed.",
+          "projectosGetRegistry": "Returns projectos_project_resources.configuration verbatim to any permanent organization member; arbitrary JSON is not proven secret-free, and the table read policy exposes the same row.",
+          "remainingFunctions": "projectos_get_registry is both a release blocker and one of nine broad-search-path functions. The other eight broad-search-path functions require hardening before release; immediate object-shadowing is mitigated because anon/authenticated have no CREATE privilege in searched schemas. create_organization uses an empty search_path and its caller/authorization checks are acceptable."
+        }
+      },
+      {
+        "name": "auth_allow_anonymous_sign_ins",
+        "count": 30,
+        "classification": "acceptable_with_verified_predicates",
+        "releaseBlocker": false,
+        "evidence": "Twenty-seven policies delegate to permanent-account helpers that require auth.uid(), reject is_anonymous=true, and require active membership; profiles is self-row only; two cron policies bind CURRENT_USER. Current anonymous-user count is zero. No broad policy rewrite is justified.",
+        "remediation": "https://supabase.com/docs/guides/database/database-advisors?queryGroups=lint&lint=0012_auth_allow_anonymous_sign_ins"
+      },
+      {
+        "name": "auth_leaked_password_protection",
+        "count": 1,
+        "classification": "must_fix",
+        "releaseBlocker": true,
+        "evidence": "The advisor reports protection disabled; the project has three password hashes and three email identities, so the finding affects an active authentication path.",
+        "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection",
+        "governedPlan": {
+          "planId": "9866e610-f4ee-48a0-aed9-4535615326a3",
+          "requestId": "fce60243-0e79-4696-85e3-8a39f6e99719",
+          "payloadHash": "64fcb9ece3cc3cc64bcf11645f18b9e1ffa91853d5e0a8e9fd2e3f40d48d68de",
+          "statusAfterApprovalAttempt": "expired",
+          "statusObservedAt": "2026-08-12T10:00:06.572Z",
+          "expiresAt": "2026-08-12T09:59:47.549Z",
+          "approvalResult": "INVALID_ARGUMENT",
+          "executed": false,
+          "settingChanged": false
+        }
+      }
+    ]
+  },
+  "ownerApiDeployment": {
+    "function": "pandora-owner-api",
+    "version": 3,
+    "verifyJwt": true,
+    "bundleSha256": "d435fcde46c86dc7afa5c52f1e2160e476750a900aad87444d9beb527777ec81",
+    "p1SanitizerPresent": false,
+    "ordinaryApprovalAal1Present": false,
+    "stillRequiresAal2": true,
+    "exposesTechnicalProviderFields": true
+  },
+  "sourceOnlyRemediationState": {
+    "ordinaryApprovalAal1OwnerAdminOnly": "implemented_and_tested_not_deployed",
+    "migrationHistory": "50 live identities documented; 48 exact SQL payloads recovered; two foundational executable sources remain unproven",
+    "searchPathAndRegistryHardening": "blocked_from_active_migrations_pending_complete_history_and_disposable_replay",
+    "providerApplyAuthorized": false
+  },
+  "releaseBlockers": [
+    "decide_approval live owner/admin/operator authorization mismatch",
+    "projectos_get_registry unredacted arbitrary configuration exposure",
+    "leaked-password protection disabled",
+    "pg_net public-schema hardening unresolved",
+    "projectos_get_registry plus eight additional privileged broad search paths not yet hardened",
+    "deployed owner API lacks the P1 sanitizer and still exposes technical fields",
+    "deployed owner API and database still require AAL2 for ordinary approvals"
+  ]
+}

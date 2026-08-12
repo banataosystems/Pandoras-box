@@ -6,6 +6,12 @@ function source(relativePath: string): string {
   return readFileSync(new URL(relativePath, import.meta.url), "utf8");
 }
 
+function recordedSql(relativePath: string): string {
+  return Buffer.from(source(relativePath).replace(/\s/g, ""), "base64").toString(
+    "utf8",
+  );
+}
+
 function assertOrdered(contents: string, ...needles: string[]) {
   let previous = -1;
   for (const needle of needles) {
@@ -19,13 +25,16 @@ function assertOrdered(contents: string, ...needles: string[]) {
   }
 }
 
-test("approval decisions require a permanent current AAL2 session in the database", () => {
-  const migration = source(
-    "../../supabase/migrations/20260810083500_enforce_aal2_approval_boundary.sql",
+test("the historical AAL2 approval boundary is explicitly superseded", () => {
+  const historicalMigration = recordedSql(
+    "../../docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810083416_enforce_aal2_approval_boundary.sql.b64",
+  );
+  const currentMigration = source(
+    "../../supabase/migrations/20260812034825_remove_projectos_approval_aal2.sql",
   );
 
   assertOrdered(
-    migration,
+    historicalMigration,
     "if current_user_id is null then",
     "auth.jwt() ->> 'is_anonymous'",
     "auth.jwt() ->> 'aal'",
@@ -35,17 +44,39 @@ test("approval decisions require a permanent current AAL2 session in the databas
     "high-risk requests require a different approver",
     "update public.approvals",
   );
-  assert.match(migration, /s\.user_id\s*=\s*current_user_id/);
-  assert.match(migration, /s\.aal\s*=\s*'aal2'::auth\.aal_level/);
+  assert.match(historicalMigration, /s\.user_id\s*=\s*current_user_id/);
   assert.match(
-    migration,
+    historicalMigration,
+    /s\.aal\s*=\s*'aal2'::auth\.aal_level/,
+  );
+  assert.match(
+    historicalMigration,
     /s\.not_after is null or s\.not_after > now\(\)/,
+  );
+
+  assert.doesNotMatch(
+    currentMigration,
+    /auth\.jwt\(\)\s*->>\s*'aal'|auth\.sessions|auth\.aal_level/,
+  );
+  assertOrdered(
+    currentMigration,
+    "if current_user_id is null then",
+    "auth.jwt() ->> 'is_anonymous'",
+    "select *\n    into approval_row",
+    "private.has_org_role(",
+    "high-risk requests require a different approver",
+    "update public.approvals",
+    "private.append_audit_event(",
+  );
+  assert.match(
+    currentMigration,
+    /array\['owner', 'admin'\]::public\.member_role\[\]/,
   );
 });
 
 test("anonymous sessions cannot enter ProjectOS intake", () => {
-  const migration = source(
-    "../../supabase/migrations/20260810084000_reject_anonymous_projectos_intake.sql",
+  const migration = recordedSql(
+    "../../docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810083717_reject_anonymous_projectos_intake.sql.b64",
   );
 
   assertOrdered(
@@ -62,8 +93,8 @@ test("anonymous sessions cannot enter ProjectOS intake", () => {
 });
 
 test("shared organization RLS helpers reject anonymous JWTs", () => {
-  const migration = source(
-    "../../supabase/migrations/20260810112000_reject_anonymous_org_membership_helpers.sql",
+  const migration = recordedSql(
+    "../../docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810104737_reject_anonymous_org_membership_helpers.sql.b64",
   );
 
   const guards = migration.match(/auth\.jwt\(\) ->> 'is_anonymous'/g) || [];
@@ -87,8 +118,8 @@ test("shared organization RLS helpers reject anonymous JWTs", () => {
 });
 
 test("organization creation is RPC-only and rejects anonymous accounts", () => {
-  const migration = source(
-    "../../supabase/migrations/20260810110000_reject_anonymous_organization_creation.sql",
+  const migration = recordedSql(
+    "../../docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810104102_reject_anonymous_organization_creation.sql.b64",
   );
 
   assertOrdered(

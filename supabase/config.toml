@@ -6,3 +6,11 @@ verify_jwt = true
 # workload bearer first.
 [functions.mcpmaster-supabase-control]
 verify_jwt = false
+
+[functions.flutterflow-credential-handoff]
+verify_jwt = true
+
+# The broker verifies GitHub OIDC itself. Supabase's user-JWT gateway must not
+# consume that workload bearer before the function can verify it.
+[functions.flutterflow-github-oidc-broker]
+verify_jwt = false

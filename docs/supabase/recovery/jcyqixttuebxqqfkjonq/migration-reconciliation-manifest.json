@@ -1,0 +1,2078 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "supabase_migration_history_reconciliation_evidence",
+  "generated_at": "2026-08-12T09:40:53.003Z",
+  "canonical_repository": "banataosystems/Pandoras-box",
+  "canonical_main_head_observed": "ced72940812724b366766e6f99b31cebbd81acde",
+  "feature_head_observed": "c7744689da37bdb099505f43c8f4a2f526888083",
+  "project_ref": "jcyqixttuebxqqfkjonq",
+  "status": {
+    "documented": true,
+    "implemented": "non-active recovery artifact only",
+    "tested": "manifest parsing, decoded payload hashes, and bounded credential-pattern scan",
+    "deployed": false,
+    "production_verified": false
+  },
+  "hard_stops": [
+    "Nothing in this directory is an active migration.",
+    "Do not copy or apply these files wholesale.",
+    "Do not mutate remote migration history from this evidence artifact.",
+    "Do not merge a history repair until both non-replayable foundations have authoritative executable source or an approved baseline-and-repair plan."
+  ],
+  "evidence": {
+    "github_check": {
+      "check_run_id": 94046450782,
+      "name": "Supabase Preview",
+      "head_sha": "ced72940812724b366766e6f99b31cebbd81acde",
+      "conclusion": "failure",
+      "started_at": "2026-08-12T07:47:20Z",
+      "completed_at": "2026-08-12T07:47:25Z",
+      "summary": "Remote migration versions not found in local migrations directory.",
+      "project_ref": "jcyqixttuebxqqfkjonq"
+    },
+    "live_history": {
+      "relation": "supabase_migrations.schema_migrations",
+      "migration_count": 50,
+      "earliest_version": "20260724010000",
+      "latest_version": "20260810104737",
+      "one_statement_rows": 50,
+      "executable_sql_rows": 48,
+      "non_sql_placeholder_rows": 2,
+      "rows_with_idempotency_key": 0,
+      "rows_with_recorded_rollback": 0
+    },
+    "canonical_main_migration_directory": {
+      "file_count": 1,
+      "only_identity": "20260812034825_remove_projectos_approval_aal2",
+      "git_blob_sha1": "b6bcc04e4986beeb8fb5f1c756d073a6bc442fcb",
+      "sha256": "8e9acf74b5ee5ea552697989768afc5aac938b92947e3495c2deecde30dadd31",
+      "bytes": 3472,
+      "live_version_present": false
+    }
+  },
+  "artifact_layout": {
+    "active_migration_directory": "supabase/migrations",
+    "recovery_root": "docs/supabase/recovery/jcyqixttuebxqqfkjonq",
+    "encoded_payload_directory": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads",
+    "encoding_note": "Each .sql.b64 file is Base64-encoded UTF-8. Ignoring Base64 whitespace, decoding reproduces the exact provider-recorded SQL bytes and SHA-256 in this manifest.",
+    "preview_sql_directory": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql",
+    "preview_normalization": "Every recorded-sql preview normalizes the provider-recorded SQL to exactly one terminal LF. Hash exact provider bytes by Base64-decoding recorded-payloads instead."
+  },
+  "validation": {
+    "source_row_count": 50,
+    "encoded_payload_count": 48,
+    "decoded_payload_hash_matches": 48,
+    "decoded_payload_hash_mismatches": 0,
+    "high_confidence_secret_pattern_findings": 0,
+    "secret_patterns_checked": [
+      "PEM private-key headers",
+      "AWS access-key identifiers",
+      "GitHub token prefixes",
+      "Supabase secret-key prefixes",
+      "OpenAI secret-key prefixes",
+      "Slack token prefixes",
+      "JWT compact serialization",
+      "quoted credential assignments"
+    ],
+    "limitation": "This bounded scan is evidence, not a substitute for the repository and provider security gates.",
+    "preview_sql_count": 48,
+    "preview_normalization_matches": 48,
+    "preview_normalization_mismatches": 0
+  },
+  "migrations": [
+    {
+      "version": "20260724010000",
+      "name": "control_plane_foundation",
+      "identity": "20260724010000_control_plane_foundation",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 64,
+        "statement_sha256": "09e313f5d1e32f3994d57e00e46d227d2b386279a7917f23ccaac0e4081815b8",
+        "created_by": "openai-agent",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "not_replayable_non_sql_placeholder",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations metadata",
+        "recorded_payload_kind": "non_sql_provenance_placeholder",
+        "recorded_payload": "applied verbatim from repository main in transaction-safe chunks",
+        "limitation": "The live row proves migration identity but does not preserve executable SQL."
+      },
+      "recovery_payload": null
+    },
+    {
+      "version": "20260724030000",
+      "name": "meta_remote_mcp_persistence",
+      "identity": "20260724030000_meta_remote_mcp_persistence",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 37,
+        "statement_sha256": "492d24c88fa906b3b1567aaa3679e1cbd49967542f340f0238e36bca8748a45f",
+        "created_by": "openai-agent",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "not_replayable_non_sql_placeholder",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations metadata",
+        "recorded_payload_kind": "non_sql_provenance_placeholder",
+        "recorded_payload": "applied verbatim from repository main",
+        "limitation": "The live row proves migration identity but does not preserve executable SQL."
+      },
+      "recovery_payload": null
+    },
+    {
+      "version": "20260728150403",
+      "name": "enable_http_for_supabase_account_discovery",
+      "identity": "20260728150403_enable_http_for_supabase_account_discovery",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 59,
+        "statement_sha256": "b5b79f616c8cc09827b263ca33c134a193821285b414e16488b6bd533cd7480b",
+        "created_by": "lawbatalla@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:b5b79f616c8cc09827b263ca33c134a193821285b414e16488b6bd533cd7480b",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728150403_enable_http_for_supabase_account_discovery.sql.b64",
+        "decoded_sha256": "b5b79f616c8cc09827b263ca33c134a193821285b414e16488b6bd533cd7480b",
+        "decoded_bytes": 59,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728150403_enable_http_for_supabase_account_discovery.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260728150403_enable_http_for_supabase_account_discovery.sql",
+          "sha256": "d964335162bb87cd377ce8627c57d94136f9849564cbcd3207debe7c86f88510",
+          "bytes": 60,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260728152425",
+      "name": "add_supabase_control_catalog_rpc",
+      "identity": "20260728152425_add_supabase_control_catalog_rpc",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 2021,
+        "statement_sha256": "acdb9231bd640785876b7261c942b2be4c77e7f2d4604a23da4f06c8ef15b11d",
+        "created_by": "lawbatalla@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:acdb9231bd640785876b7261c942b2be4c77e7f2d4604a23da4f06c8ef15b11d",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728152425_add_supabase_control_catalog_rpc.sql.b64",
+        "decoded_sha256": "acdb9231bd640785876b7261c942b2be4c77e7f2d4604a23da4f06c8ef15b11d",
+        "decoded_bytes": 2021,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728152425_add_supabase_control_catalog_rpc.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260728152425_add_supabase_control_catalog_rpc.sql",
+          "sha256": "e0c64b0b2528b22c99b9e2243bb3b18933055c97fd2eb0643c5f0dbfdc32f2f7",
+          "bytes": 2022,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260728155817",
+      "name": "add_github_connector_probe",
+      "identity": "20260728155817_add_github_connector_probe",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 4595,
+        "statement_sha256": "cc369bf010f329b02fce64656d910d4bb97d85bc68c43f58b2e434865f4cfbee",
+        "created_by": "lawbatalla@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:cc369bf010f329b02fce64656d910d4bb97d85bc68c43f58b2e434865f4cfbee",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728155817_add_github_connector_probe.sql.b64",
+        "decoded_sha256": "cc369bf010f329b02fce64656d910d4bb97d85bc68c43f58b2e434865f4cfbee",
+        "decoded_bytes": 4595,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728155817_add_github_connector_probe.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260728155817_add_github_connector_probe.sql",
+          "sha256": "a3576f1be9db30334d42cfe3db1ba9c6d4136d949efd1a81de3673e7bc83170f",
+          "bytes": 4596,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260728160013",
+      "name": "add_github_control_catalog",
+      "identity": "20260728160013_add_github_control_catalog",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 2133,
+        "statement_sha256": "7d15490455586d3d1df2450f2e06649917bf09744b3437792fe40d3302ccdf24",
+        "created_by": "lawbatalla@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:7d15490455586d3d1df2450f2e06649917bf09744b3437792fe40d3302ccdf24",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728160013_add_github_control_catalog.sql.b64",
+        "decoded_sha256": "7d15490455586d3d1df2450f2e06649917bf09744b3437792fe40d3302ccdf24",
+        "decoded_bytes": 2133,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728160013_add_github_control_catalog.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260728160013_add_github_control_catalog.sql",
+          "sha256": "861049f0221d68a9f7e6c535a1b0a214f4cd388e88e9330dc0a4dd3bc3392d59",
+          "bytes": 2134,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260728171559",
+      "name": "add_runtime_security_config",
+      "identity": "20260728171559_add_runtime_security_config",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 2395,
+        "statement_sha256": "ed4759f9b2e7b5640c6d2c3e28b2cec95a929717944025570fc0eaee5ff460f5",
+        "created_by": "lawbatalla@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:ed4759f9b2e7b5640c6d2c3e28b2cec95a929717944025570fc0eaee5ff460f5",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728171559_add_runtime_security_config.sql.b64",
+        "decoded_sha256": "ed4759f9b2e7b5640c6d2c3e28b2cec95a929717944025570fc0eaee5ff460f5",
+        "decoded_bytes": 2395,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728171559_add_runtime_security_config.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260728171559_add_runtime_security_config.sql",
+          "sha256": "f165fb0543ac79512f3e6f5f903c9149eaf87a052dcdbcf0944030dc2cd9ec95",
+          "bytes": 2396,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260728191246",
+      "name": "add_durable_execution_ledger",
+      "identity": "20260728191246_add_durable_execution_ledger",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 18187,
+        "statement_sha256": "af8a7f145752b8260fc4f1625c8b0dd5885c3a4d457344e60ca8876b9c4a1b22",
+        "created_by": "lawbatalla@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:af8a7f145752b8260fc4f1625c8b0dd5885c3a4d457344e60ca8876b9c4a1b22",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728191246_add_durable_execution_ledger.sql.b64",
+        "decoded_sha256": "af8a7f145752b8260fc4f1625c8b0dd5885c3a4d457344e60ca8876b9c4a1b22",
+        "decoded_bytes": 18187,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728191246_add_durable_execution_ledger.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260728191246_add_durable_execution_ledger.sql",
+          "sha256": "895ddc038096f60cbca31324d86c39b92ccf688ac1a1acd00e44d3b0b9147041",
+          "bytes": 18188,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260728194505",
+      "name": "add_control_catalog_scopes",
+      "identity": "20260728194505_add_control_catalog_scopes",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 4365,
+        "statement_sha256": "ecdc60942c0335be5232299ff69f27d1645f2cca72b9f595f92129a7765d9490",
+        "created_by": "lawbatalla@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:ecdc60942c0335be5232299ff69f27d1645f2cca72b9f595f92129a7765d9490",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728194505_add_control_catalog_scopes.sql.b64",
+        "decoded_sha256": "ecdc60942c0335be5232299ff69f27d1645f2cca72b9f595f92129a7765d9490",
+        "decoded_bytes": 4365,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728194505_add_control_catalog_scopes.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260728194505_add_control_catalog_scopes.sql",
+          "sha256": "8919b8df6422d0147e95dd7750ea06c22f6b976c1e2679e31730638650437d5c",
+          "bytes": 4366,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260728213723",
+      "name": "add_distributed_runtime_rate_limits",
+      "identity": "20260728213723_add_distributed_runtime_rate_limits",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 3182,
+        "statement_sha256": "326c7715226316dfad6c8ae9d636fe198777fb744b1dc85d0d1931d606fb4e86",
+        "created_by": "lawbatalla@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:326c7715226316dfad6c8ae9d636fe198777fb744b1dc85d0d1931d606fb4e86",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728213723_add_distributed_runtime_rate_limits.sql.b64",
+        "decoded_sha256": "326c7715226316dfad6c8ae9d636fe198777fb744b1dc85d0d1931d606fb4e86",
+        "decoded_bytes": 3182,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728213723_add_distributed_runtime_rate_limits.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260728213723_add_distributed_runtime_rate_limits.sql",
+          "sha256": "96c2b17427cea5e4dddcbfce49f26108d58a61768645faa1ac1708c4e844d206",
+          "bytes": 3183,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260728213829",
+      "name": "noop_verify_distributed_runtime_rate_limits",
+      "identity": "20260728213829_noop_verify_distributed_runtime_rate_limits",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 320,
+        "statement_sha256": "704e0bc0bf015ef6de022134495b4485cc182468ebd57524e65b52bb60b213c7",
+        "created_by": "lawbatalla@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:704e0bc0bf015ef6de022134495b4485cc182468ebd57524e65b52bb60b213c7",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728213829_noop_verify_distributed_runtime_rate_limits.sql.b64",
+        "decoded_sha256": "704e0bc0bf015ef6de022134495b4485cc182468ebd57524e65b52bb60b213c7",
+        "decoded_bytes": 320,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728213829_noop_verify_distributed_runtime_rate_limits.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260728213829_noop_verify_distributed_runtime_rate_limits.sql",
+          "sha256": "a6751d3424332174f86de2f72a01b594dfb652bbbc1bb428270e6982c37a3be3",
+          "bytes": 321,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260728213846",
+      "name": "verify_rate_limit_rpc_grants",
+      "identity": "20260728213846_verify_rate_limit_rpc_grants",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 618,
+        "statement_sha256": "8cacae4f4fcbd13b3da8534ac716601fc71eccb8d671873d63779f1096fb7941",
+        "created_by": "lawbatalla@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:8cacae4f4fcbd13b3da8534ac716601fc71eccb8d671873d63779f1096fb7941",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728213846_verify_rate_limit_rpc_grants.sql.b64",
+        "decoded_sha256": "8cacae4f4fcbd13b3da8534ac716601fc71eccb8d671873d63779f1096fb7941",
+        "decoded_bytes": 618,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260728213846_verify_rate_limit_rpc_grants.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260728213846_verify_rate_limit_rpc_grants.sql",
+          "sha256": "4dd9e43445cdb64a2bf74ef3a5a4bf16f6749ad7a741b8edd07a56d357880397",
+          "bytes": 619,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260729125913",
+      "name": "add_execution_plan_listing",
+      "identity": "20260729125913_add_execution_plan_listing",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 1440,
+        "statement_sha256": "3cd1aae20a433819c7108014c8f1bcc022b6b2812ab47f6cd4139ebc264c6b70",
+        "created_by": "lawbatalla@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:3cd1aae20a433819c7108014c8f1bcc022b6b2812ab47f6cd4139ebc264c6b70",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260729125913_add_execution_plan_listing.sql.b64",
+        "decoded_sha256": "3cd1aae20a433819c7108014c8f1bcc022b6b2812ab47f6cd4139ebc264c6b70",
+        "decoded_bytes": 1440,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260729125913_add_execution_plan_listing.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260729125913_add_execution_plan_listing.sql",
+          "sha256": "3cd1aae20a433819c7108014c8f1bcc022b6b2812ab47f6cd4139ebc264c6b70",
+          "bytes": 1440,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260730210432",
+      "name": "add_project_resource_bindings",
+      "identity": "20260730210432_add_project_resource_bindings",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 5558,
+        "statement_sha256": "bb549fce600216e1523198be7eeab5351fba2e2fedc27734a1ca5182e0b206f4",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:bb549fce600216e1523198be7eeab5351fba2e2fedc27734a1ca5182e0b206f4",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260730210432_add_project_resource_bindings.sql.b64",
+        "decoded_sha256": "bb549fce600216e1523198be7eeab5351fba2e2fedc27734a1ca5182e0b206f4",
+        "decoded_bytes": 5558,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260730210432_add_project_resource_bindings.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260730210432_add_project_resource_bindings.sql",
+          "sha256": "104d2c340027ebff74e267387813037b5863ee567a4478d56656d65d4e5939df",
+          "bytes": 5559,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731092135",
+      "name": "fxpass_product_intake_bridge",
+      "identity": "20260731092135_fxpass_product_intake_bridge",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 2106,
+        "statement_sha256": "c8b90cd4af13e7d4f381259e881f1e1784b932aa56a9cb84d4f607b9dfb1019d",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:c8b90cd4af13e7d4f381259e881f1e1784b932aa56a9cb84d4f607b9dfb1019d",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731092135_fxpass_product_intake_bridge.sql.b64",
+        "decoded_sha256": "c8b90cd4af13e7d4f381259e881f1e1784b932aa56a9cb84d4f607b9dfb1019d",
+        "decoded_bytes": 2106,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731092135_fxpass_product_intake_bridge.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731092135_fxpass_product_intake_bridge.sql",
+          "sha256": "01937fc9b2fc859f2ac1ce24db74effba1544c0aa5b524d75226398f4fa82e13",
+          "bytes": 2107,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731092225",
+      "name": "fxpass_product_intake_rpc",
+      "identity": "20260731092225_fxpass_product_intake_rpc",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 4974,
+        "statement_sha256": "6414aee9219a0df20ea56872644ca072acbed955886b39d51a53c58863746459",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:6414aee9219a0df20ea56872644ca072acbed955886b39d51a53c58863746459",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731092225_fxpass_product_intake_rpc.sql.b64",
+        "decoded_sha256": "6414aee9219a0df20ea56872644ca072acbed955886b39d51a53c58863746459",
+        "decoded_bytes": 4974,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731092225_fxpass_product_intake_rpc.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731092225_fxpass_product_intake_rpc.sql",
+          "sha256": "6414aee9219a0df20ea56872644ca072acbed955886b39d51a53c58863746459",
+          "bytes": 4974,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731092908",
+      "name": "projectos_operating_kernel",
+      "identity": "20260731092908_projectos_operating_kernel",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 22820,
+        "statement_sha256": "c3baca57e1813f3b3989ef8723e4581a7731d596d38a071d7ad5d39d815ea8f7",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:c3baca57e1813f3b3989ef8723e4581a7731d596d38a071d7ad5d39d815ea8f7",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731092908_projectos_operating_kernel.sql.b64",
+        "decoded_sha256": "c3baca57e1813f3b3989ef8723e4581a7731d596d38a071d7ad5d39d815ea8f7",
+        "decoded_bytes": 22820,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731092908_projectos_operating_kernel.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731092908_projectos_operating_kernel.sql",
+          "sha256": "3c0e44070f674d2f59f5d00eda519027cd48b537475aad291dfa91c68a2fbea3",
+          "bytes": 22821,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731093257",
+      "name": "projectos_operating_functions",
+      "identity": "20260731093257_projectos_operating_functions",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 43011,
+        "statement_sha256": "557f30641ef442c6c0947ebc5c794b4d290d56401ab90abd41d0787b5c865d3a",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:557f30641ef442c6c0947ebc5c794b4d290d56401ab90abd41d0787b5c865d3a",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731093257_projectos_operating_functions.sql.b64",
+        "decoded_sha256": "557f30641ef442c6c0947ebc5c794b4d290d56401ab90abd41d0787b5c865d3a",
+        "decoded_bytes": 43011,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731093257_projectos_operating_functions.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731093257_projectos_operating_functions.sql",
+          "sha256": "8cbe5c5f16d4dc651a1008f7a80833b5c8e09cbb5b02e8372b5666dbf29e912b",
+          "bytes": 43012,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731094541",
+      "name": "projectos_reconciliation_registry",
+      "identity": "20260731094541_projectos_reconciliation_registry",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 2422,
+        "statement_sha256": "7474f5ec011eb02f61c3ee818b802e29c1ab8c8c2ea6d0656fb53e4f7ed87469",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:7474f5ec011eb02f61c3ee818b802e29c1ab8c8c2ea6d0656fb53e4f7ed87469",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731094541_projectos_reconciliation_registry.sql.b64",
+        "decoded_sha256": "7474f5ec011eb02f61c3ee818b802e29c1ab8c8c2ea6d0656fb53e4f7ed87469",
+        "decoded_bytes": 2422,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731094541_projectos_reconciliation_registry.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731094541_projectos_reconciliation_registry.sql",
+          "sha256": "7b5d507414d3f50c49d3d91d187a2289b7ae87d1d994f30eb1f97ef43c0cad98",
+          "bytes": 2423,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731095029",
+      "name": "projectos_integration_health_rpc",
+      "identity": "20260731095029_projectos_integration_health_rpc",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 1796,
+        "statement_sha256": "ad72c7d60d86cbbb89874dbe04baf118a68a158b5081e4eaebb3d8467f15706f",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:ad72c7d60d86cbbb89874dbe04baf118a68a158b5081e4eaebb3d8467f15706f",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731095029_projectos_integration_health_rpc.sql.b64",
+        "decoded_sha256": "ad72c7d60d86cbbb89874dbe04baf118a68a158b5081e4eaebb3d8467f15706f",
+        "decoded_bytes": 1796,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731095029_projectos_integration_health_rpc.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731095029_projectos_integration_health_rpc.sql",
+          "sha256": "49e8af9fe829d287b403d6b2b91defb19cd42816f5a340d43ee9a4a11b610234",
+          "bytes": 1797,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731100319",
+      "name": "projectos_bootstrap_and_intelligence",
+      "identity": "20260731100319_projectos_bootstrap_and_intelligence",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 18006,
+        "statement_sha256": "fba23ecd127d10770860fcafc0ba94cf71c9e2497ad86e70bf99881a737ba064",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:fba23ecd127d10770860fcafc0ba94cf71c9e2497ad86e70bf99881a737ba064",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731100319_projectos_bootstrap_and_intelligence.sql.b64",
+        "decoded_sha256": "fba23ecd127d10770860fcafc0ba94cf71c9e2497ad86e70bf99881a737ba064",
+        "decoded_bytes": 18006,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731100319_projectos_bootstrap_and_intelligence.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731100319_projectos_bootstrap_and_intelligence.sql",
+          "sha256": "786f2ff94ea4392b60da139d9e3c02ea9c74a3ef730e6be52c1ba3e04e52d06a",
+          "bytes": 18007,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731101521",
+      "name": "projectos_pgcrypto_search_path",
+      "identity": "20260731101521_projectos_pgcrypto_search_path",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 350,
+        "statement_sha256": "a3a1738e1225b4ea5044ec175be5ed0fdbc729375a91da6bd5558f2e8c9eafe9",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:a3a1738e1225b4ea5044ec175be5ed0fdbc729375a91da6bd5558f2e8c9eafe9",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731101521_projectos_pgcrypto_search_path.sql.b64",
+        "decoded_sha256": "a3a1738e1225b4ea5044ec175be5ed0fdbc729375a91da6bd5558f2e8c9eafe9",
+        "decoded_bytes": 350,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731101521_projectos_pgcrypto_search_path.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731101521_projectos_pgcrypto_search_path.sql",
+          "sha256": "4ecd85171b4544fbf58d34c14576701be61c9f711bb56459f883e6d14e8d0c74",
+          "bytes": 351,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731102654",
+      "name": "projectos_revoke_legacy_server_reads",
+      "identity": "20260731102654_projectos_revoke_legacy_server_reads",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 844,
+        "statement_sha256": "72bdbc6f8e2b66b0c83edba455e1766ae72f618b7d3a956261ef546206af9415",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:72bdbc6f8e2b66b0c83edba455e1766ae72f618b7d3a956261ef546206af9415",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731102654_projectos_revoke_legacy_server_reads.sql.b64",
+        "decoded_sha256": "72bdbc6f8e2b66b0c83edba455e1766ae72f618b7d3a956261ef546206af9415",
+        "decoded_bytes": 844,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731102654_projectos_revoke_legacy_server_reads.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731102654_projectos_revoke_legacy_server_reads.sql",
+          "sha256": "182d5f5a4b8cf6ab77b231ddb60e6831d65eab908c0eb7b4e4b0c0414431147f",
+          "bytes": 845,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731103336",
+      "name": "projectos_reconciliation_run_rpc",
+      "identity": "20260731103336_projectos_reconciliation_run_rpc",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 1995,
+        "statement_sha256": "62b2805f48f05371c0ff30acfd64ea3cdde6d12c8612858946f4c50c3c11b28a",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:62b2805f48f05371c0ff30acfd64ea3cdde6d12c8612858946f4c50c3c11b28a",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731103336_projectos_reconciliation_run_rpc.sql.b64",
+        "decoded_sha256": "62b2805f48f05371c0ff30acfd64ea3cdde6d12c8612858946f4c50c3c11b28a",
+        "decoded_bytes": 1995,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731103336_projectos_reconciliation_run_rpc.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731103336_projectos_reconciliation_run_rpc.sql",
+          "sha256": "ffcba5e538b77349cfe33361cc7801a4ba6c8cab7157bd3cc62bc4d2961b9e0c",
+          "bytes": 1996,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731105433",
+      "name": "projectos_harden_legacy_private_tables",
+      "identity": "20260731105433_projectos_harden_legacy_private_tables",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 1194,
+        "statement_sha256": "93e4d9ce5bb1f43c3942310b39c2c975ae3fa243e6da8e2114b683a20cb74ab8",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:93e4d9ce5bb1f43c3942310b39c2c975ae3fa243e6da8e2114b683a20cb74ab8",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731105433_projectos_harden_legacy_private_tables.sql.b64",
+        "decoded_sha256": "93e4d9ce5bb1f43c3942310b39c2c975ae3fa243e6da8e2114b683a20cb74ab8",
+        "decoded_bytes": 1194,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731105433_projectos_harden_legacy_private_tables.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731105433_projectos_harden_legacy_private_tables.sql",
+          "sha256": "3f195c37df84ca504e8bf1752b15978dcd5032a5855b521a9f568bedec68d07b",
+          "bytes": 1195,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731122011",
+      "name": "projectos_product_intelligence_schema",
+      "identity": "20260731122011_projectos_product_intelligence_schema",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 9908,
+        "statement_sha256": "86d458b22bb7c40d43258a4e73ae19172ee058c780a6412ddc0e731e1ea62658",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:86d458b22bb7c40d43258a4e73ae19172ee058c780a6412ddc0e731e1ea62658",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731122011_projectos_product_intelligence_schema.sql.b64",
+        "decoded_sha256": "86d458b22bb7c40d43258a4e73ae19172ee058c780a6412ddc0e731e1ea62658",
+        "decoded_bytes": 9908,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731122011_projectos_product_intelligence_schema.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731122011_projectos_product_intelligence_schema.sql",
+          "sha256": "80d63485042faeecb86626b1712181e2859157a85c8817db59cb9e21efa921ce",
+          "bytes": 9909,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731122055",
+      "name": "projectos_product_intelligence_functions",
+      "identity": "20260731122055_projectos_product_intelligence_functions",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 10278,
+        "statement_sha256": "6a46b4cb78f4d6c6b0bda83493d65912b71c0bf88734b7ec00d5bf988d35e902",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:6a46b4cb78f4d6c6b0bda83493d65912b71c0bf88734b7ec00d5bf988d35e902",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731122055_projectos_product_intelligence_functions.sql.b64",
+        "decoded_sha256": "6a46b4cb78f4d6c6b0bda83493d65912b71c0bf88734b7ec00d5bf988d35e902",
+        "decoded_bytes": 10278,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731122055_projectos_product_intelligence_functions.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731122055_projectos_product_intelligence_functions.sql",
+          "sha256": "8ffe06e3faa82f5536451f6dcf789449c2c961135639faa7b8192cde2759741a",
+          "bytes": 10279,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731122358",
+      "name": "projectos_product_intelligence_context",
+      "identity": "20260731122358_projectos_product_intelligence_context",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 2001,
+        "statement_sha256": "2d34674f872c20fd51031f995cbaf988cbbeff6794ec60dc4fd5ba55646bd717",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:2d34674f872c20fd51031f995cbaf988cbbeff6794ec60dc4fd5ba55646bd717",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731122358_projectos_product_intelligence_context.sql.b64",
+        "decoded_sha256": "2d34674f872c20fd51031f995cbaf988cbbeff6794ec60dc4fd5ba55646bd717",
+        "decoded_bytes": 2001,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731122358_projectos_product_intelligence_context.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731122358_projectos_product_intelligence_context.sql",
+          "sha256": "65a53fea0b05a6398e710a2bc549ee9441944a621ed9bd01148d77364211efba",
+          "bytes": 2002,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731123437",
+      "name": "projectos_product_intelligence_access_hardening",
+      "identity": "20260731123437_projectos_product_intelligence_access_hardening",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 2163,
+        "statement_sha256": "a5559509f8f3e2e56c9e1f2ca05b11976ce1453d8c9589071cccc812679c5656",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:a5559509f8f3e2e56c9e1f2ca05b11976ce1453d8c9589071cccc812679c5656",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731123437_projectos_product_intelligence_access_hardening.sql.b64",
+        "decoded_sha256": "a5559509f8f3e2e56c9e1f2ca05b11976ce1453d8c9589071cccc812679c5656",
+        "decoded_bytes": 2163,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731123437_projectos_product_intelligence_access_hardening.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731123437_projectos_product_intelligence_access_hardening.sql",
+          "sha256": "68ecc44e58fd0b9ed3c0f967310cf6fbfc684f076d77020a8c6838c222f9ef51",
+          "bytes": 2164,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260731124653",
+      "name": "projectos_integration_secrets_deny_clients",
+      "identity": "20260731124653_projectos_integration_secrets_deny_clients",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 246,
+        "statement_sha256": "a90814f7fd7b5f5d65c456ff64a1d887043473957684dcee31033be0fe6f6ecb",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:a90814f7fd7b5f5d65c456ff64a1d887043473957684dcee31033be0fe6f6ecb",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731124653_projectos_integration_secrets_deny_clients.sql.b64",
+        "decoded_sha256": "a90814f7fd7b5f5d65c456ff64a1d887043473957684dcee31033be0fe6f6ecb",
+        "decoded_bytes": 246,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731124653_projectos_integration_secrets_deny_clients.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260731124653_projectos_integration_secrets_deny_clients.sql",
+          "sha256": "f5e615f18377fdadf598e68c13542a2bc29ff01c9c5dc98af948a5d670ce5663",
+          "bytes": 247,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260801163303",
+      "name": "fxpass_growth_signal_contracts",
+      "identity": "20260801163303_fxpass_growth_signal_contracts",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 3974,
+        "statement_sha256": "307f324d43c89d7e4ef260bdcb4a63bc3a911400fa4bdd8d29c6f89c522ad260",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:307f324d43c89d7e4ef260bdcb4a63bc3a911400fa4bdd8d29c6f89c522ad260",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260801163303_fxpass_growth_signal_contracts.sql.b64",
+        "decoded_sha256": "307f324d43c89d7e4ef260bdcb4a63bc3a911400fa4bdd8d29c6f89c522ad260",
+        "decoded_bytes": 3974,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260801163303_fxpass_growth_signal_contracts.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260801163303_fxpass_growth_signal_contracts.sql",
+          "sha256": "961cfba8047a1ddd3617589e394531873583e4273ef5aef748050183cf72934e",
+          "bytes": 3975,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260801164335",
+      "name": "fxpass_growth_contract_property_alignment",
+      "identity": "20260801164335_fxpass_growth_contract_property_alignment",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 642,
+        "statement_sha256": "a8638bac239f39fb0da2bb08b8f4af7522187a1c9eba2d8dc5cb55777ff49d67",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:a8638bac239f39fb0da2bb08b8f4af7522187a1c9eba2d8dc5cb55777ff49d67",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260801164335_fxpass_growth_contract_property_alignment.sql.b64",
+        "decoded_sha256": "a8638bac239f39fb0da2bb08b8f4af7522187a1c9eba2d8dc5cb55777ff49d67",
+        "decoded_bytes": 642,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260801164335_fxpass_growth_contract_property_alignment.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260801164335_fxpass_growth_contract_property_alignment.sql",
+          "sha256": "5fc028580d6dd3ed17cd8120fb0e621db4f46abc72f7cf6b652534759851122b",
+          "bytes": 643,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260802141551",
+      "name": "add_execution_plan_memory_context",
+      "identity": "20260802141551_add_execution_plan_memory_context",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 8575,
+        "statement_sha256": "3d71629bbd7dd1a9987c5576b40255d2e1a1b8d9f02831aa24a0075dd4da225e",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:3d71629bbd7dd1a9987c5576b40255d2e1a1b8d9f02831aa24a0075dd4da225e",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260802141551_add_execution_plan_memory_context.sql.b64",
+        "decoded_sha256": "3d71629bbd7dd1a9987c5576b40255d2e1a1b8d9f02831aa24a0075dd4da225e",
+        "decoded_bytes": 8575,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260802141551_add_execution_plan_memory_context.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260802141551_add_execution_plan_memory_context.sql",
+          "sha256": "afc683edaac85d0eb1184dadc795b0b6518624c766bbb717b5424de0223360e2",
+          "bytes": 8576,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260802143055",
+      "name": "enforce_mandatory_execution_intake",
+      "identity": "20260802143055_enforce_mandatory_execution_intake",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 18288,
+        "statement_sha256": "5abcf764ef3506830ea39179c65fadbd63c777f9054a295b584510a9aa22c9d9",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:5abcf764ef3506830ea39179c65fadbd63c777f9054a295b584510a9aa22c9d9",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260802143055_enforce_mandatory_execution_intake.sql.b64",
+        "decoded_sha256": "5abcf764ef3506830ea39179c65fadbd63c777f9054a295b584510a9aa22c9d9",
+        "decoded_bytes": 18288,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260802143055_enforce_mandatory_execution_intake.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260802143055_enforce_mandatory_execution_intake.sql",
+          "sha256": "ec04b00bcf021b2d7662fbc97edfad7a6287552cdc497df5399ad91c83f66159",
+          "bytes": 18289,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260804153000",
+      "name": "agent_runtime_proof_registry",
+      "identity": "20260804153000_agent_runtime_proof_registry",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 21240,
+        "statement_sha256": "f7de650db6f616f4711cdba25b3523e41a2422d85a63dc22491edcf9c1d8e548",
+        "created_by": null,
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:f7de650db6f616f4711cdba25b3523e41a2422d85a63dc22491edcf9c1d8e548",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260804153000_agent_runtime_proof_registry.sql.b64",
+        "decoded_sha256": "f7de650db6f616f4711cdba25b3523e41a2422d85a63dc22491edcf9c1d8e548",
+        "decoded_bytes": 21240,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260804153000_agent_runtime_proof_registry.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260804153000_agent_runtime_proof_registry.sql",
+          "sha256": "f7de650db6f616f4711cdba25b3523e41a2422d85a63dc22491edcf9c1d8e548",
+          "bytes": 21240,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260804154500",
+      "name": "harden_agent_runtime_proof_registry",
+      "identity": "20260804154500_harden_agent_runtime_proof_registry",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 7959,
+        "statement_sha256": "12472c77015447a98f0eaab42278364d5004e7da447d9876dbb693e132149e81",
+        "created_by": null,
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:12472c77015447a98f0eaab42278364d5004e7da447d9876dbb693e132149e81",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260804154500_harden_agent_runtime_proof_registry.sql.b64",
+        "decoded_sha256": "12472c77015447a98f0eaab42278364d5004e7da447d9876dbb693e132149e81",
+        "decoded_bytes": 7959,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260804154500_harden_agent_runtime_proof_registry.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260804154500_harden_agent_runtime_proof_registry.sql",
+          "sha256": "12472c77015447a98f0eaab42278364d5004e7da447d9876dbb693e132149e81",
+          "bytes": 7959,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260804201049",
+      "name": "harden_projectos_rpc_execution_grants",
+      "identity": "20260804201049_harden_projectos_rpc_execution_grants",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 4546,
+        "statement_sha256": "4321e0fc64659a9bfc7e2900590f64adbdbe4d982e30007c9d41fb65e6132da9",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:4321e0fc64659a9bfc7e2900590f64adbdbe4d982e30007c9d41fb65e6132da9",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260804201049_harden_projectos_rpc_execution_grants.sql.b64",
+        "decoded_sha256": "4321e0fc64659a9bfc7e2900590f64adbdbe4d982e30007c9d41fb65e6132da9",
+        "decoded_bytes": 4546,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260804201049_harden_projectos_rpc_execution_grants.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260804201049_harden_projectos_rpc_execution_grants.sql",
+          "sha256": "4321e0fc64659a9bfc7e2900590f64adbdbe4d982e30007c9d41fb65e6132da9",
+          "bytes": 4546,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260806114515",
+      "name": "optimize_projectos_nano_hot_paths",
+      "identity": "20260806114515_optimize_projectos_nano_hot_paths",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 1945,
+        "statement_sha256": "be8f8f7c2055d1c8c5b8d321890cb4d46342a8194c4641c02ec8335faf2e1692",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:be8f8f7c2055d1c8c5b8d321890cb4d46342a8194c4641c02ec8335faf2e1692",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260806114515_optimize_projectos_nano_hot_paths.sql.b64",
+        "decoded_sha256": "be8f8f7c2055d1c8c5b8d321890cb4d46342a8194c4641c02ec8335faf2e1692",
+        "decoded_bytes": 1945,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260806114515_optimize_projectos_nano_hot_paths.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260806114515_optimize_projectos_nano_hot_paths.sql",
+          "sha256": "891e189779b6644d01f314a7fb8f32854f649e43556769fd039db16570bb0db5",
+          "bytes": 1946,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260807083337",
+      "name": "projectos_memory_lifecycle_enforcement",
+      "identity": "20260807083337_projectos_memory_lifecycle_enforcement",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 15138,
+        "statement_sha256": "4e82bfc6283fe6d816fceb9ef36f28c2d81c032db8206a062225ddf4cca7c0cd",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:4e82bfc6283fe6d816fceb9ef36f28c2d81c032db8206a062225ddf4cca7c0cd",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260807083337_projectos_memory_lifecycle_enforcement.sql.b64",
+        "decoded_sha256": "4e82bfc6283fe6d816fceb9ef36f28c2d81c032db8206a062225ddf4cca7c0cd",
+        "decoded_bytes": 15138,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260807083337_projectos_memory_lifecycle_enforcement.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260807083337_projectos_memory_lifecycle_enforcement.sql",
+          "sha256": "78e8a1bad5b370dcd6bb4da92682804d38ad0ce037a33486e3b80d7bfdb3201c",
+          "bytes": 15139,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260807090425",
+      "name": "projectos_pg_net_client_privilege_revoke",
+      "identity": "20260807090425_projectos_pg_net_client_privilege_revoke",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 744,
+        "statement_sha256": "9c95ae7832e286631584f8a5825cc88cda07368e216f8219dee51103366e0239",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:9c95ae7832e286631584f8a5825cc88cda07368e216f8219dee51103366e0239",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260807090425_projectos_pg_net_client_privilege_revoke.sql.b64",
+        "decoded_sha256": "9c95ae7832e286631584f8a5825cc88cda07368e216f8219dee51103366e0239",
+        "decoded_bytes": 744,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260807090425_projectos_pg_net_client_privilege_revoke.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260807090425_projectos_pg_net_client_privilege_revoke.sql",
+          "sha256": "0634a8d5706e33d0eb0c10004e7c7d44097844a1d2c0eb407153fccc354c92b4",
+          "bytes": 745,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260807090628",
+      "name": "projectos_memory_private_function_execution_boundary",
+      "identity": "20260807090628_projectos_memory_private_function_execution_boundary",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 635,
+        "statement_sha256": "0a74209d47db24656ea85b4d4660a647a425f3152b8d482594a856e2511148d4",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:0a74209d47db24656ea85b4d4660a647a425f3152b8d482594a856e2511148d4",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260807090628_projectos_memory_private_function_execution_boundary.sql.b64",
+        "decoded_sha256": "0a74209d47db24656ea85b4d4660a647a425f3152b8d482594a856e2511148d4",
+        "decoded_bytes": 635,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260807090628_projectos_memory_private_function_execution_boundary.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260807090628_projectos_memory_private_function_execution_boundary.sql",
+          "sha256": "0a8e58da989f1a3b3a4e12b945eecbddb7ddd3ba1e40a1e7c5691b107f3f6d83",
+          "bytes": 636,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260807230810",
+      "name": "enable_rls_execution_learning_outbox",
+      "identity": "20260807230810_enable_rls_execution_learning_outbox",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 72,
+        "statement_sha256": "fec87d85f083693a619081c78d86f71322c293dd3c31d805ac3752378b9f3f8e",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:fec87d85f083693a619081c78d86f71322c293dd3c31d805ac3752378b9f3f8e",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260807230810_enable_rls_execution_learning_outbox.sql.b64",
+        "decoded_sha256": "fec87d85f083693a619081c78d86f71322c293dd3c31d805ac3752378b9f3f8e",
+        "decoded_bytes": 72,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260807230810_enable_rls_execution_learning_outbox.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260807230810_enable_rls_execution_learning_outbox.sql",
+          "sha256": "fe50d0ded9022705e6cfefef05b509bac018fd9e6be9670b1c3bdd430ad14e16",
+          "bytes": 73,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260808003751",
+      "name": "rollback_execution_learning_outbox_rls",
+      "identity": "20260808003751_rollback_execution_learning_outbox_rls",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 73,
+        "statement_sha256": "aaf84c581945eecd9ee39ac6e14a4238088c1e1234ac839b974b08f0d60b9a4b",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:aaf84c581945eecd9ee39ac6e14a4238088c1e1234ac839b974b08f0d60b9a4b",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260808003751_rollback_execution_learning_outbox_rls.sql.b64",
+        "decoded_sha256": "aaf84c581945eecd9ee39ac6e14a4238088c1e1234ac839b974b08f0d60b9a4b",
+        "decoded_bytes": 73,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260808003751_rollback_execution_learning_outbox_rls.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260808003751_rollback_execution_learning_outbox_rls.sql",
+          "sha256": "dc45fec41953a7583c11910674a0be9fb1819f70626e2b8b6581b1970347986b",
+          "bytes": 74,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260808003804",
+      "name": "reapply_execution_learning_outbox_rls",
+      "identity": "20260808003804_reapply_execution_learning_outbox_rls",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 72,
+        "statement_sha256": "fec87d85f083693a619081c78d86f71322c293dd3c31d805ac3752378b9f3f8e",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:fec87d85f083693a619081c78d86f71322c293dd3c31d805ac3752378b9f3f8e",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260808003804_reapply_execution_learning_outbox_rls.sql.b64",
+        "decoded_sha256": "fec87d85f083693a619081c78d86f71322c293dd3c31d805ac3752378b9f3f8e",
+        "decoded_bytes": 72,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260808003804_reapply_execution_learning_outbox_rls.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260808003804_reapply_execution_learning_outbox_rls.sql",
+          "sha256": "fe50d0ded9022705e6cfefef05b509bac018fd9e6be9670b1c3bdd430ad14e16",
+          "bytes": 73,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260809064611",
+      "name": "add_execution_plan_expiry_reconciler",
+      "identity": "20260809064611_add_execution_plan_expiry_reconciler",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 1932,
+        "statement_sha256": "602bf6eb12f1f8d2b24106aae937ce07bf75dd717e52713f07337a76a2d7fa5b",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:602bf6eb12f1f8d2b24106aae937ce07bf75dd717e52713f07337a76a2d7fa5b",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260809064611_add_execution_plan_expiry_reconciler.sql.b64",
+        "decoded_sha256": "602bf6eb12f1f8d2b24106aae937ce07bf75dd717e52713f07337a76a2d7fa5b",
+        "decoded_bytes": 1932,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260809064611_add_execution_plan_expiry_reconciler.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260809064611_add_execution_plan_expiry_reconciler.sql",
+          "sha256": "20b15593c121ea39aef62413f17ee885ba9e56b2046d38d26c0be576e1c53e78",
+          "bytes": 1933,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260810080332",
+      "name": "reject_anonymous_organization_creation",
+      "identity": "20260810080332_reject_anonymous_organization_creation",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 1552,
+        "statement_sha256": "6cbfeee54b524aa78e0972f2130c4aa7cf1108cee6212bc10581206fe4cfec02",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:6cbfeee54b524aa78e0972f2130c4aa7cf1108cee6212bc10581206fe4cfec02",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810080332_reject_anonymous_organization_creation.sql.b64",
+        "decoded_sha256": "6cbfeee54b524aa78e0972f2130c4aa7cf1108cee6212bc10581206fe4cfec02",
+        "decoded_bytes": 1552,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810080332_reject_anonymous_organization_creation.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260810080332_reject_anonymous_organization_creation.sql",
+          "sha256": "e8a3ad1be0fc66d2ee7d134e38d57e16308a645a9f158a4f574fd99dadd59df9",
+          "bytes": 1553,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260810083416",
+      "name": "enforce_aal2_approval_boundary",
+      "identity": "20260810083416_enforce_aal2_approval_boundary",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 3647,
+        "statement_sha256": "73687a1bf620d281527eacab80a0db93c91b3a10964c3e193c36c508a5d1d8dc",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:73687a1bf620d281527eacab80a0db93c91b3a10964c3e193c36c508a5d1d8dc",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810083416_enforce_aal2_approval_boundary.sql.b64",
+        "decoded_sha256": "73687a1bf620d281527eacab80a0db93c91b3a10964c3e193c36c508a5d1d8dc",
+        "decoded_bytes": 3647,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810083416_enforce_aal2_approval_boundary.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260810083416_enforce_aal2_approval_boundary.sql",
+          "sha256": "73687a1bf620d281527eacab80a0db93c91b3a10964c3e193c36c508a5d1d8dc",
+          "bytes": 3647,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260810083717",
+      "name": "reject_anonymous_projectos_intake",
+      "identity": "20260810083717_reject_anonymous_projectos_intake",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 3659,
+        "statement_sha256": "a36dd947d0fcc376af4f90449a07d3ff1270a12c3012cdef821898d1b4b44d35",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:a36dd947d0fcc376af4f90449a07d3ff1270a12c3012cdef821898d1b4b44d35",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810083717_reject_anonymous_projectos_intake.sql.b64",
+        "decoded_sha256": "a36dd947d0fcc376af4f90449a07d3ff1270a12c3012cdef821898d1b4b44d35",
+        "decoded_bytes": 3659,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810083717_reject_anonymous_projectos_intake.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260810083717_reject_anonymous_projectos_intake.sql",
+          "sha256": "a36dd947d0fcc376af4f90449a07d3ff1270a12c3012cdef821898d1b4b44d35",
+          "bytes": 3659,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260810104102",
+      "name": "reject_anonymous_organization_creation",
+      "identity": "20260810104102_reject_anonymous_organization_creation",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 2471,
+        "statement_sha256": "404a6b3ea6c232ad6a1b7ea22001828de0d410282e783b2243b22b424c84c17f",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:404a6b3ea6c232ad6a1b7ea22001828de0d410282e783b2243b22b424c84c17f",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810104102_reject_anonymous_organization_creation.sql.b64",
+        "decoded_sha256": "404a6b3ea6c232ad6a1b7ea22001828de0d410282e783b2243b22b424c84c17f",
+        "decoded_bytes": 2471,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810104102_reject_anonymous_organization_creation.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260810104102_reject_anonymous_organization_creation.sql",
+          "sha256": "404a6b3ea6c232ad6a1b7ea22001828de0d410282e783b2243b22b424c84c17f",
+          "bytes": 2471,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    },
+    {
+      "version": "20260810104737",
+      "name": "reject_anonymous_org_membership_helpers",
+      "identity": "20260810104737_reject_anonymous_org_membership_helpers",
+      "live_record": {
+        "statement_count": 1,
+        "statement_bytes": 1732,
+        "statement_sha256": "2ae35ec8c802816a8da3bee2536d78592888fe8651baa064f5e1e4d9cace5a77",
+        "created_by": "markjohnsonbanatao888@gmail.com",
+        "idempotency_key": null,
+        "rollback_recorded": false
+      },
+      "replayability": "exact_provider_recorded_sql_payload",
+      "provenance": {
+        "authority": "live supabase_migrations.schema_migrations payload",
+        "content_address": "sha256:2ae35ec8c802816a8da3bee2536d78592888fe8651baa064f5e1e4d9cace5a77",
+        "limitation": "This proves the provider-recorded executable payload, not its original Git commit provenance."
+      },
+      "recovery_payload": {
+        "encoding": "base64",
+        "decoded_media_type": "application/sql; charset=utf-8",
+        "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810104737_reject_anonymous_org_membership_helpers.sql.b64",
+        "decoded_sha256": "2ae35ec8c802816a8da3bee2536d78592888fe8651baa064f5e1e4d9cace5a77",
+        "decoded_bytes": 1732,
+        "active_migration": false,
+        "exact_byte_evidence_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260810104737_reject_anonymous_org_membership_helpers.sql.b64",
+        "replay_preview": {
+          "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-sql/20260810104737_reject_anonymous_org_membership_helpers.sql",
+          "sha256": "2ae35ec8c802816a8da3bee2536d78592888fe8651baa064f5e1e4d9cace5a77",
+          "bytes": 1732,
+          "normalization": "provider-recorded payload normalized to exactly one terminal LF",
+          "exact_provider_byte_match": false,
+          "active_migration": false
+        }
+      }
+    }
+  ],
+  "wrong_timestamp_exact_content_duplicates": [
+    {
+      "live_identity": "20260810083416_enforce_aal2_approval_boundary",
+      "wrong_timestamp_local_identity": "20260810083500_enforce_aal2_approval_boundary",
+      "local_path": "supabase/migrations/20260810083500_enforce_aal2_approval_boundary.sql",
+      "inactive_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/misstamped/20260810083500_enforce_aal2_approval_boundary.sql",
+      "observed_on_feature_head": "c7744689da37bdb099505f43c8f4a2f526888083",
+      "git_blob_sha1": "a5e8194c8cdc13ea42029ca97b0b8a2069b7db5f",
+      "payload_sha256": "73687a1bf620d281527eacab80a0db93c91b3a10964c3e193c36c508a5d1d8dc",
+      "payload_bytes": 3647,
+      "exact_content_match": true,
+      "instruction": "Do not replay this payload under the wrong local timestamp. Preserve provenance, then reconcile to the live version identity."
+    },
+    {
+      "live_identity": "20260810083717_reject_anonymous_projectos_intake",
+      "wrong_timestamp_local_identity": "20260810084000_reject_anonymous_projectos_intake",
+      "local_path": "supabase/migrations/20260810084000_reject_anonymous_projectos_intake.sql",
+      "inactive_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/misstamped/20260810084000_reject_anonymous_projectos_intake.sql",
+      "observed_on_feature_head": "c7744689da37bdb099505f43c8f4a2f526888083",
+      "git_blob_sha1": "551628c1ef0dabb539e9c678c916a0a92259d8bb",
+      "payload_sha256": "a36dd947d0fcc376af4f90449a07d3ff1270a12c3012cdef821898d1b4b44d35",
+      "payload_bytes": 3659,
+      "exact_content_match": true,
+      "instruction": "Do not replay this payload under the wrong local timestamp. Preserve provenance, then reconcile to the live version identity."
+    },
+    {
+      "live_identity": "20260810104102_reject_anonymous_organization_creation",
+      "wrong_timestamp_local_identity": "20260810110000_reject_anonymous_organization_creation",
+      "local_path": "supabase/migrations/20260810110000_reject_anonymous_organization_creation.sql",
+      "inactive_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/misstamped/20260810110000_reject_anonymous_organization_creation.sql",
+      "observed_on_feature_head": "c7744689da37bdb099505f43c8f4a2f526888083",
+      "git_blob_sha1": "91273f79c95486d03cb0f12ef59cf72662daea83",
+      "payload_sha256": "404a6b3ea6c232ad6a1b7ea22001828de0d410282e783b2243b22b424c84c17f",
+      "payload_bytes": 2471,
+      "exact_content_match": true,
+      "instruction": "Do not replay this payload under the wrong local timestamp. Preserve provenance, then reconcile to the live version identity."
+    },
+    {
+      "live_identity": "20260810104737_reject_anonymous_org_membership_helpers",
+      "wrong_timestamp_local_identity": "20260810112000_reject_anonymous_org_membership_helpers",
+      "local_path": "supabase/migrations/20260810112000_reject_anonymous_org_membership_helpers.sql",
+      "inactive_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/misstamped/20260810112000_reject_anonymous_org_membership_helpers.sql",
+      "observed_on_feature_head": "c7744689da37bdb099505f43c8f4a2f526888083",
+      "git_blob_sha1": "113cfefd41562f59c303e08d87060a82ccd7e205",
+      "payload_sha256": "2ae35ec8c802816a8da3bee2536d78592888fe8651baa064f5e1e4d9cace5a77",
+      "payload_bytes": 1732,
+      "exact_content_match": true,
+      "instruction": "Do not replay this payload under the wrong local timestamp. Preserve provenance, then reconcile to the live version identity."
+    }
+  ],
+  "intentional_live_duplicate": {
+    "identities": [
+      "20260807230810_enable_rls_execution_learning_outbox",
+      "20260808003804_reapply_execution_learning_outbox_rls"
+    ],
+    "statement_sha256": "fec87d85f083693a619081c78d86f71322c293dd3c31d805ac3752378b9f3f8e",
+    "exact_content_match": true,
+    "intervening_identity": "20260808003751_rollback_execution_learning_outbox_rls",
+    "deduplication_allowed": false,
+    "reason": "The intervening migration disables RLS, so the later identical enable statement is sequence-significant."
+  },
+  "non_replayable_foundations": [
+    {
+      "identity": "20260724010000_control_plane_foundation",
+      "live_recorded_payload": "applied verbatim from repository main in transaction-safe chunks",
+      "live_recorded_statement_sha256": "09e313f5d1e32f3994d57e00e46d227d2b386279a7917f23ccaac0e4081815b8",
+      "live_recorded_statement_bytes": 64,
+      "status": "unrecoverable_from_live_history",
+      "candidate_source": {
+        "path_in_recovery_archive": "source/supabase/migrations/20260724010000_control_plane_foundation.sql",
+        "bytes": 27160,
+        "crc32": "90b2694f",
+        "sha256": "15733a9714e81fb0689438b8c92eec1490310c7476a45d5144902c09c9ec3fd5",
+        "authority": "candidate_only",
+        "limitation": "The committed archive parts do not match their manifest hash and lack a valid ZIP central directory."
+      },
+      "archive_integrity": {
+        "manifest_declared_sha256": "dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83",
+        "observed_reassembled_sha256": "496ad922c145e3685a552e0307428deb2e4ccb0290058d371af465415da1e63a",
+        "match": false
+      }
+    },
+    {
+      "identity": "20260724030000_meta_remote_mcp_persistence",
+      "live_recorded_payload": "applied verbatim from repository main",
+      "live_recorded_statement_sha256": "492d24c88fa906b3b1567aaa3679e1cbd49967542f340f0238e36bca8748a45f",
+      "live_recorded_statement_bytes": 37,
+      "status": "unrecoverable_from_live_history",
+      "candidate_source": null,
+      "blocker": "No authoritative executable source was found in the canonical repository evidence inspected."
+    }
+  ],
+  "foreign_flutterflow_oidc_migrations": [
+    {
+      "identity": "20260810032703_flutterflow_secure_credential_handoff_v1",
+      "path": "supabase/migrations/20260810032703_flutterflow_secure_credential_handoff_v1.sql",
+      "inactive_path": "docs/supabase/recovery/ivmvufhcsezyhczzondn/inactive-source/target-overlay/20260810032703_flutterflow_secure_credential_handoff_v1.sql",
+      "intended_target_project_ref": "ivmvufhcsezyhczzondn",
+      "git_blob_sha1": "c2fefee987343fe08c50061b2d9e370ffbc72dfc",
+      "sha256": "71db50e7754f0daa7c6c48b9249be7915351ad11f1d4e63a653c0de860146136",
+      "bytes": 3218,
+      "target_objects_absent": [
+        "private.flutterflow_credential_handoffs",
+        "private.flutterflow_integration_credentials",
+        "public.consume_flutterflow_credential_handoff(text,text,text,text)"
+      ],
+      "observed_on_feature_head": "c7744689da37bdb099505f43c8f4a2f526888083",
+      "absent_from_live_migration_history": true,
+      "must_remain_segregated_from_project_ref": "jcyqixttuebxqqfkjonq",
+      "reason": "This project has none of the migration identity or expected objects. Applying it here would create a foreign credential/OIDC control surface."
+    },
+    {
+      "identity": "20260810101500_flutterflow_github_oidc_broker",
+      "path": "supabase/migrations/20260810101500_flutterflow_github_oidc_broker.sql",
+      "inactive_path": "docs/supabase/recovery/ivmvufhcsezyhczzondn/inactive-source/target-overlay/20260810101500_flutterflow_github_oidc_broker.sql",
+      "intended_target_project_ref": "ivmvufhcsezyhczzondn",
+      "git_blob_sha1": "ed8e16b324ec15099c276840297928ca278d530e",
+      "sha256": "c597e5fdc19a681124460625825c637eb07e05e4c63a51db153df27c73301759",
+      "bytes": 4239,
+      "target_objects_absent": [
+        "private.flutterflow_github_oidc_grants",
+        "public.consume_flutterflow_github_oidc_grant(text,text,text,text,text,text,text,text,text,text,integer)"
+      ],
+      "observed_on_feature_head": "c7744689da37bdb099505f43c8f4a2f526888083",
+      "absent_from_live_migration_history": true,
+      "must_remain_segregated_from_project_ref": "jcyqixttuebxqqfkjonq",
+      "reason": "This project has none of the migration identity or expected objects. Applying it here would create a foreign credential/OIDC control surface."
+    },
+    {
+      "identity": "20260810104000_fix_flutterflow_oidc_service_role_gate",
+      "path": "supabase/migrations/20260810104000_fix_flutterflow_oidc_service_role_gate.sql",
+      "inactive_path": "docs/supabase/recovery/ivmvufhcsezyhczzondn/inactive-source/target-overlay/20260810104000_fix_flutterflow_oidc_service_role_gate.sql",
+      "intended_target_project_ref": "ivmvufhcsezyhczzondn",
+      "git_blob_sha1": "2121de6402da9300bdd54c9bf549341d929a78bf",
+      "sha256": "8b820c5faee9abca8b47d316589d853d924184081363c5d89ace39d2a53f07bd",
+      "bytes": 2925,
+      "target_objects_absent": [
+        "public.consume_flutterflow_github_oidc_grant(text,text,text,text,text,text,text,text,text,text,integer)"
+      ],
+      "observed_on_feature_head": "c7744689da37bdb099505f43c8f4a2f526888083",
+      "absent_from_live_migration_history": true,
+      "must_remain_segregated_from_project_ref": "jcyqixttuebxqqfkjonq",
+      "reason": "This project has none of the migration identity or expected objects. Applying it here would create a foreign credential/OIDC control surface."
+    },
+    {
+      "identity": "20260810113000_record_flutterflow_oidc_attempts",
+      "path": "supabase/migrations/20260810113000_record_flutterflow_oidc_attempts.sql",
+      "inactive_path": "docs/supabase/recovery/ivmvufhcsezyhczzondn/inactive-source/target-overlay/20260810113000_record_flutterflow_oidc_attempts.sql",
+      "intended_target_project_ref": "ivmvufhcsezyhczzondn",
+      "git_blob_sha1": "557c7108ad56d98c38906563677c236e31ee3274",
+      "sha256": "9e1babfb9f17360a59a639c4b752a18b32ac0edd1fd0e57de35663b075e5caf3",
+      "bytes": 2409,
+      "target_objects_absent": [
+        "private.flutterflow_github_oidc_attempts",
+        "public.record_flutterflow_github_oidc_attempt(text,text,text,text,text,text,integer,text)"
+      ],
+      "observed_on_feature_head": "c7744689da37bdb099505f43c8f4a2f526888083",
+      "absent_from_live_migration_history": true,
+      "must_remain_segregated_from_project_ref": "jcyqixttuebxqqfkjonq",
+      "reason": "This project has none of the migration identity or expected objects. Applying it here would create a foreign credential/OIDC control surface."
+    }
+  ],
+  "pending_local_change": {
+    "identity": "20260812034825_remove_projectos_approval_aal2",
+    "effect": "Replaces the live ordinary ProjectOS approval function to remove the AAL2/auth.sessions requirement while retaining permanent-account, owner/admin, assignment, expiry, separation-of-duty, and audit checks.",
+    "classification": "real control-plane authorization change; not history repair",
+    "deployment_authorized_by_this_artifact": false
+  },
+  "minimum_safe_next_gate": [
+    "Recover and content-address the two non-replayable foundational SQL sources, or separately approve a governed baseline-and-history-repair design.",
+    "Keep wrong-timestamp duplicates and foreign FlutterFlow/OIDC migrations out of this project's active stream.",
+    "Replay from an empty database and compare schema, functions, policies, grants, extensions, and required non-secret configuration with the live project.",
+    "Require a protected preview whose migration diff contains only the intended pending AAL1 change.",
+    "Preserve a before snapshot and exact AAL2 rollback function before any provider apply."
+  ],
+  "inactive_target_source_records": {
+    "status": "materialized as inactive source by the concurrent target-segregation lane; excluded from supabase/migrations",
+    "project_ref": "jcyqixttuebxqqfkjonq",
+    "sources": [
+      {
+        "class": "wrong_timestamp_exact_content_duplicates",
+        "count": 4,
+        "original_active_source_paths": [
+          "supabase/migrations/20260810083500_enforce_aal2_approval_boundary.sql",
+          "supabase/migrations/20260810084000_reject_anonymous_projectos_intake.sql",
+          "supabase/migrations/20260810110000_reject_anonymous_organization_creation.sql",
+          "supabase/migrations/20260810112000_reject_anonymous_org_membership_helpers.sql"
+        ],
+        "inactive_source_paths": [
+          "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/misstamped/20260810083500_enforce_aal2_approval_boundary.sql",
+          "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/misstamped/20260810084000_reject_anonymous_projectos_intake.sql",
+          "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/misstamped/20260810110000_reject_anonymous_organization_creation.sql",
+          "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/misstamped/20260810112000_reject_anonymous_org_membership_helpers.sql"
+        ],
+        "treatment": "exclude from this project's repaired active history; retain provenance until replaced by exact live-version identities"
+      },
+      {
+        "class": "foreign_flutterflow_oidc_migrations",
+        "count": 4,
+        "original_active_source_paths": [
+          "supabase/migrations/20260810032703_flutterflow_secure_credential_handoff_v1.sql",
+          "supabase/migrations/20260810101500_flutterflow_github_oidc_broker.sql",
+          "supabase/migrations/20260810104000_fix_flutterflow_oidc_service_role_gate.sql",
+          "supabase/migrations/20260810113000_record_flutterflow_oidc_attempts.sql"
+        ],
+        "intended_target_project_ref": "ivmvufhcsezyhczzondn",
+        "inactive_source_paths": [
+          "docs/supabase/recovery/ivmvufhcsezyhczzondn/inactive-source/target-overlay/20260810032703_flutterflow_secure_credential_handoff_v1.sql",
+          "docs/supabase/recovery/ivmvufhcsezyhczzondn/inactive-source/target-overlay/20260810101500_flutterflow_github_oidc_broker.sql",
+          "docs/supabase/recovery/ivmvufhcsezyhczzondn/inactive-source/target-overlay/20260810104000_fix_flutterflow_oidc_service_role_gate.sql",
+          "docs/supabase/recovery/ivmvufhcsezyhczzondn/inactive-source/target-overlay/20260810113000_record_flutterflow_oidc_attempts.sql"
+        ],
+        "treatment": "segregate to their intended project/control surface; never apply to jcyqixttuebxqqfkjonq"
+      },
+      {
+        "class": "pending_control_plane_change",
+        "count": 1,
+        "active_source_paths": [
+          "supabase/migrations/20260812034825_remove_projectos_approval_aal2.sql"
+        ],
+        "treatment": "retain as a separately reviewed pending change; it is not historical reconciliation"
+      }
+    ]
+  }
+}

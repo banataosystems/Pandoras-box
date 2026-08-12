@@ -89,15 +89,23 @@
     {
       "id": "P1",
       "name": "Provider-invisibility firewall",
-      "status": "documented",
+      "status": "source_implemented_bounded_tests_passed",
       "weight": 7,
       "goal": "Guarantee hidden implementation/provider terminology can never leak into user-visible Pandora surfaces.",
+      "currentEvidence": {
+        "sourceCommit": "ad3e40506db72faba09385b97dae92855ae9c604",
+        "containedInCandidate": "c7744689da37bdb099505f43c8f4a2f526888083",
+        "sourceGuardPassed": true,
+        "ownerAppApplied": false,
+        "ownerApiSanitizerDeployed": false,
+        "productionVerified": false
+      },
       "tasks": [
-        {"id": "P1-T1", "name": "Create forbidden-string lint", "status": "documented"},
-        {"id": "P1-T2", "name": "Add server error sanitizer/translator", "status": "documented"},
-        {"id": "P1-T3", "name": "Remove hidden app builder from Connections UI", "status": "documented"},
-        {"id": "P1-T4", "name": "Scan UI strings, accessibility labels, notifications, approvals, activity, release copy", "status": "documented"},
-        {"id": "P1-T5", "name": "Add regression test that fails release on forbidden user-visible strings", "status": "documented"}
+        {"id": "P1-T1", "name": "Create forbidden-string lint", "status": "tested_bounded_source"},
+        {"id": "P1-T2", "name": "Add server error sanitizer/translator", "status": "tested_bounded_source_not_deployed"},
+        {"id": "P1-T3", "name": "Remove hidden app builder from Connections UI", "status": "tested_bounded_source_not_applied"},
+        {"id": "P1-T4", "name": "Scan UI strings, accessibility labels, notifications, approvals, activity, release copy", "status": "partially_tested_bounded_source"},
+        {"id": "P1-T5", "name": "Add regression test that fails release on forbidden user-visible strings", "status": "implemented_bounded_source_gate"}
       ],
       "exitCriteria": [
         "zero forbidden implementation terms in user-visible project strings",
@@ -108,15 +116,22 @@
     {
       "id": "P2",
       "name": "Premium design system and app shell",
-      "status": "documented",
+      "status": "source_implemented_bounded_tests_passed",
       "weight": 12,
       "goal": "Apply the premium Pandora design language and standardized component system to the existing app.",
+      "currentEvidence": {
+        "sourceCommit": "8b18dfd8931ca6801c7e41b28a59dc8022a58f6f",
+        "containedInCandidate": "c7744689da37bdb099505f43c8f4a2f526888083",
+        "sourceGuardPassed": true,
+        "ownerAppApplied": false,
+        "productionVerified": false
+      },
       "tasks": [
-        {"id": "P2-T1", "name": "Lock semantic color/theme tokens from approved mark", "status": "documented"},
-        {"id": "P2-T2", "name": "Lock typography, spacing, radii, touch targets, iconography, motion", "status": "documented"},
-        {"id": "P2-T3", "name": "Build shared AppScaffold/TopBar/BottomNav/Button/State components", "status": "documented"},
-        {"id": "P2-T4", "name": "Implement Light/Dark/System themes", "status": "documented"},
-        {"id": "P2-T5", "name": "Implement one-handed and safe-area rules", "status": "documented"}
+        {"id": "P2-T1", "name": "Lock semantic color/theme tokens from approved mark", "status": "tested_bounded_source_not_applied"},
+        {"id": "P2-T2", "name": "Lock typography, spacing, radii, touch targets, iconography, motion", "status": "partially_tested_spacing_radii_touch_only"},
+        {"id": "P2-T3", "name": "Build shared AppScaffold/TopBar/BottomNav/Button/State components", "status": "implemented_source_not_fully_proven"},
+        {"id": "P2-T4", "name": "Implement Light/Dark/System themes", "status": "partially_tested_dark_mode_source_only"},
+        {"id": "P2-T5", "name": "Implement one-handed and safe-area rules", "status": "partially_tested_touch_targets_only"}
       ],
       "exitCriteria": [
         "component system implemented in current app project",
@@ -128,9 +143,16 @@
     {
       "id": "P3",
       "name": "Current screen premium redesign",
-      "status": "documented",
+      "status": "source_implemented_bounded_tests_passed",
       "weight": 14,
       "goal": "Transform all ten current app screens into the target owner experience without creating a duplicate app project.",
+      "currentEvidence": {
+        "containedInCandidate": "c7744689da37bdb099505f43c8f4a2f526888083",
+        "sourceGuardPassed": true,
+        "ownerAppApplied": false,
+        "liveWordingStillIncludes": ["Work", "Approve", "governed", "backend", "technical proof"],
+        "productionVerified": false
+      },
       "screenMap": [
         {"current": "SplashConnection", "target": "Launch Gate"},
         {"current": "SignIn", "target": "Sign In"},
@@ -144,15 +166,15 @@
         {"current": "SecurityOperations", "target": "Safety"}
       ],
       "tasks": [
-        {"id": "P3-T1", "name": "Redesign Launch Gate and Sign In", "status": "documented"},
-        {"id": "P3-T2", "name": "Redesign Home with Ask Pandora, one priority card, truthful projects/activity", "status": "documented"},
-        {"id": "P3-T3", "name": "Redesign Project Detail", "status": "documented"},
-        {"id": "P3-T4", "name": "Redesign Actions and Ask Pandora/Build/Fix composer", "status": "documented"},
-        {"id": "P3-T5", "name": "Redesign Approvals", "status": "documented"},
-        {"id": "P3-T6", "name": "Redesign Preview/Action Progress", "status": "documented"},
-        {"id": "P3-T7", "name": "Redesign Activity", "status": "documented"},
-        {"id": "P3-T8", "name": "Redesign Safety", "status": "documented"},
-        {"id": "P3-T9", "name": "Add loading/empty/error/offline/stale states for every page", "status": "documented"}
+        {"id": "P3-T1", "name": "Redesign Launch Gate and Sign In", "status": "implemented_source_bounded_sign_in_test"},
+        {"id": "P3-T2", "name": "Redesign Home with Ask Pandora, one priority card, truthful projects/activity", "status": "implemented_source_not_fully_proven"},
+        {"id": "P3-T3", "name": "Redesign Project Detail", "status": "implemented_source_not_fully_proven"},
+        {"id": "P3-T4", "name": "Redesign Actions and Ask Pandora/Build/Fix composer", "status": "tested_bounded_source_not_applied"},
+        {"id": "P3-T5", "name": "Redesign Approvals", "status": "tested_bounded_source_not_applied"},
+        {"id": "P3-T6", "name": "Redesign Preview/Action Progress", "status": "tested_bounded_source_not_applied"},
+        {"id": "P3-T7", "name": "Redesign Activity", "status": "tested_bounded_source_not_applied"},
+        {"id": "P3-T8", "name": "Redesign Safety", "status": "implemented_source_not_fully_proven"},
+        {"id": "P3-T9", "name": "Add loading/empty/error/offline/stale states for every page", "status": "not_proven_for_every_page"}
       ],
       "exitCriteria": [
         "all ten screens use shared design tokens/components",
@@ -169,9 +191,13 @@
       "goal": "Replace mock/static values with canonical owner-safe backend projections.",
       "currentEvidence": {
         "ownerApiBridgeImplemented": true,
-        "ownerApiBridgeTestsPassed": 8,
+        "ownerApiOverlayTestsPassed": 25,
         "ownerApiEdgeFunctionDeployed": true,
-        "ownerApiEdgeFunctionVersion": 2,
+        "ownerApiEdgeFunctionVersion": 3,
+        "deployedBundleSha256": "d435fcde46c86dc7afa5c52f1e2160e476750a900aad87444d9beb527777ec81",
+        "p1SanitizerDeployed": false,
+        "aal1ApprovalsDeployed": false,
+        "deployedVersionStillRequiresAal2": true,
         "pageLayerFullyWired": false
       },
       "tasks": [
@@ -193,16 +219,28 @@
     {
       "id": "P5",
       "name": "Governed app read/write operations",
-      "status": "partially_implemented",
+      "status": "source_tested_provider_validation_blocked",
       "weight": 8,
       "goal": "Make inspection, validation, safe editing, snapshots, and rollback first-class Pandora capabilities.",
+      "currentEvidence": {
+        "candidateCommit": "c7744689da37bdb099505f43c8f4a2f526888083",
+        "ownerApiOverlayTestsPassed": 25,
+        "adapterDirectBehaviorTestsPassed": 0,
+        "validationRunId": 31582149316,
+        "validationConclusion": "failed_before_project_access",
+        "validationHttpStatus": 403,
+        "governedGrantPlanId": "e4bbab48-7495-4734-a2f4-aa9a2c11003a",
+        "grantPlanPayloadHash": "447c86a3385580a19a84970954f9605f284241179ddb21db56bc4b351c8b260c",
+        "grantApprovalBlockedByLiveAal2": true,
+        "ownerAppMutationOccurred": false
+      },
       "tasks": [
         {"id": "P5-T1", "name": "Project inspection adapter", "status": "implemented_unpromoted"},
         {"id": "P5-T2", "name": "Project validation adapter", "status": "implemented_unpromoted"},
-        {"id": "P5-T3", "name": "Minimal write adapter with exact project scope", "status": "implemented_unpromoted"},
-        {"id": "P5-T4", "name": "Provider snapshot + read-back verification", "status": "implemented_unpromoted"},
-        {"id": "P5-T5", "name": "Schema drift fail-closed handling", "status": "documented"},
-        {"id": "P5-T6", "name": "Ambiguous write no-auto-retry policy", "status": "documented"},
+        {"id": "P5-T3", "name": "Minimal write adapter with exact project scope", "status": "implemented_source_not_live_tested"},
+        {"id": "P5-T4", "name": "Provider snapshot + read-back verification", "status": "partial_source_readback_no_durable_rollback_snapshot"},
+        {"id": "P5-T5", "name": "Schema drift fail-closed handling", "status": "implemented_source_not_behavior_tested"},
+        {"id": "P5-T6", "name": "Ambiguous write no-auto-retry policy", "status": "implemented_source_not_behavior_tested"},
         {"id": "P5-T7", "name": "Rollback restoration drill", "status": "not_tested"}
       ],
       "exitCriteria": [
@@ -356,9 +394,13 @@
       ]
     }
   ],
-  "immediateNextAutonomousAction": "Implement P1 provider-invisibility lint/translation and P2/P3 premium shared UI system on the existing app work candidate, while P4 finishes truthful live owner API wiring. Stop before production release promotion.",
+  "immediateNextAutonomousAction": "Publish the tested source-hygiene candidate to the existing draft PR, require exact-head source checks, and run read-only owner-app validation only after an exact one-time grant can be approved through the governed control plane. Keep owner-app apply, backend deployment, merge, and production promotion blocked until their separate gates are satisfied.",
   "currentBlockers": [
     "Live Pandora Memory semantic write is not available through this ChatGPT session, so canonical Memory DB update cannot be independently proven from this run.",
+    "Exact-head owner-app validation is blocked before project access because the one-time OIDC grant requires a live owner/admin approval path that still enforces AAL2; the prior exact grant plan expired without execution.",
+    "GitHub main is currently unprotected, required status checks are off, and no repository ruleset applies; the exact-head owner-app check is therefore not an externally enforced merge gate.",
+    "Supabase migration history is not replayable from source: 50 live jcy identities exist, 48 exact SQL payloads are preserved, and two foundational executable sources remain unproven.",
+    "The live security release blockers remain unresolved: owner/admin/operator decide_approval authorization, unredacted registry configuration, leaked-password protection disabled, pg_net in public, privileged broad search paths, and deployed owner API P1/AAL1 drift.",
     "Current page layer is not yet proven fully wired to truthful live owner API data.",
     "Android-first visual/navigation/accessibility verification is not yet recorded.",
     "Protected approval/extra identity flow is not yet verified end-to-end in the app.",
