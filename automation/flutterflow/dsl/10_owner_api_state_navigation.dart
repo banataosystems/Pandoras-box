@@ -426,30 +426,34 @@ void buildPandoraOwnerApp(
 }
 
 void _configurePandoraTheme(App app) {
-  app.themeColor('primary', 0xFF111827, dark: 0xFF374151);
-  app.themeColor('secondary', 0xFF4B5563, dark: 0xFF6B7280);
-  app.themeColor('tertiary', 0xFF6B7280, dark: 0xFF9CA3AF);
-  app.themeColor('alternate', 0xFFD1D5DB, dark: 0xFF374151);
+  // P2 premium institutional foundation. The approved Pandora mark is
+  // monochrome and its manifest forbids recoloring, so no brand-red seed is
+  // invented here. Semantic error red remains reserved for destructive/error
+  // states until an independently approved Pandora accent token exists.
+  app.themeColor('primary', 0xFF171717, dark: 0xFF2B2B2B);
+  app.themeColor('secondary', 0xFF3F3F46, dark: 0xFF52525B);
+  app.themeColor('tertiary', 0xFF71717A, dark: 0xFFA1A1AA);
+  app.themeColor('alternate', 0xFFE4E4E7, dark: 0xFF2F2F35);
   app.themeColor(
     'primaryBackground',
-    0xFFF7F8FA,
-    dark: 0xFF0B0F14,
+    0xFFF7F7F5,
+    dark: 0xFF090909,
   );
   app.themeColor(
     'secondaryBackground',
     0xFFFFFFFF,
-    dark: 0xFF151A21,
+    dark: 0xFF151515,
   );
-  app.themeColor('primaryText', 0xFF111827, dark: 0xFFF9FAFB);
-  app.themeColor('secondaryText', 0xFF4B5563, dark: 0xFFB7C0CC);
-  app.themeColor('accent1', 0x24111827, dark: 0x33374151);
-  app.themeColor('accent2', 0x244B5563, dark: 0x336B7280);
-  app.themeColor('accent3', 0x246B7280, dark: 0x339CA3AF);
-  app.themeColor('accent4', 0xCCFFFFFF, dark: 0xCC151A21);
-  app.themeColor('success', 0xFF16794A, dark: 0xFF4FAE7A);
-  app.themeColor('warning', 0xFFA15C00, dark: 0xFFD99A3D);
+  app.themeColor('primaryText', 0xFF111111, dark: 0xFFF7F7F5);
+  app.themeColor('secondaryText', 0xFF5F6368, dark: 0xFFB8B8B8);
+  app.themeColor('accent1', 0x14111111, dark: 0x1FF7F7F5);
+  app.themeColor('accent2', 0x143F3F46, dark: 0x1F52525B);
+  app.themeColor('accent3', 0x1471717A, dark: 0x1FA1A1AA);
+  app.themeColor('accent4', 0xF2FFFFFF, dark: 0xF2151515);
+  app.themeColor('success', 0xFF166C46, dark: 0xFF4FAE7A);
+  app.themeColor('warning', 0xFF946200, dark: 0xFFD9A441);
   app.themeColor('error', 0xFFB42318, dark: 0xFFE57373);
-  app.themeColor('info', 0xFF375A7F, dark: 0xFF7FA6C9);
+  app.themeColor('info', 0xFF52525B, dark: 0xFFA1A1AA);
   app.darkMode(enabled: true);
   app.breakpoints(small: 479, medium: 991, large: 1200);
 }

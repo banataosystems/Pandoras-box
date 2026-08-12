@@ -13,6 +13,19 @@ const String approvedPandoraProductMark =
 /// Typed data/action handles created by pass 2 and consumed by its exact UI
 /// replacement pass. The widget selectors below are from inspection artifact
 /// cb3a51db; none is inferred from display text or an unindexed resource path.
+abstract final class PandoraUi {
+  static const double microGap = 4;
+  static const double compactGap = 8;
+  static const double rowGap = 12;
+  static const double contentGap = 16;
+  static const double pagePadding = 20;
+  static const double sectionGap = 24;
+  static const double panelPadding = 16;
+  static const double panelRadius = 18;
+  static const double appMark = 44;
+  static const double touchTarget = 48;
+}
+
 final class PandoraBindingSpec {
   const PandoraBindingSpec({
     required this.organizationId,
@@ -371,8 +384,8 @@ DslWidget _splashBody() => Column(
   name: 'PandoraSplashBody',
   mainAxis: MainAxis.center,
   crossAxis: CrossAxis.center,
-  spacing: 16,
-  padding: const EdgeInsets.all(24),
+  spacing: PandoraUi.contentGap,
+  padding: const EdgeInsets.all(PandoraUi.sectionGap),
   children: [
     _mark(200),
     Text('Pandora\'s Box', style: Styles.headlineSmall),
@@ -386,13 +399,13 @@ DslWidget _signInBody(PandoraBindingSpec spec) => Column(
   name: 'PandoraSignInBody',
   mainAxis: MainAxis.center,
   crossAxis: CrossAxis.stretch,
-  spacing: 16,
-  padding: const EdgeInsets.all(24),
+  spacing: PandoraUi.contentGap,
+  padding: const EdgeInsets.all(PandoraUi.sectionGap),
   scrollable: true,
   children: [
     Column(
       crossAxis: CrossAxis.center,
-      spacing: 8,
+      spacing: PandoraUi.compactGap,
       children: [
         _mark(160),
         Text('Pandora\'s Box', style: Styles.headlineSmall),
@@ -511,8 +524,8 @@ DslWidget _signInBody(PandoraBindingSpec spec) => Column(
 DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
   name: 'PandoraCommandCenterBody',
   crossAxis: CrossAxis.stretch,
-  spacing: 16,
-  padding: const EdgeInsets.all(16),
+  spacing: PandoraUi.contentGap,
+  padding: const EdgeInsets.all(PandoraUi.pagePadding),
   scrollable: true,
   children: [
     _brandHeader('Pandora\'s Box', 'Owner command center'),
@@ -520,7 +533,7 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraOwnerCommandPanel',
       child: Column(
         crossAxis: CrossAxis.stretch,
-        spacing: 10,
+        spacing: PandoraUi.rowGap,
         children: [
           Text(
             'What do you want Pandora to do?',
@@ -580,9 +593,9 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraSystemHealthPanel',
       child: Column(
         crossAxis: CrossAxis.start,
-        spacing: 4,
+        spacing: PandoraUi.microGap,
         children: [
-          Text('SYSTEM HEALTH', style: Styles.labelMedium),
+          Text('CURRENT STATUS', style: Styles.labelMedium),
           Text(
             State(spec.homeData)['systemHealth']['label'],
             style: Styles.titleLarge,
@@ -596,8 +609,8 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
     ),
     Wrap(
       name: 'PandoraHomeMetricsWrap',
-      spacing: 8,
-      runSpacing: 8,
+      spacing: PandoraUi.compactGap,
+      runSpacing: PandoraUi.compactGap,
       children: [
         _metric(
           'Approvals',
@@ -639,7 +652,7 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
       ),
       child: Column(
         crossAxis: CrossAxis.start,
-        spacing: 6,
+        spacing: PandoraUi.compactGap,
         children: [
           Text('NEXT BEST STEP', style: Styles.labelMedium),
           Text(
@@ -658,7 +671,7 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraProjectsList',
       source: State(spec.homeProjects),
       shrinkWrap: true,
-      spacing: 10,
+      spacing: PandoraUi.rowGap,
       itemBuilder: (item) => _panel(
         name: 'PandoraProjectRow',
         onTap: Navigate(
@@ -667,7 +680,7 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
         ),
         child: Column(
           crossAxis: CrossAxis.start,
-          spacing: 4,
+          spacing: PandoraUi.microGap,
           children: [
             Text(item['name'], style: Styles.titleMedium),
             Text(item['plainPurpose'], style: Styles.bodyMedium),
@@ -682,12 +695,12 @@ DslWidget _commandCenterBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraHomeActivityList',
       source: State(spec.homeData)['recentActivity'],
       shrinkWrap: true,
-      spacing: 8,
+      spacing: PandoraUi.compactGap,
       itemBuilder: (item) => _panel(
         name: 'PandoraHomeActivityRow',
         child: Column(
           crossAxis: CrossAxis.start,
-          spacing: 3,
+          spacing: PandoraUi.microGap,
           children: [
             Text(item['summary'], style: Styles.bodyMedium),
           ],
@@ -735,8 +748,8 @@ List<DslAction> _submitHomeCommand(
 DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
   name: 'PandoraProjectDetailsBody',
   crossAxis: CrossAxis.stretch,
-  spacing: 14,
-  padding: const EdgeInsets.all(16),
+  spacing: PandoraUi.contentGap,
+  padding: const EdgeInsets.all(PandoraUi.pagePadding),
   scrollable: true,
   children: [
     Row(
@@ -769,7 +782,7 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraProjectStatusPanel',
       child: Column(
         crossAxis: CrossAxis.start,
-        spacing: 6,
+        spacing: PandoraUi.compactGap,
         children: [
           Text('Where we are', style: Styles.labelMedium),
           Text(State(spec.projectData)['plainStatus'], style: Styles.titleMedium),
@@ -781,7 +794,7 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraProjectProgressPanel',
       child: Column(
         crossAxis: CrossAxis.start,
-        spacing: 6,
+        spacing: PandoraUi.compactGap,
         children: [
           Text(
             'Verified roadmap progress',
@@ -796,7 +809,7 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
             ),
           ),
           Row(
-            spacing: 3,
+            spacing: PandoraUi.microGap,
             visible: State(spec.projectData)['progressVerified'],
             children: [
               Text(
@@ -825,7 +838,7 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraProjectNextPanel',
       child: Column(
         crossAxis: CrossAxis.start,
-        spacing: 6,
+        spacing: PandoraUi.compactGap,
         children: [
           Text('What is stopping us', style: Styles.labelMedium),
           Text(
@@ -846,12 +859,12 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraProjectTasksList',
       source: State(spec.projectData)['tasks'],
       shrinkWrap: true,
-      spacing: 8,
+      spacing: PandoraUi.compactGap,
       itemBuilder: (item) => _panel(
         name: 'PandoraProjectTaskRow',
         child: Column(
           crossAxis: CrossAxis.start,
-          spacing: 4,
+          spacing: PandoraUi.microGap,
           children: [
             Text(item['title'], style: Styles.titleSmall),
             Text(item['plainStatus'], style: Styles.labelMedium),
@@ -865,12 +878,12 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraProjectReleasesList',
       source: State(spec.projectData)['recentReleases'],
       shrinkWrap: true,
-      spacing: 8,
+      spacing: PandoraUi.compactGap,
       itemBuilder: (item) => _panel(
         name: 'PandoraProjectReleaseRow',
         child: Column(
           crossAxis: CrossAxis.start,
-          spacing: 4,
+          spacing: PandoraUi.microGap,
           children: [
             Text(item['title'], style: Styles.titleSmall),
             Text(item['plainStatus'], style: Styles.labelMedium),
@@ -889,12 +902,12 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraProjectEvidenceList',
       source: State(spec.projectData)['evidence'],
       shrinkWrap: true,
-      spacing: 8,
+      spacing: PandoraUi.compactGap,
       itemBuilder: (item) => _panel(
         name: 'PandoraProjectEvidenceRow',
         child: Column(
           crossAxis: CrossAxis.start,
-          spacing: 4,
+          spacing: PandoraUi.microGap,
           children: [
             Text(item['title'], style: Styles.titleSmall),
             Text(item['plainStatus'], style: Styles.labelMedium),
@@ -923,8 +936,8 @@ DslWidget _projectDetailsBody(PandoraBindingSpec spec) => Column(
 DslWidget _actionsCatalogBody(PandoraBindingSpec spec) => Column(
   name: 'PandoraActionsCatalogBody',
   crossAxis: CrossAxis.stretch,
-  spacing: 14,
-  padding: const EdgeInsets.all(16),
+  spacing: PandoraUi.contentGap,
+  padding: const EdgeInsets.all(PandoraUi.pagePadding),
   scrollable: true,
   children: [
     _brandHeader('Actions', 'Choose what you want Pandora to do'),
@@ -944,7 +957,7 @@ DslWidget _actionsCatalogBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraActionsList',
       source: State(spec.actionItems),
       shrinkWrap: true,
-      spacing: 10,
+      spacing: PandoraUi.rowGap,
       itemBuilder: (item) => _panel(
         name: 'PandoraActionRow',
         onTap: Navigate(
@@ -957,7 +970,7 @@ DslWidget _actionsCatalogBody(PandoraBindingSpec spec) => Column(
         ),
         child: Column(
           crossAxis: CrossAxis.start,
-          spacing: 6,
+          spacing: PandoraUi.compactGap,
           children: [
             Text(item['title'], style: Styles.titleMedium),
             Text(item['description'], style: Styles.bodyMedium),
@@ -976,8 +989,8 @@ DslWidget _actionsCatalogBody(PandoraBindingSpec spec) => Column(
 DslWidget _actionBuilderBody(PandoraBindingSpec spec) => Column(
   name: 'PandoraActionBuilderBody',
   crossAxis: CrossAxis.stretch,
-  spacing: 14,
-  padding: const EdgeInsets.all(16),
+  spacing: PandoraUi.contentGap,
+  padding: const EdgeInsets.all(PandoraUi.pagePadding),
   scrollable: true,
   children: [
     Row(
@@ -1040,8 +1053,8 @@ DslWidget _actionBuilderBody(PandoraBindingSpec spec) => Column(
 DslWidget _approvalCenterBody(PandoraBindingSpec spec) => Column(
   name: 'PandoraApprovalCenterBody',
   crossAxis: CrossAxis.stretch,
-  spacing: 14,
-  padding: const EdgeInsets.all(16),
+  spacing: PandoraUi.contentGap,
+  padding: const EdgeInsets.all(PandoraUi.pagePadding),
   scrollable: true,
   children: [
     _brandHeader('Approvals', 'Only decisions that need you'),
@@ -1068,12 +1081,12 @@ DslWidget _approvalCenterBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraApprovalList',
       source: State(spec.approvalItems),
       shrinkWrap: true,
-      spacing: 12,
+      spacing: PandoraUi.rowGap,
       itemBuilder: (item) => _panel(
         name: 'PandoraApprovalRow',
         child: Column(
           crossAxis: CrossAxis.stretch,
-          spacing: 8,
+          spacing: PandoraUi.compactGap,
           children: [
             Text(item['whatWillHappen'], style: Styles.titleMedium),
             Text('Why Pandora needs you', style: Styles.labelMedium),
@@ -1093,7 +1106,7 @@ DslWidget _approvalCenterBody(PandoraBindingSpec spec) => Column(
             ),
             Column(
               crossAxis: CrossAxis.stretch,
-              spacing: 8,
+              spacing: PandoraUi.compactGap,
               children: [
                 Button(
                   'Approve this change',
@@ -1162,8 +1175,8 @@ DslWidget _approvalCenterBody(PandoraBindingSpec spec) => Column(
 DslWidget _plansExecutionBody(PandoraBindingSpec spec) => Column(
   name: 'PandoraPlansExecutionBody',
   crossAxis: CrossAxis.stretch,
-  spacing: 14,
-  padding: const EdgeInsets.all(16),
+  spacing: PandoraUi.contentGap,
+  padding: const EdgeInsets.all(PandoraUi.pagePadding),
   scrollable: true,
   children: [
     Row(
@@ -1182,7 +1195,7 @@ DslWidget _plansExecutionBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraPlanSummary',
       child: Column(
         crossAxis: CrossAxis.start,
-        spacing: 6,
+        spacing: PandoraUi.compactGap,
         children: [
           Text('Action', style: Styles.labelMedium),
           Text(Param(spec.planActionId), style: Styles.titleMedium),
@@ -1251,8 +1264,8 @@ DslWidget _plansExecutionBody(PandoraBindingSpec spec) => Column(
 DslWidget _activityBody(PandoraBindingSpec spec) => Column(
   name: 'PandoraActivityBody',
   crossAxis: CrossAxis.stretch,
-  spacing: 14,
-  padding: const EdgeInsets.all(16),
+  spacing: PandoraUi.contentGap,
+  padding: const EdgeInsets.all(PandoraUi.pagePadding),
   scrollable: true,
   children: [
     _brandHeader('Activity', 'Recent changes and verified records'),
@@ -1293,7 +1306,7 @@ DslWidget _activityBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraMemorySourcePanel',
       child: Column(
         crossAxis: CrossAxis.start,
-        spacing: 4,
+        spacing: PandoraUi.microGap,
         children: [
           Text('Showing', style: Styles.labelMedium),
           Text(
@@ -1312,12 +1325,12 @@ DslWidget _activityBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraMemoryResultsList',
       source: State(spec.memoryData)['items'],
       shrinkWrap: true,
-      spacing: 8,
+      spacing: PandoraUi.compactGap,
       itemBuilder: (item) => _panel(
         name: 'PandoraMemoryResultRow',
         child: Column(
           crossAxis: CrossAxis.start,
-          spacing: 4,
+          spacing: PandoraUi.microGap,
           children: [
             Text(item['kind'], style: Styles.labelMedium),
             Text(item['title'], style: Styles.titleSmall),
@@ -1349,12 +1362,12 @@ DslWidget _activityBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraActivityList',
       source: State(spec.activityItems),
       shrinkWrap: true,
-      spacing: 10,
+      spacing: PandoraUi.rowGap,
       itemBuilder: (item) => _panel(
         name: 'PandoraActivityRow',
         child: Column(
           crossAxis: CrossAxis.start,
-          spacing: 4,
+          spacing: PandoraUi.microGap,
           children: [
             Text(item['summary'], style: Styles.titleSmall),
             Text(item['happenedAt'], style: Styles.bodySmall),
@@ -1395,8 +1408,8 @@ List<DslAction> _searchMemory(
 DslWidget _securityBody(PandoraBindingSpec spec) => Column(
   name: 'PandoraSecurityBody',
   crossAxis: CrossAxis.stretch,
-  spacing: 14,
-  padding: const EdgeInsets.all(16),
+  spacing: PandoraUi.contentGap,
+  padding: const EdgeInsets.all(PandoraUi.pagePadding),
   scrollable: true,
   children: [
     _brandHeader('Safety', 'Protection and connections'),
@@ -1405,7 +1418,7 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraSafetyStatusPanel',
       child: Column(
         crossAxis: CrossAxis.start,
-        spacing: 6,
+        spacing: PandoraUi.compactGap,
         children: [
           Text('CURRENT SAFETY', style: Styles.labelMedium),
           Text(
@@ -1465,12 +1478,12 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraConnectionsList',
       source: State(spec.connectionItems),
       shrinkWrap: true,
-      spacing: 10,
+      spacing: PandoraUi.rowGap,
       itemBuilder: (item) => _panel(
         name: 'PandoraConnectionRow',
         child: Column(
           crossAxis: CrossAxis.start,
-          spacing: 4,
+          spacing: PandoraUi.microGap,
           children: [
             Text(item['name'], style: Styles.titleMedium),
             Text(item['plainPurpose'], style: Styles.bodyMedium),
@@ -1482,7 +1495,7 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
               collapsed: Text(''),
               expanded: Column(
                 crossAxis: CrossAxis.start,
-                spacing: 4,
+                spacing: PandoraUi.microGap,
                 children: [
                   Text(
                     'Read access is ready.',
@@ -1567,7 +1580,7 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
       name: 'PandoraAuditIntegrityPanel',
       child: Column(
         crossAxis: CrossAxis.start,
-        spacing: 4,
+        spacing: PandoraUi.microGap,
         children: [
           Text('Protected activity', style: Styles.titleMedium),
           Text(
@@ -1584,7 +1597,7 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
     Text('Appearance', style: Styles.titleLarge),
     Column(
       crossAxis: CrossAxis.stretch,
-      spacing: 8,
+      spacing: PandoraUi.compactGap,
       children: [
         Button(
           'Use device setting',
@@ -1615,13 +1628,13 @@ DslWidget _securityBody(PandoraBindingSpec spec) => Column(
     _panel(
       name: 'PandoraAboutPanel',
       child: Row(
-        spacing: 12,
+        spacing: PandoraUi.rowGap,
         children: [
           _mark(48),
           Expanded(
             Column(
               crossAxis: CrossAxis.start,
-              spacing: 3,
+              spacing: PandoraUi.microGap,
               children: [
                 Text('Pandora\'s Box', style: Styles.titleMedium),
                 Text('Banatao Systems', style: Styles.bodySmall),
@@ -1688,12 +1701,12 @@ List<DslWidget> _loadingAndError(
 
 DslWidget _brandHeader(String title, String subtitle) => Column(
   crossAxis: CrossAxis.start,
-  spacing: 6,
+  spacing: PandoraUi.compactGap,
   children: [
     Row(
-      spacing: 10,
+      spacing: PandoraUi.rowGap,
       children: [
-        _mark(42),
+        _mark(PandoraUi.appMark),
         Flexible(
           Text(
             title,
@@ -1725,7 +1738,7 @@ DslWidget _metric(Object label, Object value, String name) => _panel(
   width: 136,
   child: Column(
     crossAxis: CrossAxis.start,
-    spacing: 4,
+    spacing: PandoraUi.microGap,
     children: [
       Text(label, style: Styles.labelSmall),
       Text(value, style: Styles.titleLarge),
@@ -1740,8 +1753,8 @@ DslWidget _panel({
   double? width,
 }) => Container(
   name: name,
-  padding: const EdgeInsets.all(14),
-  borderRadius: 12,
+  padding: const EdgeInsets.all(PandoraUi.panelPadding),
+  borderRadius: PandoraUi.panelRadius,
   color: Colors.secondaryBackground,
   width: width,
   onTap: onTap,
