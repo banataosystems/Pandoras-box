@@ -6,6 +6,7 @@ on:
       - 'recovery/mcpmaster-source.part-*'
       - 'recovery/SOURCE_RECOVERY_MANIFEST.md'
       - 'recovery/evidence/diagnostics/pr171-dep0169-trace.patch'
+      - 'recovery/evidence/diagnostics/current-dep0169-serverless-target.md'
       - '.github/workflows/recover-canonical-source.yml'
       - '.github/workflows/validate-canonical-source-input.yml'
   workflow_dispatch:
@@ -34,6 +35,21 @@ jobs:
           patch='recovery/evidence/diagnostics/pr171-dep0169-trace.patch'
           test "$(wc -c < "$patch" | tr -d ' ')" = '860'
           printf '%s  %s\n' 'abcbd7040ef2a4ce02b96ae11e66d0734f2e4e419c66bf7781d9b2e43e0c0941' "$patch" | sha256sum -c -
+      - name: Verify current serverless DEP0169 target authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='recovery/evidence/diagnostics/current-dep0169-serverless-target.md'
+          test "$(wc -c < "$target" | tr -d ' ')" = '2331'
+          printf '%s  %s\n' '172d4c4056781576a3f9f6b47666dcc322acc0534f3907b2c705ac2e9e0bffc7' "$target" | sha256sum -c -
+          grep -Fq 'dpl_8ZyJBv7oR4gC4krdo2eYfj6DKVMX' "$target"
+          grep -Fq '6faf1dd25cb12f6ff20aa4f9500658c285d3025f' "$target"
+          grep -Fq '12 Node.js lambdas + 1 container' "$target"
+          grep -Fq 'source=serverless' "$target"
+          grep -Fq 'container-only `--trace-deprecation` change is not sufficient evidence' "$target"
+          grep -Fq 'Vercel Node-function/shared-bootstrap execution surface' "$target"
+          grep -Fq 'dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83' "$target"
+          grep -Fq 'Positive POS-SEC AAL2 execution remains separately owner-authenticated' "$target"
       - name: Verify exact recovery archive and required source
         shell: bash
         run: |
