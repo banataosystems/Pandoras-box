@@ -2,47 +2,61 @@
   "schema_version": 1,
   "status": "inactive_review_candidate",
   "project_ref": "jcyqixttuebxqqfkjonq",
-  "captured_at": "2026-08-12T12:27:42Z",
   "production_mutation_performed": false,
   "active_migration_directory_modified": false,
-  "evidence_authority": {
-    "ledger": "live read-only supabase_migrations.schema_migrations",
-    "catalog": "live read-only PostgreSQL information_schema and pg_catalog",
+  "evidence_sources": {
+    "recovery_shard_member": "committed_and_reproducible",
+    "ledger_capture": "historical_attestation_without_committed_query_or_result",
+    "catalog_capture": "historical_attestation_without_committed_query_bundle_or_result",
     "application_contracts": [
       "apps/meta-business-mcp/src/drafts/supabase-store.js",
       "apps/meta-business-mcp/src/webhooks/supabase-stores.js"
     ]
   },
+  "complete_archive_reassembly": {
+    "status": "integrity_mismatch_and_missing_zip_eocd",
+    "documented_sha256_source": "recovery/SOURCE_RECOVERY_MANIFEST.md",
+    "documented_sha256": "dd7a4d1f982698bfe008f376809253011e8436598860bd86600c17e31538af83",
+    "observed_lexicographic_concat_sha256": "496ad922c145e3685a552e0307428deb2e4ccb0290058d371af465415da1e63a",
+    "observed_bytes": 54913,
+    "zip_eocd_present": false,
+    "scope_effect": "individual complete local-file records may still be independently verified"
+  },
   "foundations": [
     {
       "identity": "20260724010000_control_plane_foundation",
-      "live_recorded_payload": "applied verbatim from repository main in transaction-safe chunks",
-      "live_recorded_statement_sha256": "09e313f5d1e32f3994d57e00e46d227d2b386279a7917f23ccaac0e4081815b8",
-      "candidate_kind": "recovered_executable_source_live_equivalence_unverified",
+      "attested_live_ledger_payload": "applied verbatim from repository main in transaction-safe chunks",
+      "attested_live_ledger_statement_sha256": "09e313f5d1e32f3994d57e00e46d227d2b386279a7917f23ccaac0e4081815b8",
+      "candidate_kind": "recovered_archive_member_live_equivalence_unproven",
       "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/schema-baseline-candidates/20260724010000_control_plane_foundation.recovered.sql",
       "sha256": "15733a9714e81fb0689438b8c92eec1490310c7476a45d5144902c09c9ec3fd5",
       "bytes": 27160,
       "recovery_container_commit": "cb811a30cc325567ce1ecbbc01cbf03a5715085c",
       "recovery_container_path": "recovery/mcpmaster-source.part-02",
       "recovery_container_blob": "dbc9b03511423e2eba4defe7b6d2fd051dab9cda",
-      "recovered_archive_member_byte_equivalence": true,
+      "recovered_archive_member_byte_equivalence": "verified_by_committed_test",
       "live_applied_migration_byte_equivalence": "unproven",
-      "live_schema_equivalence": false
+      "live_schema_equivalence": "unproven"
     },
     {
       "identity": "20260724030000_meta_remote_mcp_persistence",
-      "live_recorded_payload": "applied verbatim from repository main",
-      "live_recorded_statement_sha256": "492d24c88fa906b3b1567aaa3679e1cbd49967542f340f0238e36bca8748a45f",
-      "candidate_kind": "independent_schema_only_reconstruction",
+      "attested_live_ledger_payload": "applied verbatim from repository main",
+      "attested_live_ledger_statement_sha256": "492d24c88fa906b3b1567aaa3679e1cbd49967542f340f0238e36bca8748a45f",
+      "candidate_kind": "schema_shape_hypothesis_from_uncommitted_catalog_attestation",
       "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/schema-baseline-candidates/20260724030000_meta_remote_mcp_persistence.reconstructed.sql",
-      "sha256": "e9f8be2167c49c9e28a09d8daf23289e481914d618a0ddb247a254f5050e9f25",
-      "bytes": 7908,
-      "recovered_archive_member_byte_equivalence": false,
+      "sha256": "53bcbb5149baa76ac864cbe5744c75d1ace7e2fcfe27840f926a40018eee3eac",
+      "bytes": 8216,
+      "recovered_archive_member_byte_equivalence": "not_applicable_no_source_member",
       "live_applied_migration_byte_equivalence": "unproven",
-      "live_schema_equivalence": false
+      "live_schema_equivalence": "unproven"
     }
   ],
-  "live_catalog_contract": {
+  "uncommitted_catalog_capture_attestation": {
+    "status": "historical_attestation_not_reproduced_by_this_candidate",
+    "captured_at": "2026-08-12T12:27:42Z",
+    "query_bundle_committed": false,
+    "machine_readable_result_committed": false,
+    "acl_temporal_classification": "capture_time_end_state_not_foundation_ddl",
     "captured_rows": {
       "meta_drafts": 0,
       "meta_webhook_health": 0,
@@ -96,11 +110,42 @@
     },
     "comments_present": false
   },
+  "acl_chronology": {
+    "historical_foundation_acl_status": "unproven",
+    "current_endpoint_classification": "historical_catalog_attestation_without_committed_capture",
+    "later_evidence_head": "f73c477d6eb2e287c59c895bc1c5017ab4b17980",
+    "later_payload_verification": "unattached_remote_metadata_not_reproduced_by_this_candidate",
+    "exact_later_events": [
+      {
+        "version": "20260731092908_projectos_operating_kernel",
+        "provider_payload_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731092908_projectos_operating_kernel.sql.b64",
+        "provider_payload_blob": "65053618527aaf3fe21140cfd4bb9cb14e4f48d6",
+        "decoded_sha256": "c3baca57e1813f3b3989ef8723e4581a7731d596d38a071d7ad5d39d815ea8f7",
+        "decoded_bytes": 22820,
+        "relevant_statement": "grant select on all tables in schema public to authenticated;"
+      },
+      {
+        "version": "20260731102654_projectos_revoke_legacy_server_reads",
+        "provider_payload_path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/recorded-payloads/20260731102654_projectos_revoke_legacy_server_reads.sql.b64",
+        "provider_payload_blob": "dce3f40480070f3e3e826c937b858fa2565cc690",
+        "decoded_sha256": "72bdbc6f8e2b66b0c83edba455e1766ae72f618b7d3a956261ef546206af9415",
+        "decoded_bytes": 844,
+        "relevant_statement": "revoke select on table public.meta_webhook_health from authenticated;"
+      }
+    ],
+    "post_chain_overlay": {
+      "classification": "current_endpoint_reproduction_not_historical_source",
+      "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/schema-baseline-candidates/current-catalog-acl-overlay.sql",
+      "sha256": "d262bc467083ca827a11da72b488900715348f538bd25f2d1effbfc10ad57d0a",
+      "bytes": 1242
+    }
+  },
   "uncertainties": [
     "The original second-foundation bytes, formatting, statement order, transaction boundaries, and idempotency clauses are unavailable.",
     "The old webhook uniqueness constraint name in the DROP CONSTRAINT clause is inferred from the recovered first-foundation candidate.",
-    "Live function semantics are catalog-exact at capture time, but catalog state cannot prove no later out-of-band replacement occurred.",
-    "Later migrations changed effective ACLs, so original grant wording cannot be inferred solely from current privileges."
+    "The reported live function semantics have no committed query/result artifact and cannot prove no later out-of-band replacement occurred.",
+    "Later migrations changed effective ACLs, so original grant wording cannot be inferred solely from current privileges.",
+    "The capture-time authenticated SELECT privilege on meta_drafts is attributable to a later global grant and is not projected backward; the historical origin of INSERT remains unproven."
   ],
   "replay_fixtures": [
     {
@@ -121,7 +166,7 @@
   "validation": {
     "content_addressed": true,
     "credential_literals_found": 0,
-    "static_contract_test": "test/schema-foundation-baseline.test.js",
+    "static_shape_and_provenance_test": "test/schema-foundation-baseline.test.js",
     "portable_foundation_replay": {
       "status": "historical_attestation_not_reproduced_by_this_candidate",
       "claimed_result": "passed",

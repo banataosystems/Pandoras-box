@@ -8,27 +8,44 @@ migrations.
 ## Evidence classification
 
 - `20260724010000_control_plane_foundation.recovered.sql` is an executable
-  source candidate extracted from recovery container
+  source candidate extracted from one committed recovery shard
   `recovery/mcpmaster-source.part-02` at commit
   `cb811a30cc325567ce1ecbbc01cbf03a5715085c` (container blob
-  `dbc9b03511423e2eba4defe7b6d2fd051dab9cda`). That blob is the archive part,
-  not the direct SQL blob. The candidate preserves the recovered archive
-  member exactly; byte and schema equivalence to the live applied migration
-  remain unproven.
+  `dbc9b03511423e2eba4defe7b6d2fd051dab9cda`). That blob is a shard, not the
+  direct SQL blob. A committed test parses the complete ZIP local-file record
+  inside that shard and proves the candidate is byte-identical to that member.
+  The four shards do not currently concatenate to the separately documented
+  full-archive digest or a complete ZIP, so no complete-archive claim is made.
+  Byte and schema equivalence to the live applied migration remain unproven.
 - `20260724030000_meta_remote_mcp_persistence.reconstructed.sql` is a
-  schema-only reconstruction from the live PostgreSQL catalog and canonical
-  application consumers. The original migration bytes are unavailable, so
-  this file must never be described as an original or byte-equivalent source.
-  Its resulting `webhook_events` uniqueness constraint is catalog-proven; the
-  old auto-generated constraint name used in the drop statement is inferred
-  from the recovered first foundation.
+  schema-shape hypothesis from a reported read-only PostgreSQL catalog capture
+  and canonical application consumers. The capture query bundle and result are
+  not committed. The original migration bytes are unavailable, so this file
+  must never be described as original, byte-equivalent, or catalog-proven
+  source. Its `webhook_events` uniqueness constraint reflects the reported
+  capture-time end state; the old auto-generated constraint name used in the
+  drop statement is inferred from the recovered first foundation.
 - `schema-baseline-manifest.json` binds both candidates to hashes, live ledger
   markers, catalog objects, and the remaining validation gates.
 
-The live catalog inspection was read-only. At capture time, `meta_drafts`,
-`meta_webhook_health`, and `webhook_events` each contained zero rows. No
-production schema, data, credential, deployment, or network configuration was
-changed.
+A read-only live catalog inspection was reported. Its uncommitted result says
+that `meta_drafts`, `meta_webhook_health`, and `webhook_events` each contained
+zero rows at capture time. Until a query bundle and machine-readable capture
+are committed and reproduced, every catalog/RLS/ACL/function field in the
+manifest is a historical attestation. No production schema, data, credential,
+deployment, or network configuration was changed by this candidate.
+
+The positive ACL statements are isolated in `current-catalog-acl-overlay.sql`,
+which is explicitly a post-chain rehearsal overlay rather than recovered
+foundation-era DDL. The reconstructed foundation retains only immediate
+defensive table-privilege and function-execution revocations so provider
+defaults cannot create a positive privilege before the overlay.
+The reported current state gives `authenticated` both `SELECT` and `INSERT` on
+`meta_drafts`, while exact later migration `20260731092908` grants `SELECT` on
+all public tables, and `20260731102654` later revokes `SELECT` from
+`meta_webhook_health`. The origin of `INSERT` and the service-role grants remain
+unproven. Apply the overlay only after the full preserved chain during an
+isolated rehearsal, then compare the resulting endpoint independently.
 
 ## Historical offline replay attestation
 
@@ -67,7 +84,8 @@ are true:
 
 1. Repeat the full ordered replay on a new isolated no-production Supabase
    database with real provider extensions, using the explicit test fixtures.
-2. Diff tables, types, columns, defaults, constraints, indexes, functions,
+2. Commit the read-only capture query bundle, redacted machine-readable result,
+   and digest; then diff tables, types, columns, defaults, constraints, indexes, functions,
    triggers, RLS policies, ACLs, extensions, and ownership against the live
    catalog contract.
 3. Pass the pgTAP approval suite and rollback matrix without credential
@@ -76,9 +94,10 @@ are true:
 5. Record exact replay artifacts and hashes in the durable Pandora task before
    any separately authorized release action.
 
-The candidate is intentionally not idempotent: it models the historical
-ordering after the recovered control-plane foundation and should fail if
-applied against an unexpected schema.
+The candidate is intentionally not idempotent and may fail on conflicting
+schemas. It does not contain a complete preflight catalog fingerprint, so
+non-idempotence must not be treated as proof that every unexpected schema will
+fail closed. Isolated replay and the full catalog diff remain the safety gate.
 
 Current catalog state cannot prove that the live function bodies were never
 changed out of band. It also cannot recover original formatting, transaction

@@ -1,14 +1,17 @@
 -- INACTIVE RECOVERY CANDIDATE.
 --
--- This is an independently reconstructed schema-only baseline derived from the
--- live PostgreSQL catalog and canonical application contracts on 2026-08-12.
--- The original migration bytes are unavailable. Do not claim byte equivalence,
--- place this file under supabase/migrations, or apply it to a provider until a
--- clean isolated replay and distinct-vendor review both pass.
+-- This is an independently authored schema-shape hypothesis derived from a
+-- reported read-only PostgreSQL catalog inspection and canonical application
+-- contracts on 2026-08-12. The capture query bundle and machine-readable result
+-- are not committed with this candidate. The original migration bytes are
+-- unavailable. Do not claim byte equivalence, place this file under
+-- supabase/migrations, or apply it to a provider until a clean isolated replay
+-- and distinct-vendor review both pass.
 --
--- The resulting live uniqueness constraint is catalog-proven. The historical
--- auto-name used by the DROP CONSTRAINT clause below is inferred from the
--- recovered foundation candidate and must be checked during isolated replay.
+-- The uniqueness constraint below reflects the reported capture-time end state,
+-- not independently reproducible catalog proof. The historical auto-name used
+-- by the DROP CONSTRAINT clause is inferred from the recovered foundation
+-- candidate and must be checked during isolated replay.
 
 alter table public.webhook_events
   drop constraint webhook_events_provider_delivery_id_key,
@@ -56,6 +59,12 @@ create table public.meta_webhook_health (
   updated_at timestamptz not null default timezone('utc', now()),
   primary key (organization_id, page_id)
 );
+
+-- REPLAY-SAFETY INVARIANT, NOT RECOVERED HISTORICAL DDL.
+-- Normalize provider default privileges immediately. Positive endpoint grants
+-- belong only in the separate post-chain ACL overlay.
+revoke all on table public.meta_drafts from public, anon, authenticated, service_role;
+revoke all on table public.meta_webhook_health from public, anon, authenticated, service_role;
 
 create trigger meta_drafts_set_updated_at
   before update on public.meta_drafts
@@ -211,23 +220,15 @@ begin
 end;
 $$;
 
-revoke all on table public.meta_drafts from public, anon, authenticated, service_role;
-grant select, insert on table public.meta_drafts to authenticated;
-grant all on table public.meta_drafts to service_role;
-
-revoke all on table public.meta_webhook_health from public, anon, authenticated, service_role;
-grant all on table public.meta_webhook_health to service_role;
-
-revoke all on function public.claim_meta_webhook_delivery(
+-- REPLAY-SAFETY INVARIANT, NOT RECOVERED HISTORICAL DDL.
+-- SECURITY DEFINER functions are callable by PUBLIC by default. Revoke public
+-- and client execution immediately so an isolated replay cannot expose them
+-- before the separate post-chain ACL overlay is applied. No positive grant is
+-- projected backward into this foundation hypothesis.
+revoke execute on function public.claim_meta_webhook_delivery(
   uuid, uuid, text, text, timestamptz
 ) from public, anon, authenticated, service_role;
-grant execute on function public.claim_meta_webhook_delivery(
-  uuid, uuid, text, text, timestamptz
-) to service_role;
 
-revoke all on function public.record_meta_webhook_health(
+revoke execute on function public.record_meta_webhook_health(
   uuid, text, boolean, timestamptz
 ) from public, anon, authenticated, service_role;
-grant execute on function public.record_meta_webhook_health(
-  uuid, text, boolean, timestamptz
-) to service_role;
