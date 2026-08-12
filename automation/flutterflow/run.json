@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "mode": "inspect",
+  "mode": "validate-owner",
   "projectId": "pandoras-box-gj9hnb",
-  "purpose": "Read the exact current Pandora owner app and signed project SDK before repairing the rerun-safe owner interface validator. This operation is inspection-only and must not mutate the app."
+  "purpose": "Inspection-only signed SDK contract recovery. The temporary DSL probe reads only verified vendored SDK source, emits updateApiEndpoint/updateApiGroup declarations, and exits before any Pandora project operation."
 }
