@@ -1,0 +1,76 @@
+name: Repair Pandora P1 Source Guard
+
+on:
+  push:
+    branches:
+      - feature/flutterflow-pandora-mobile-v1
+    paths:
+      - .github/workflows/pandora-p1-guard-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair-guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Repair only the failed matcher
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/pandora-p1-source-guard.yml')
+          text = path.read_text()
+          start_marker = "          api = replace_once(\n              api,\n              '''      title: textValue(item.evidence_type, \"Project proof\").replace("
+          end_marker = "              'memory proof provider removal',\n          )"
+          start = text.find(start_marker)
+          if start < 0:
+              raise SystemExit('failed Memory-proof matcher start marker not found')
+          end = text.find(end_marker, start)
+          if end < 0:
+              raise SystemExit('failed Memory-proof matcher end marker not found')
+          end += len(end_marker)
+          replacement = '''          api = replace_once(
+              api,
+              '      title: textValue(item.evidence_type, "Project proof").replace(',
+              '      title: plainOwnerText(item.evidence_type, "Project proof").replace(',
+              'memory proof title translation',
+          )
+          api = sub_once(
+              api,
+              r''' + "'''" + r'''      summary: `\$\{textValue\(item\.provider, "Recorded service"\)\}: \$\{.*?\n      \}`,''' + "'''" + r''',
+              ''' + "'''" + '''      summary: plainOwnerText(
+                item.verdict,
+                plainOwnerText(item.status, "Not checked yet"),
+              ).replace(/[._-]+/g, " "),''' + "'''" + ''',
+              'memory proof provider removal',
+          )
+          api = replace_once(
+              api,
+              ''' + "'''" + '''      plainStatus: textValue(item.status, "Not checked yet").replace(
+                /[._-]+/g,
+                " ",
+              ),
+              happenedAt: item.observed_at ?? null,''' + "'''" + ''',
+              ''' + "'''" + '''      plainStatus: plainOwnerText(item.status, "Not checked yet").replace(
+                /[._-]+/g,
+                " ",
+              ),
+              happenedAt: item.observed_at ?? null,''' + "'''" + ''',
+              'memory proof status translation',
+          )'''
+          path.write_text(text[:start] + replacement + text[end:])
+          PY
+          git diff --check
+          git config user.name 'Pandora Guard Repair'
+          git config user.email 'pandora-guard-repair@users.noreply.github.com'
+          git add .github/workflows/pandora-p1-source-guard.yml
+          git commit -m 'Repair strict P1 Memory-proof matcher'
+          git push origin HEAD:feature/flutterflow-pandora-mobile-v1
