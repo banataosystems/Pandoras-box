@@ -2,5 +2,5 @@
   "schemaVersion": "1.0.0",
   "mode": "validate-owner",
   "projectId": "pandoras-box-gj9hnb",
-  "purpose": "Inspection-only signed SDK contract recovery pass 2. Read the full updateApiEndpoint/updateApiGroup declarations from the already verified vendored SDK and exit before any Pandora project operation."
+  "purpose": "Inspection-only signed SDK project-access recovery. Read the verified App/FFProject access contract needed for rerun-safe endpoint updates, then exit before any Pandora project operation."
 }
