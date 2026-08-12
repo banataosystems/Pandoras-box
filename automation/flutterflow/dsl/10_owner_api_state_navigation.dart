@@ -318,8 +318,13 @@ Future<void> main(List<String> args) async {
     final source = entity.readAsStringSync();
     final lines = source.split('\n');
     for (var i = 0; i < lines.length; i++) {
-      if (!lines[i].contains('updateApiEndpoint') &&
-          !lines[i].contains('updateApiGroup')) {
+      final probeLine = lines[i];
+      if (!probeLine.contains('updateApiEndpoint') &&
+          !probeLine.contains('updateApiGroup') &&
+          !probeLine.contains('class App') &&
+          !probeLine.contains('FFProject get project') &&
+          !probeLine.contains('final FFProject project') &&
+          !probeLine.contains('flutterFlowAI')) {
         continue;
       }
       hits += 1;
