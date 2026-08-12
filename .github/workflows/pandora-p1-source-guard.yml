@@ -1,0 +1,781 @@
+name: Pandora P1 Source Guard
+
+on:
+  push:
+    branches:
+      - feature/flutterflow-pandora-mobile-v1
+    paths:
+      - .github/workflows/pandora-p1-source-guard.yml
+
+permissions:
+  contents: write
+
+jobs:
+  harden-owner-surface:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+
+      - name: Apply fail-closed owner-surface hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          api_path = Path('supabase/functions/pandora-owner-api/index.ts')
+          schema_path = Path('automation/flutterflow/dsl/10_owner_api_state_navigation.dart')
+          ui_path = Path('automation/flutterflow/dsl/selector_bindings.dart')
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one source match, found {count}')
+              return text.replace(old, new, 1)
+
+          def sub_once(text: str, pattern: str, replacement: str, label: str) -> str:
+              updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one source match, found {count}')
+              return updated
+
+          api = api_path.read_text()
+
+          api = replace_once(
+              api,
+              '''function textValue(value: unknown, fallback = "") {
+            return typeof value === "string" && value.trim() ? value.trim() : fallback;
+          }
+          ''',
+              '''function textValue(value: unknown, fallback = "") {
+            return typeof value === "string" && value.trim() ? value.trim() : fallback;
+          }
+
+          function plainOwnerText(value: unknown, fallback = "") {
+            let text = textValue(value, fallback);
+            const replacements: Array<[RegExp, string]> = [
+              [/flutter\\s*flow/gi, "app builder"],
+              [/\\bmcp\\b/gi, "connection layer"],
+              [/\\byaml\\b/gi, "project configuration"],
+              [/\\bci\\b/gi, "automated checks"],
+              [/\\bprovider\\b/gi, "service"],
+              [/bearer\\s+token/gi, "access credential"],
+              [/service\\s+role/gi, "protected server access"],
+              [/schema\\s+fingerprint/gi, "data structure check"],
+              [/\\baal2\\b/gi, "extra identity check"],
+              [/\\btotp\\b/gi, "security code"],
+              [/\\bgithub\\b/gi, "source workspace"],
+              [/\\bvercel\\b/gi, "live hosting"],
+              [/\\bsupabase\\b/gi, "project data service"],
+              [/https?:\\/\\/\\S+/gi, "a protected link"],
+              [/\\b[0-9a-f]{40,64}\\b/gi, "a recorded version"],
+            ];
+            for (const [pattern, replacement] of replacements) {
+              text = text.replace(pattern, replacement);
+            }
+            return text;
+          }
+          ''',
+              'plain-language translation helper',
+          )
+
+          api = replace_once(
+              api,
+              '    { code, plainMessage, requestId },',
+              '    { plainMessage },',
+              'raw owner API diagnostic removal',
+          )
+
+          api = replace_once(
+              api,
+              '''    plainPurpose: textValue(project.objective ?? projectionProject.objective),
+              phase: textValue(
+                project.currentPhaseKey ?? project.current_phase_key ??
+                  currentPhase.name ?? currentPhase.key,
+              ),''',
+              '''    plainPurpose: plainOwnerText(
+                project.objective ?? projectionProject.objective,
+              ),
+              phase: plainOwnerText(
+                project.currentPhaseKey ?? project.current_phase_key ??
+                  currentPhase.name ?? currentPhase.key,
+              ),''',
+              'project purpose translation',
+          )
+          api = replace_once(
+              api,
+              '''    plainStatus: textValue(project.status, "Not verified yet"),
+              whatIsStoppingUs: textValue(blockedTask?.title) || null,
+              whatIWillDoNext: textValue(nextTask.title) || null,
+              repository: textValue(project.repository) || null,''',
+              '''    plainStatus: plainOwnerText(project.status, "Not verified yet"),
+              whatIsStoppingUs: plainOwnerText(blockedTask?.title) || null,
+              whatIWillDoNext: plainOwnerText(nextTask.title) || null,''',
+              'project plumbing removal',
+          )
+
+          api = sub_once(
+              api,
+              r'''function plainEvidenceSummary\(value: unknown\) \{.*?\n\}\n\nfunction releaseSummary''',
+              '''function plainEvidenceSummary(value: unknown) {
+            const evidence = asRecord(value);
+            const title = plainOwnerText(
+              evidence.evidence_type,
+              "Project proof",
+            ).replace(/[._-]+/g, " ");
+            const plainStatus = plainOwnerText(
+              evidence.verdict,
+              plainOwnerText(evidence.status, "Not checked yet"),
+            ).replace(/[._-]+/g, " ");
+            return {
+              id: textValue(evidence.id),
+              taskId: textValue(evidence.task_id) || null,
+              title,
+              plainStatus,
+              observedAt: evidence.observed_at ?? null,
+            };
+          }
+
+          function releaseSummary''',
+              'evidence DTO sanitization',
+          )
+
+          api = sub_once(
+              api,
+              r'''function releaseSummary\(value: unknown\) \{.*?\n\}\n\nasync function loadProjectSummaries''',
+              '''function releaseSummary(value: unknown) {
+            const evidence = asRecord(value);
+            const payload = asRecord(evidence.payload_redacted);
+            const status = textValue(evidence.status);
+            const verdict = textValue(evidence.verdict);
+            const verified = /(^|[._ -])(pass(?:ed)?|success|verified)([._ -]|$)/i.test(
+              `${status} ${verdict}`,
+            );
+            const rollbackReference = payload.rollbackTarget ?? payload.rollback_target ??
+              payload.previousDeployment ?? payload.previous_deployment ?? payload.rollback;
+            return {
+              id: textValue(evidence.id),
+              title: plainOwnerText(
+                payload.plainTitle ?? payload.title ?? payload.name,
+                "Live version",
+              ),
+              plainStatus: verified
+                ? "Verified"
+                : plainOwnerText(verdict, plainOwnerText(status, "Not checked yet"))
+                  .replace(/[._-]+/g, " "),
+              verified,
+              rollbackAvailable: rollbackReference !== null &&
+                rollbackReference !== undefined && rollbackReference !== "",
+              observedAt: evidence.observed_at ?? null,
+            };
+          }
+
+          async function loadProjectSummaries''',
+              'release DTO sanitization',
+          )
+
+          api = replace_once(
+              api,
+              '''  const purposes: Record<string, string> = {
+              github: "Code, issues, and proposed changes",
+              supabase: "Database, sign-in, and safe server functions",
+              vercel: "Live web versions and service health",
+              google_drive: "Shared files and documents",
+              gmail: "Owner-authorized email workflows",
+              posthog: "Product usage and reliability signals",
+              resend: "System email delivery",
+            };''',
+              '''  const names: Record<string, string> = {
+              github: "Source workspace",
+              supabase: "Project data",
+              vercel: "Live web",
+              google_drive: "Files",
+              gmail: "Email",
+              posthog: "Product insights",
+              resend: "Email delivery",
+            };
+            const purposes: Record<string, string> = {
+              github: "Code, issues, and proposed changes",
+              supabase: "Project data, sign-in, and protected functions",
+              vercel: "Live web versions and service health",
+              google_drive: "Shared files and documents",
+              gmail: "Owner-authorized email workflows",
+              posthog: "Product usage and reliability signals",
+              resend: "System email delivery",
+            };''',
+              'connection owner labels',
+          )
+          api = replace_once(
+              api,
+              '    name: textValue(connection.display_name, provider),',
+              '    name: names[provider.toLowerCase()] || "Connected service",',
+              'connection name sanitization',
+          )
+          api = replace_once(
+              api,
+              '    advanced: { provider, scopes, observedStatus: status },\n',
+              '',
+              'connection advanced payload removal',
+          )
+
+          api = sub_once(
+              api,
+              r'''\n    advanced: \{\n      riskCode: riskCode \|\| null,\n      actionHash: approval\.action_hash \?\? null,\n      runId: approval\.run_id \?\? null,\n      stepId: approval\.step_id \?\? null,\n    \},''',
+              '',
+              'approval advanced payload removal',
+          )
+
+          api = replace_once(
+              api,
+              '''    objective: projectRow.objective,
+              roadmapVersion: projectRow.roadmap_version,
+              phases: phases.data || [],
+              tasks: tasks.data || [],
+              evidence: evidenceRows.map(plainEvidenceSummary),
+              recentReleases: evidenceRows
+                .filter((item) => isReleaseEvidenceType(textValue(item.evidence_type)))
+                .map(releaseSummary)
+                .slice(0, 10),
+              currentState: projection.data?.projection || null,''',
+              '''    objective: plainOwnerText(projectRow.objective),
+              phases: ((phases.data || []) as JsonRecord[]).map((item) => ({
+                id: textValue(item.id),
+                name: plainOwnerText(item.name, "Project phase"),
+                sequence: Number(item.sequence) || 0,
+                plainStatus: plainOwnerText(item.status, "Not checked yet").replace(
+                  /[._-]+/g,
+                  " ",
+                ),
+                startedAt: item.started_at ?? null,
+                completedAt: item.completed_at ?? null,
+              })),
+              tasks: ((tasks.data || []) as JsonRecord[]).map((item) => ({
+                id: textValue(item.id),
+                title: plainOwnerText(item.title, "Project work"),
+                description: plainOwnerText(
+                  item.description,
+                  "No summary was recorded.",
+                ),
+                plainStatus: plainOwnerText(item.status, "Not checked yet").replace(
+                  /[._-]+/g,
+                  " ",
+                ),
+                updatedAt: item.updated_at ?? null,
+              })),
+              evidence: evidenceRows.map(plainEvidenceSummary),
+              recentReleases: evidenceRows
+                .filter((item) => isReleaseEvidenceType(textValue(item.evidence_type)))
+                .map(releaseSummary)
+                .slice(0, 10),''',
+              'project detail safe DTO',
+          )
+
+          api = replace_once(
+              api,
+              '''  const healthRows = (healthResult.data || []) as JsonRecord[];
+            return (connectionsResult.data || []).map((item: JsonRecord) =>
+              connectionSummary(item, healthRows)
+            );''',
+              '''  const healthRows = (healthResult.data || []) as JsonRecord[];
+            const visibleConnections = (connectionsResult.data || []).filter(
+              (item: JsonRecord) =>
+                !/flutter\\s*flow/i.test(
+                  `${textValue(item.provider)} ${textValue(item.display_name)}`,
+                ),
+            );
+            return visibleConnections.map((item: JsonRecord) =>
+              connectionSummary(item, healthRows)
+            );''',
+              'hidden app builder connection filter',
+          )
+
+          api = replace_once(
+              api,
+              '  const provider = textValue(asRecord(item.advanced).provider, item.name);',
+              '  const serviceName = item.name;',
+              'connection action internal name',
+          )
+          for label, old, new in [
+              ('connect request', '${provider}. Verify', '${serviceName}. Verify'),
+              ('reconnect request', '${provider}. Diagnose', '${serviceName}. Diagnose'),
+              ('test request', '${provider} connection', '${serviceName} connection'),
+              ('disconnect request', '${provider}. Show', '${serviceName}. Show'),
+          ]:
+              api = replace_once(api, old, new, label)
+
+          api = sub_once(
+              api,
+              r'''async function activity\(context: UserContext, limit: number\) \{.*?\n\}\n\nasync function resolveMemoryProject''',
+              '''async function activity(context: UserContext, limit: number) {
+            const { data, error } = await context.client.from("audit_events")
+              .select("id, event_type, payload_redacted, created_at")
+              .eq("organization_id", context.organizationId).order("created_at", {
+                ascending: false,
+              }).limit(limit);
+            if (error) throw new Error("BACKEND_READ_FAILED");
+            return (data || []).map((event: JsonRecord) => ({
+              id: String(event.id),
+              summary: plainOwnerText(
+                asRecord(event.payload_redacted).summary,
+                String(event.event_type).replace(/[._-]+/g, " "),
+              ),
+              happenedAt: event.created_at,
+            }));
+          }
+
+          async function resolveMemoryProject''',
+              'activity DTO sanitization',
+          )
+
+          api = replace_once(
+              api,
+              '''      title: textValue(item.evidence_type, "Project proof").replace(
+                /[._-]+/g,
+                " ",
+              ),
+              summary: `${textValue(item.provider, "Recorded service")}: ${
+                textValue(item.verdict, textValue(item.status, "not checked yet"))
+                  .replace(/[._-]+/g, " ")
+              }`,
+              plainStatus: textValue(item.status, "Not checked yet").replace(''',
+              '''      title: plainOwnerText(item.evidence_type, "Project proof").replace(
+                /[._-]+/g,
+                " ",
+              ),
+              summary: plainOwnerText(
+                item.verdict,
+                plainOwnerText(item.status, "Not checked yet"),
+              ).replace(/[._-]+/g, " "),
+              plainStatus: plainOwnerText(item.status, "Not checked yet").replace(''',
+              'memory proof provider removal',
+          )
+
+          api = sub_once(
+              api,
+              r'''async function safety\(context: UserContext\) \{.*?\n\}\n\nasync function acceptIntake''',
+              '''async function safety(context: UserContext) {
+            const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+              auth: { persistSession: false, autoRefreshToken: false },
+            });
+            const [policy, health, audit] = await Promise.all([
+              context.client.from("projectos_policies").select("*").eq(
+                "organization_id",
+                context.organizationId,
+              ).maybeSingle(),
+              context.client.from("projectos_integration_health").select(
+                "status, last_success_at, stale_after",
+              )
+                .eq("organization_id", context.organizationId),
+              admin.rpc("verify_execution_audit_chain", {
+                p_organization_id: context.organizationId,
+              }),
+            ]);
+            if (policy.error || health.error || audit.error) {
+              throw new Error("BACKEND_READ_FAILED");
+            }
+            const now = Date.now();
+            const healthRows = (health.data || []) as JsonRecord[];
+            const auditIntegrity = asRecord(audit.data);
+            const policyRecord = asRecord(policy.data);
+            const hasProblem = auditIntegrity.valid !== true ||
+              healthRows.some((item) =>
+                ["error", "failed", "degraded"].includes(
+                  textValue(item.status).toLowerCase(),
+                )
+              );
+            const allFresh = healthRows.length > 0 && healthRows.every((item) => {
+              const staleAfter = textValue(item.stale_after);
+              const lastSuccessAt = textValue(item.last_success_at);
+              return Boolean(
+                staleAfter && Date.parse(staleAfter) > now && lastSuccessAt &&
+                  Number.isFinite(Date.parse(lastSuccessAt)),
+              );
+            });
+            const requiredPolicyEnabled = policyRecord.mandatory_control_layer === true &&
+              policyRecord.require_owner_release_approval === true;
+            const state = hasProblem
+              ? "problem"
+              : allFresh && requiredPolicyEnabled
+              ? "protected"
+              : "not_checked";
+            return {
+              mfaRequiredForApproval: true,
+              state,
+              plainStatus: state === "problem"
+                ? "Needs attention"
+                : state === "protected"
+                ? "Protected"
+                : "Not checked yet",
+            };
+          }
+
+          async function acceptIntake''',
+              'safety DTO sanitization',
+          )
+
+          api = sub_once(
+              api,
+              r'''\n    advanced: \{\n      intakeId: intake\.id \?\? null,\n      projectKey: acceptedProject\.project_key \?\? null,\n      idempotencyKey: idempotency,\n      duplicateProtection: providedKey\n        \? "client_key"\n        : "ten_minute_retry_window",\n    \},''',
+              '',
+              'intake advanced payload removal',
+          )
+          api = replace_once(
+              api,
+              "I saved that request and sent it into Pandora's governed planning flow.",
+              "I saved that request and sent it into Pandora's safe planning flow.",
+              'owner intake language',
+          )
+
+          api = replace_once(
+              api,
+              '''        Object.entries(ACTION_CATALOG).map(([id, action]) => ({
+                  id,
+                  ...action,
+                  extraIdentityCheckRequired: action.risk === "CRITICAL" ||
+                    id === "pause-service" || id === "apply-approved-code-change",
+                  executionMode: "plan_first",
+                })),''',
+              '''        Object.entries(ACTION_CATALOG).map(([id, action]) => ({
+                  id,
+                  title: action.title,
+                  description: action.description,
+                  extraIdentityCheckRequired: action.risk === "CRITICAL" ||
+                    id === "pause-service" || id === "apply-approved-code-change",
+                })),''',
+              'action catalog safe DTO',
+          )
+
+          # Apply plain-language translation to dynamic Memory fields that can carry
+          # internal terminology from older project records.
+          for old, new, label in [
+              ('title: textValue(item.statement, "Recorded decision")', 'title: plainOwnerText(item.statement, "Recorded decision")', 'memory decision title'),
+              ('summary: textValue(item.rationale, "No reason was recorded.")', 'summary: plainOwnerText(item.rationale, "No reason was recorded.")', 'memory decision rationale'),
+              ('title: textValue(item.title, "Project work")', 'title: plainOwnerText(item.title, "Project work")', 'memory task title'),
+              ('summary: textValue(item.description, "No summary was recorded.")', 'summary: plainOwnerText(item.description, "No summary was recorded.")', 'memory task summary'),
+              ('summary: textValue(item.lesson, "No summary was recorded.")', 'summary: plainOwnerText(item.lesson, "No summary was recorded.")', 'memory lesson summary'),
+          ]:
+              api = replace_once(api, old, new, label)
+
+          schema = schema_path.read_text()
+          schema = sub_once(
+              schema,
+              r'''_PandoraSchemas _declareSchemas\(App app\) \{.*?\n\}\n\n_PandoraApi _declareOwnerApi''',
+              '''_PandoraSchemas _declareSchemas(App app) {
+            final projectSummary = app.struct('PandoraProjectSummary', {
+              'id': string,
+              'name': string,
+              'plainPurpose': string,
+              'phase': string,
+              'progressPercent': double_,
+              'progressVerified': bool_,
+              'plainStatus': string,
+              'whatIsStoppingUs': string,
+              'whatIWillDoNext': string,
+              'dataFreshness': string,
+              'lastVerifiedAt': dateTime,
+            });
+            final projectPhase = app.struct('PandoraProjectPhase', {
+              'id': string,
+              'name': string,
+              'sequence': int_,
+              'plainStatus': string,
+              'startedAt': dateTime,
+              'completedAt': dateTime,
+            });
+            final projectTask = app.struct('PandoraProjectTask', {
+              'id': string,
+              'title': string,
+              'description': string,
+              'plainStatus': string,
+              'updatedAt': dateTime,
+            });
+            final projectEvidence = app.struct('PandoraProjectEvidence', {
+              'id': string,
+              'taskId': string,
+              'title': string,
+              'plainStatus': string,
+              'observedAt': dateTime,
+            });
+            final release = app.struct('PandoraRelease', {
+              'id': string,
+              'title': string,
+              'plainStatus': string,
+              'verified': bool_,
+              'rollbackAvailable': bool_,
+              'observedAt': dateTime,
+            });
+            final projectDetail = app.struct('PandoraProjectDetail', {
+              'id': string,
+              'name': string,
+              'plainPurpose': string,
+              'phase': string,
+              'progressPercent': double_,
+              'progressVerified': bool_,
+              'plainStatus': string,
+              'whatIsStoppingUs': string,
+              'whatIWillDoNext': string,
+              'dataFreshness': string,
+              'lastVerifiedAt': dateTime,
+              'objective': string,
+              'phases': listOf(projectPhase),
+              'tasks': listOf(projectTask),
+              'evidence': listOf(projectEvidence),
+              'recentReleases': listOf(release),
+            });
+            final systemHealth = app.struct('PandoraSystemHealth', {
+              'state': string,
+              'label': string,
+              'lastCheckedAt': dateTime,
+            });
+            final counters = app.struct('PandoraHomeCounters', {
+              'approvals': int_,
+              'activeProjects': int_,
+              'needsAttention': int_,
+            });
+            final approval = app.struct('PandoraApproval', {
+              'id': string,
+              'projectId': string,
+              'whatWillHappen': string,
+              'whyINeedYou': string,
+              'whatWillChange': string,
+              'whatCouldGoWrong': string,
+              'howWeCanUndoIt': string,
+              'riskLevel': string,
+              'reversible': bool_,
+              'extraIdentityCheckRequired': bool_,
+              'decision': string,
+              'expiresAt': dateTime,
+              'createdAt': dateTime,
+            });
+            final activity = app.struct('PandoraActivity', {
+              'id': string,
+              'summary': string,
+              'happenedAt': dateTime,
+            });
+            final memoryItem = app.struct('PandoraMemoryItem', {
+              'id': string,
+              'projectId': string,
+              'kind': string,
+              'title': string,
+              'summary': string,
+              'plainStatus': string,
+              'happenedAt': dateTime,
+            });
+            final memory = app.struct('PandoraMemoryPayload', {
+              'query': string,
+              'projectId': string,
+              'plainSource': string,
+              'directMemoryStatus': string,
+              'items': listOf(memoryItem),
+            });
+            final home = app.struct('PandoraHomePayload', {
+              'systemHealth': systemHealth,
+              'priority': approval,
+              'counters': counters,
+              'topProjects': listOf(projectSummary),
+              'recentActivity': listOf(activity),
+            });
+            final connection = app.struct('PandoraConnection', {
+              'id': string,
+              'name': string,
+              'plainPurpose': string,
+              'state': string,
+              'plainStatus': string,
+              'canRead': bool_,
+              'canChange': bool_,
+              'canConnect': bool_,
+              'canReconnect': bool_,
+              'canTest': bool_,
+              'canDisconnect': bool_,
+              'needsOwnerApprovalForChanges': bool_,
+              'lastCheckedAt': dateTime,
+            });
+            final safety = app.struct('PandoraSafety', {
+              'mfaRequiredForApproval': bool_,
+              'state': string,
+              'plainStatus': string,
+            });
+            final actionItem = app.struct('PandoraActionCatalogItem', {
+              'id': string,
+              'title': string,
+              'description': string,
+              'extraIdentityCheckRequired': bool_,
+            });
+            final askStatus = app.struct('PandoraAskStatus', {
+              'whatChanged': string,
+              'whereWeAre': string,
+              'whatIsDone': string,
+              'whatIsHappeningNow': string,
+              'whatIsStoppingUs': string,
+              'whatIWillDoNext': string,
+            });
+            final askResponse = app.struct('PandoraAskResponse', {
+              'reply': string,
+              'needsApproval': bool_,
+              'actionId': string,
+              'approvalId': string,
+              'status': askStatus,
+            });
+            final decisionResponse = app.struct('PandoraApprovalDecision', {
+              'ok': bool_,
+              'decision': string,
+              'approval': approval,
+            });
+
+            return _PandoraSchemas(
+              projectSummary: projectSummary,
+              projectDetail: projectDetail,
+              approval: approval,
+              activity: activity,
+              memory: memory,
+              home: home,
+              connection: connection,
+              safety: safety,
+              actionItem: actionItem,
+              askResponse: askResponse,
+              decisionResponse: decisionResponse,
+            );
+          }
+
+          _PandoraApi _declareOwnerApi''',
+              'owner API schema hardening',
+          )
+
+          schema = replace_once(schema, "      label: 'Work',", "      label: 'Actions',", 'Actions navigation label')
+          schema = replace_once(schema, "      label: 'Approve',", "      label: 'Approvals',", 'Approvals navigation label')
+          schema = replace_once(schema, "      label: 'Memory',", "      label: 'Activity',", 'Activity navigation label')
+
+          ui = ui_path.read_text()
+          ui = replace_once(
+              ui,
+              "          Text(State(spec.projectData)['repository'], style: Styles.bodySmall),\n",
+              '',
+              'project repository row',
+          )
+          ui = replace_once(ui, "            Text(item['status'], style: Styles.labelMedium),", "            Text(item['plainStatus'], style: Styles.labelMedium),", 'task status field')
+          ui = replace_once(ui, "            Text(item['environment'], style: Styles.bodySmall),\n", '', 'release environment row')
+          ui = replace_once(
+              ui,
+              '''            Text(item['evidence_type'], style: Styles.titleSmall),
+                      Text(item['provider'], style: Styles.bodySmall),
+                      Text(item['verdict'], style: Styles.labelMedium),
+                      Text(item['observed_at'], style: Styles.bodySmall),''',
+              '''            Text(item['title'], style: Styles.titleSmall),
+                      Text(item['plainStatus'], style: Styles.labelMedium),
+                      Text(item['observedAt'], style: Styles.bodySmall),''',
+              'evidence row fields',
+          )
+          ui = replace_once(ui, "    _brandHeader('Work', 'Choose a governed action'),", "    _brandHeader('Actions', 'Choose what you want Pandora to do'),", 'Actions page header')
+          ui = replace_once(ui, "      'Try loading work again',", "      'Try loading actions again',", 'Actions retry copy')
+          ui = replace_once(ui, "            Text(item['provider'], style: Styles.labelSmall),\n", '', 'action provider row')
+          ui = replace_once(ui, "    _brandHeader('Approve', 'Only items that need you'),", "    _brandHeader('Approvals', 'Only decisions that need you'),", 'Approvals page header')
+          ui = replace_once(ui, "    _brandHeader('Memory & updates', 'Continue from verified records'),", "    _brandHeader('Activity', 'Recent changes and verified records'),", 'Activity page header')
+          ui = replace_once(ui, "          Text('Direct Memory connection', style: Styles.labelMedium),", "          Text('Record status', style: Styles.labelMedium),", 'Memory status label')
+          ui = replace_once(
+              ui,
+              '''      'Pandora plans first. The backend still enforces approval and the extra '
+                'identity check before protected changes.', ''',
+              '''      'Pandora plans first. Approval and an extra identity check still apply '
+                'before protected changes.', ''',
+              'plan page infrastructure language',
+          )
+          ui = replace_once(ui, "          Text('Audit integrity', style: Styles.titleMedium),", "          Text('Protected activity', style: Styles.titleMedium),", 'Safety heading')
+          ui = replace_once(ui, "            'Pandora checks the audit chain on the governed backend.',", "            'Pandora checks that protected activity records remain intact.',", 'Safety infrastructure copy')
+          ui = replace_once(ui, "            'Technical hashes stay hidden in simple mode.',", "            'Detailed verification data stays out of the way.',", 'Safety hash copy')
+          ui = replace_once(ui, "      'Set up work for this project',", "      'Choose an action for this project',", 'project action CTA')
+
+          # Fail closed if any known customer-visible plumbing survived this pass.
+          api_forbidden = [
+              'repository: textValue(project.repository)',
+              'provider: textValue(evidence.provider)',
+              'advanced: { provider, scopes, observedStatus: status }',
+              'currentAssuranceLevel: context.aal',
+              'summary: `${textValue(item.provider',
+              '...action,',
+              'advanced: {\n      intakeId:',
+          ]
+          schema_forbidden = [
+              "'repository': string,",
+              "'provider': string,",
+              "'advanced': json,",
+              "'currentAssuranceLevel': string,",
+              "'environment': string,",
+              "'headSha': string,",
+              "label: 'Work'",
+              "label: 'Approve'",
+              "label: 'Memory'",
+          ]
+          ui_forbidden = [
+              "State(spec.projectData)['repository']",
+              "item['provider']",
+              "_brandHeader('Work'",
+              "_brandHeader('Approve'",
+              "_brandHeader('Memory & updates'",
+              'The backend still enforces',
+              'governed backend',
+              'Technical hashes',
+          ]
+          for label, text, forbidden in [
+              ('owner API', api, api_forbidden),
+              ('owner schema/navigation', schema, schema_forbidden),
+              ('owner UI', ui, ui_forbidden),
+          ]:
+              leaked = [item for item in forbidden if item in text]
+              if leaked:
+                  raise SystemExit(f'{label}: forbidden owner-surface fragments remain: {leaked}')
+
+          # Locked customer navigation contract.
+          for required in ["label: 'Home'", "label: 'Actions'", "label: 'Approvals'", "label: 'Activity'", "label: 'Safety'"]:
+              if required not in schema:
+                  raise SystemExit(f'owner navigation: missing {required}')
+
+          api_path.write_text(api)
+          schema_path.write_text(schema)
+          ui_path.write_text(ui)
+          PY
+
+      - name: Verify source guard and existing owner tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          node --experimental-strip-types --test recovery/overlay/*.test.ts
+          python3 - <<'PY'
+          from pathlib import Path
+          ui = Path('automation/flutterflow/dsl/selector_bindings.dart').read_text()
+          schema = Path('automation/flutterflow/dsl/10_owner_api_state_navigation.dart').read_text()
+          api = Path('supabase/functions/pandora-owner-api/index.ts').read_text()
+          required_nav = ["label: 'Home'", "label: 'Actions'", "label: 'Approvals'", "label: 'Activity'", "label: 'Safety'"]
+          if any(item not in schema for item in required_nav):
+              raise SystemExit('locked navigation contract failed')
+          for fragment in ["item['provider']", "State(spec.projectData)['repository']", 'governed backend', 'Technical hashes']:
+              if fragment in ui:
+                  raise SystemExit(f'customer-visible plumbing remains: {fragment}')
+          for fragment in ['repository: textValue(project.repository)', 'provider: textValue(evidence.provider)', 'currentAssuranceLevel: context.aal', '...action,']:
+              if fragment in api:
+                  raise SystemExit(f'owner DTO plumbing remains: {fragment}')
+          print('PANDORA_P1_SOURCE_GUARD PASS')
+          PY
+
+      - name: Commit verified source hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Pandora Source Guard'
+          git config user.email 'pandora-source-guard@users.noreply.github.com'
+          git add \
+            supabase/functions/pandora-owner-api/index.ts \
+            automation/flutterflow/dsl/10_owner_api_state_navigation.dart \
+            automation/flutterflow/dsl/selector_bindings.dart
+          if git diff --cached --quiet; then
+            echo 'No source hardening changes were necessary.'
+            exit 0
+          fi
+          git commit -m 'Harden Pandora owner language firewall'
+          git push origin HEAD:feature/flutterflow-pandora-mobile-v1
