@@ -14,6 +14,7 @@ const supabase_control_resolver_js_1 = require("./supabase-control-resolver.js")
  * and deployed application behind this hostname are authoritative.
  */
 const DEFAULT_MEMORY_ORIGIN = 'https://pandorasbox-memory.vercel.app';
+const FLUTTERFLOW_API_ORIGIN = 'https://api.flutterflow.io/v2';
 /**
  * Legacy deployment retired by the same decision. It is quarantined rather
  * than merely non-default: MCPMaster and Pandora's-Box traffic must never
@@ -129,7 +130,57 @@ async function buildSupabaseConfiguration(context) {
     }
     return new supabase_control_resolver_js_1.SupabaseControlResolver().resolve(oidcToken);
 }
-function sanitizeProviderConnections(github, supabase) {
+function buildFlutterFlowEnvironmentConfiguration() {
+    const raw = requiredEnvironmentValue('flutterflow', 'FLUTTERFLOW_ACCOUNTS_JSON');
+    let definitions;
+    try {
+        definitions = JSON.parse(raw);
+    }
+    catch {
+        throw new MissingConfigurationError('flutterflow', ['valid FLUTTERFLOW_ACCOUNTS_JSON']);
+    }
+    if (!Array.isArray(definitions) || definitions.length === 0) {
+        throw new MissingConfigurationError('flutterflow', ['non-empty FLUTTERFLOW_ACCOUNTS_JSON']);
+    }
+    const accounts = definitions.map((definition) => {
+        if (!definition
+            || typeof definition !== 'object'
+            || Array.isArray(definition)
+            || typeof definition.id !== 'string'
+            || typeof definition.label !== 'string'
+            || typeof definition.tokenEnv !== 'string'
+            || !/^FLUTTERFLOW_[A-Z0-9_]{1,96}$/.test(definition.tokenEnv)
+            || !Array.isArray(definition.allowedProjectIds)
+            || definition.allowedProjectIds.length === 0
+            || !definition.allowedProjectIds.every((projectId) => (typeof projectId === 'string'
+                && /^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$/.test(projectId)))) {
+            throw new MissingConfigurationError('flutterflow', [
+                'FLUTTERFLOW_ACCOUNTS_JSON entries with id, label, a FLUTTERFLOW_* tokenEnv, and valid allowedProjectIds',
+            ]);
+        }
+        const baseUrl = definition.baseUrl || FLUTTERFLOW_API_ORIGIN;
+        if (baseUrl !== FLUTTERFLOW_API_ORIGIN) {
+            throw new MissingConfigurationError('flutterflow', [
+                `baseUrl exactly equal to ${FLUTTERFLOW_API_ORIGIN}`,
+            ]);
+        }
+        return {
+            id: definition.id,
+            label: definition.label,
+            authMode: 'api_token',
+            token: requiredEnvironmentValue('flutterflow', definition.tokenEnv),
+            baseUrl,
+            allowedProjectIds: definition.allowedProjectIds,
+            grantedScopes: Array.isArray(definition.grantedScopes) ? definition.grantedScopes : [],
+        };
+    });
+    return {
+        accounts,
+        timeoutMs: boundedIntegerEnvironment('flutterflow', 'FLUTTERFLOW_API_TIMEOUT_MS', 10000, 250, 30000),
+        maxResponseBytes: boundedIntegerEnvironment('flutterflow', 'FLUTTERFLOW_API_MAX_RESPONSE_BYTES', 1000000, 1024, 2000000),
+    };
+}
+function sanitizeProviderConnections(github, supabase, flutterflow) {
     return [
         {
             id: github.id,
@@ -159,6 +210,20 @@ function sanitizeProviderConnections(github, supabase) {
                 projects: [...account.allowedProjectRefs],
             },
         })),
+        ...(flutterflow?.accounts || []).map((account) => ({
+            id: account.id,
+            provider: 'flutterflow',
+            label: account.label,
+            account: account.id,
+            mutations: false,
+            scopes: [...(account.grantedScopes || [])],
+            targets: {
+                accounts: [account.id],
+                repositories: [],
+                organizations: [],
+                projects: [...account.allowedProjectIds],
+            },
+        })),
     ];
 }
 async function buildProviderConnectionMetadata(context = {}) {
@@ -166,7 +231,17 @@ async function buildProviderConnectionMetadata(context = {}) {
         buildGitHubConfiguration(context),
         buildSupabaseConfiguration(context),
     ]);
-    return sanitizeProviderConnections(github, supabase);
+    let flutterflow;
+    if (process.env.FLUTTERFLOW_ACCOUNTS_JSON?.trim()) {
+        try {
+            flutterflow = buildFlutterFlowEnvironmentConfiguration();
+        }
+        catch (error) {
+            if (!(error instanceof MissingConfigurationError))
+                throw error;
+        }
+    }
+    return sanitizeProviderConnections(github, supabase, flutterflow);
 }
 function memoryNamespaces() {
     const configured = commaSeparatedEnvironment('PANDORA_MEMORY_ALLOWED_NAMESPACES');
@@ -251,6 +326,9 @@ async function buildToolConfiguration(toolName, context = {}) {
     if (entry.handler === 'memory') {
         return { memory: buildMemoryConfiguration(context) };
     }
+    if (entry.handler === 'flutterflow') {
+        return { flutterflow: buildFlutterFlowEnvironmentConfiguration() };
+    }
     return { supabase: await buildSupabaseConfiguration(context) };
 }
 function inspectToolConfiguration(toolName) {
@@ -284,6 +362,16 @@ function inspectToolConfiguration(toolName) {
                 configured: false,
                 missing: ['Vercel OIDC runtime'],
             };
+        }
+        if (entry.handler === 'flutterflow') {
+            if (!process.env.FLUTTERFLOW_ACCOUNTS_JSON?.trim()) {
+                return {
+                    configured: false,
+                    missing: ['FLUTTERFLOW_ACCOUNTS_JSON'],
+                };
+            }
+            buildFlutterFlowEnvironmentConfiguration();
+            return { configured: true, missing: [] };
         }
         if (process.env.SUPABASE_ACCOUNTS_JSON?.trim()) {
             buildSupabaseEnvironmentConfiguration();

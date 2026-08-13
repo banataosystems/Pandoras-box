@@ -67,11 +67,13 @@ test("tools/list preserves cached provider reads and durable plan aliases", asyn
   assert.equal(response.statusCode, 200);
   const tools = new Map(response.body.result.tools.map((tool) => [tool.name, tool]));
   assert.ok(tools.has("github.read-repository-api"));
+  assert.ok(tools.has("flutterflow.inspect-readiness"));
   assert.ok(tools.has("projectos_plan_github_write-repository-api"));
   assert.ok(tools.has("projectos_approve_plan"));
   assert.ok(tools.has("projectos_list_audit"));
   assert.ok(tools.has("projectos_verify_audit"));
   assert.equal(tools.has("github.write-repository-api"), false);
+  assert.equal(tools.has("projectos_plan_flutterflow_inspect-readiness"), false);
 });
 
 test("tool catalog resolves registry names into complete definitions", async () => {

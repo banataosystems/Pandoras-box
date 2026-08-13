@@ -5,6 +5,7 @@ exports.getAllTools = getAllTools;
 exports.getRuntimeToolDefinition = getRuntimeToolDefinition;
 exports.executeTool = executeTool;
 const github_js_1 = require("../tools/github.js");
+const flutterflow_js_1 = require("../tools/flutterflow.js");
 const memory_js_1 = require("../tools/memory.js");
 const provider_api_js_1 = require("../tools/provider-api.js");
 const supabase_auth_security_js_1 = require("../tools/supabase-auth-security.js");
@@ -37,6 +38,9 @@ const supabaseDefinitions = {
 const memoryDefinitions = {
     ...memory_js_1.memoryTools,
 };
+const flutterFlowDefinitions = {
+    ...flutterflow_js_1.flutterFlowTools,
+};
 function buildRegistry(handler, definitions) {
     return Object.fromEntries(Object.entries(definitions).map(([name, definition]) => {
         const tool = (0, tool_manifest_js_1.getToolManifest)(name);
@@ -56,9 +60,11 @@ function buildRegistry(handler, definitions) {
 const githubRegistry = buildRegistry('github', githubDefinitions);
 const supabaseRegistry = buildRegistry('supabase', supabaseDefinitions);
 const memoryRegistry = buildRegistry('memory', memoryDefinitions);
+const flutterFlowRegistry = buildRegistry('flutterflow', flutterFlowDefinitions);
 exports.toolRegistry = Object.freeze({
     ...githubRegistry,
     ...supabaseRegistry,
+    ...flutterFlowRegistry,
     ...memoryRegistry,
 });
 const registeredNames = new Set(Object.keys(exports.toolRegistry));
@@ -137,6 +143,30 @@ function assertMemoryAccess(definition, args, configuration) {
         }
     }
 }
+function selectedFlutterFlowAccount(configuration, args) {
+    const accountId = typeof args.accountId === 'string' ? args.accountId : undefined;
+    if (!accountId)
+        return undefined;
+    return configuration.accounts.find((candidate) => candidate.id === accountId);
+}
+function assertFlutterFlowAccess(definition, args, configuration) {
+    if (definition.manifest.name === 'flutterflow.list-accounts')
+        return;
+    const accountId = typeof args.accountId === 'string' ? args.accountId : undefined;
+    if (!accountId)
+        throw new Error('FlutterFlow operation requires an explicit accountId');
+    const account = selectedFlutterFlowAccount(configuration, args);
+    if (!account)
+        throw new Error(`Unknown FlutterFlow account: ${accountId}`);
+    if (account.baseUrl !== 'https://api.flutterflow.io/v2') {
+        throw new Error('FlutterFlow Project API origin is not trusted');
+    }
+    assertRequiredScopes(definition, account.grantedScopes);
+    const projectId = typeof args.projectId === 'string' ? args.projectId : undefined;
+    if (projectId && !account.allowedProjectIds.includes(projectId)) {
+        throw new Error(`FlutterFlow account ${account.id} is not allowed to access project ${projectId}`);
+    }
+}
 function repositoryFromApiUrl(value) {
     if (typeof value !== 'string')
         return undefined;
@@ -206,6 +236,16 @@ async function executeTool(toolName, args, configuration) {
         assertMemoryAccess(definition, args, typedConfiguration);
         (0, tool_manifest_js_1.assertHighImpactPolicy)(toolName, args);
         return (0, result_redaction_js_1.redactSensitiveResult)(await (0, memory_js_1.executeMemoryTool)(toolName, args, typedConfiguration));
+    }
+    if (definition.handler === 'flutterflow') {
+        const flutterFlowConfiguration = resolvedConfiguration.flutterflow;
+        if (!flutterFlowConfiguration || typeof flutterFlowConfiguration !== 'object') {
+            throw new Error('FlutterFlow configuration is missing');
+        }
+        const typedConfiguration = flutterFlowConfiguration;
+        assertFlutterFlowAccess(definition, args, typedConfiguration);
+        (0, tool_manifest_js_1.assertHighImpactPolicy)(toolName, args);
+        return (0, result_redaction_js_1.redactSensitiveResult)(await (0, flutterflow_js_1.executeFlutterFlowTool)(toolName, args, typedConfiguration));
     }
     const supabaseConfiguration = resolvedConfiguration.supabase;
     if (!supabaseConfiguration || typeof supabaseConfiguration !== 'object') {
