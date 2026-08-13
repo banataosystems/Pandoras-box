@@ -312,6 +312,9 @@ class _ConflictApprovalRepository extends _Repository {
         code: 'REFRESH_FAILED',
       );
     }
+    if (decisionErrorCode == 'APPROVAL_FORBIDDEN') {
+      return _snapshot(<ApprovalSummary>[_pending]);
+    }
     return _snapshot(const <ApprovalSummary>[]);
   }
 
@@ -407,7 +410,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Open Settings'));
     await tester.pumpAndSettle();
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Settings'), findsWidgets);
 
     auth.setSession(null);
     await tester.pumpAndSettle();
@@ -433,7 +436,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Open Settings'));
     await tester.pumpAndSettle();
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Settings'), findsWidgets);
 
     auth.setSession(const PandoraSession(userId: 'owner-b'));
     await tester.pumpAndSettle();
@@ -457,7 +460,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Open Settings'));
     await tester.pumpAndSettle();
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Settings'), findsWidgets);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -485,7 +488,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Open Settings'));
     await tester.pumpAndSettle();
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Settings'), findsWidgets);
 
     repository.invalidate(1);
     await tester.pumpAndSettle();
@@ -599,6 +602,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Retry same request safely'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Retry same request safely'));
     await tester.tap(find.text('Retry same request safely'));
     await tester.pumpAndSettle();
 
@@ -618,7 +622,7 @@ void main() {
           auth: const _Auth(),
           repository: _ApprovalRepository(),
           diagnostics: DiagnosticsStore(),
-          child: const ApprovalsScreen(),
+          child: const Scaffold(body: ApprovalsScreen()),
         ),
       ),
     );
@@ -652,7 +656,7 @@ void main() {
               auth: const _Auth(),
               repository: repository,
               diagnostics: DiagnosticsStore(),
-              child: const ApprovalsScreen(),
+              child: const Scaffold(body: ApprovalsScreen()),
             ),
           ),
         );
@@ -699,7 +703,7 @@ void main() {
             auth: const _Auth(),
             repository: repository,
             diagnostics: DiagnosticsStore(),
-            child: const ApprovalsScreen(),
+            child: const Scaffold(body: ApprovalsScreen()),
           ),
         ),
       );

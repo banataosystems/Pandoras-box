@@ -197,35 +197,37 @@ class _AuthorizationRecheckScreen extends StatelessWidget {
   final Future<void> Function() onSignOut;
 
   @override
-  Widget build(BuildContext context) => PandoraPage(
-        title: 'Owner access needs rechecking',
-        subtitle:
-            'Protected content has been cleared while Pandora verifies this session.',
-        child: PandoraSurface(
-          title: 'Access paused',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(message),
-              const SizedBox(height: PandoraSpacing.lg),
-              FilledButton.icon(
-                onPressed: busy ? null : onRecheck,
-                icon: busy
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.verified_user_outlined),
-                label: Text(
-                  busy ? 'Rechecking owner access…' : 'Recheck owner access',
+  Widget build(BuildContext context) => Scaffold(
+        body: PandoraPage(
+          title: 'Owner access needs rechecking',
+          subtitle:
+              'Protected content has been cleared while Pandora verifies this session.',
+          child: PandoraSurface(
+            title: 'Access paused',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(message),
+                const SizedBox(height: PandoraSpacing.lg),
+                FilledButton.icon(
+                  onPressed: busy ? null : onRecheck,
+                  icon: busy
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.verified_user_outlined),
+                  label: Text(
+                    busy ? 'Rechecking owner access…' : 'Recheck owner access',
+                  ),
                 ),
-              ),
-              const SizedBox(height: PandoraSpacing.xs),
-              TextButton(
-                onPressed: busy ? null : onSignOut,
-                child: const Text('Sign out'),
-              ),
-            ],
+                const SizedBox(height: PandoraSpacing.xs),
+                TextButton(
+                  onPressed: busy ? null : onSignOut,
+                  child: const Text('Sign out'),
+                ),
+              ],
+            ),
           ),
         ),
       );

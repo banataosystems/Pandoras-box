@@ -56,7 +56,10 @@ class _DeveloperDiagnosticsScreenState extends State<DeveloperDiagnosticsScreen>
   void _startAuthorizationCheck({required bool notify}) {
     _authorizationTimer?.cancel();
     final check = _verifyOwnerAccess();
-    void assign() => _authorization = check;
+    void assign() {
+      _authorization = check;
+    }
+
     if (notify) {
       setState(assign);
     } else {
