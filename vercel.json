@@ -1,5 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "framework": "express",
   "env": {
     "PANDORA_MEMORY_BASE_URL": "https://pandorasbox-memory.vercel.app",
     "PROJECTOS_MCP_RESOURCE_ORIGIN": "https://mcpmaster.vercel.app"

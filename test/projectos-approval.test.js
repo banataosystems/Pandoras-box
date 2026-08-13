@@ -15,6 +15,7 @@ const {
 const USER_ID = 'e5f5744e-554b-4f92-aad2-3f58ae6a33ad';
 const ORGANIZATION_ID = '2270b266-59da-4c39-bfd9-9f8d08352af0';
 const PLAN_ID = 'ed34d145-f738-47b7-a985-15e75342ba2c';
+const IDENTITY_SCOPES = ['openid', 'email', 'profile'];
 const ALL_SCOPES = ['openid', 'email', 'profile', 'offline_access', 'projectos:read', 'projectos:plan', 'projectos:approve', 'projectos:execute'];
 const ACCESS_TOKEN = `header.${Buffer.from(JSON.stringify({ sub: USER_ID, aal: 'aal1', scope: ALL_SCOPES.join(' ') })).toString('base64url')}.signature-material-long-enough`;
 
@@ -158,16 +159,47 @@ test('invalid plan identity is rejected before the durable ledger', async () => 
   assert.equal(calls.length, 0);
 });
 
-test('OAuth scope undergrant cannot approve or execute a ProjectOS plan', async () => {
-  for (const [name, scopes, required] of [
-    ['projectos_approve_plan', ['openid', 'projectos:read'], 'projectos:approve'],
-    ['projectos_execute_plan', ['openid', 'projectos:approve'], 'projectos:execute'],
-  ]) {
+test('existing identity-only OAuth grant can approve without connector reconsent', async () => {
+  const { ledger, calls } = harness('owner');
+  const handler = createProjectOsMcpHandler({
+    organizationId: ORGANIZATION_ID,
+    authenticator: {
+      async authenticate() {
+        return {
+          userId: USER_ID,
+          accessToken: ACCESS_TOKEN,
+          aal: 'aal1',
+          scopes: IDENTITY_SCOPES,
+          scopeClaimsPresent: true,
+        };
+      },
+    },
+    membershipResolver: {
+      async resolve() { return { organizationId: ORGANIZATION_ID, userId: USER_ID, role: 'owner' }; },
+    },
+    ledger,
+    workloadToken: () => 'server-side-vercel-oidc-token-that-is-never-read-from-the-caller',
+  });
+  const response = await invoke(handler, requestFor('projectos_approve_plan', { planId: PLAN_ID }));
+  assert.equal(response.statusCode, 200);
+  assert.equal(calls.length, 1);
+});
+
+test('a declared OAuth grant missing openid cannot approve or execute a ProjectOS plan', async () => {
+  for (const name of ['projectos_approve_plan', 'projectos_execute_plan']) {
     const { ledger } = harness('owner');
     const handler = createProjectOsMcpHandler({
       organizationId: ORGANIZATION_ID,
       authenticator: {
-        async authenticate() { return { userId: USER_ID, accessToken: ACCESS_TOKEN, aal: 'aal1', scopes }; },
+        async authenticate() {
+          return {
+            userId: USER_ID,
+            accessToken: ACCESS_TOKEN,
+            aal: 'aal1',
+            scopes: ['email', 'profile'],
+            scopeClaimsPresent: true,
+          };
+        },
       },
       membershipResolver: {
         async resolve() { return { organizationId: ORGANIZATION_ID, userId: USER_ID, role: 'owner' }; },
@@ -177,28 +209,89 @@ test('OAuth scope undergrant cannot approve or execute a ProjectOS plan', async 
     });
     const response = await invoke(handler, requestFor(name, { planId: PLAN_ID }));
     assert.equal(response.statusCode, 403);
-    assert.match(response.body.error.message, new RegExp(required));
+    assert.match(response.body.error.message, /openid/);
+    assert.equal(response.headers['www-authenticate'], 'Bearer error="insufficient_scope", scope="openid"');
   }
 });
 
-test('standard identity scopes alone cannot widen into ProjectOS approval authority', async () => {
-  for (const [scopes, required] of [
-    [['openid', 'email', 'profile', 'offline_access'], 'projectos:approve'],
-    [['email', 'profile', 'projectos:approve'], 'openid'],
+test('project-scoped OAuth grants require the exact action scope and cannot fall back to legacy compatibility', async () => {
+  for (const [name, scopes, required] of [
+    ['projectos_approve_plan', [...IDENTITY_SCOPES, 'projectos:read'], 'projectos:approve'],
+    ['projectos_execute_plan', [...IDENTITY_SCOPES, 'projectos:approve'], 'projectos:execute'],
+    ['projectos_approve_plan', [...IDENTITY_SCOPES, 'unrecognized:scope'], 'projectos:approve'],
   ]) {
     const { ledger } = harness('owner');
     const handler = createProjectOsMcpHandler({
       organizationId: ORGANIZATION_ID,
-      authenticator: { async authenticate() { return { userId: USER_ID, accessToken: ACCESS_TOKEN, aal: 'aal1', scopes }; } },
-      membershipResolver: { async resolve() { return { organizationId: ORGANIZATION_ID, userId: USER_ID, role: 'owner' }; } },
+      authenticator: {
+        async authenticate() {
+          return { userId: USER_ID, accessToken: ACCESS_TOKEN, aal: 'aal1', scopes, scopeClaimsPresent: true };
+        },
+      },
+      membershipResolver: {
+        async resolve() { return { organizationId: ORGANIZATION_ID, userId: USER_ID, role: 'owner' }; },
+      },
       ledger,
       workloadToken: () => 'server-side-vercel-oidc-token-that-is-never-read-from-the-caller',
     });
-    const response = await invoke(handler, requestFor('projectos_approve_plan', { planId: PLAN_ID }));
+    const response = await invoke(handler, requestFor(name, { planId: PLAN_ID }));
     assert.equal(response.statusCode, 403);
-    assert.match(response.body.error.message, new RegExp(required));
-    assert.match(response.headers['www-authenticate'], /insufficient_scope/);
+    assert.match(response.body.error.message, new RegExp(required.replace(':', '\\:')));
+    assert.equal(response.headers['www-authenticate'], `Bearer error="insufficient_scope", scope="${required}"`);
   }
+});
+
+test('projectos wildcard remains an explicit modern grant for an owner approval', async () => {
+  const { ledger, calls } = harness('owner');
+  const handler = createProjectOsMcpHandler({
+    organizationId: ORGANIZATION_ID,
+    authenticator: {
+      async authenticate() {
+        return {
+          userId: USER_ID,
+          accessToken: ACCESS_TOKEN,
+          aal: 'aal1',
+          scopes: [...IDENTITY_SCOPES, 'projectos:*'],
+          scopeClaimsPresent: true,
+        };
+      },
+    },
+    membershipResolver: {
+      async resolve() { return { organizationId: ORGANIZATION_ID, userId: USER_ID, role: 'owner' }; },
+    },
+    ledger,
+    workloadToken: () => 'server-side-vercel-oidc-token-that-is-never-read-from-the-caller',
+  });
+  const response = await invoke(handler, requestFor('projectos_approve_plan', { planId: PLAN_ID }));
+  assert.equal(response.statusCode, 200);
+  assert.equal(calls.length, 1);
+});
+
+test('verified bearer with an empty or malformed OAuth grant cannot approve', async () => {
+  const { ledger, calls } = harness('admin');
+  const handler = createProjectOsMcpHandler({
+    organizationId: ORGANIZATION_ID,
+    authenticator: {
+      async authenticate() {
+        return {
+          userId: USER_ID,
+          accessToken: ACCESS_TOKEN,
+          aal: 'aal1',
+          scopes: [],
+          scopeClaimsPresent: false,
+        };
+      },
+    },
+    membershipResolver: {
+      async resolve() { return { organizationId: ORGANIZATION_ID, userId: USER_ID, role: 'admin' }; },
+    },
+    ledger,
+    workloadToken: () => 'server-side-vercel-oidc-token-that-is-never-read-from-the-caller',
+  });
+  const response = await invoke(handler, requestFor('projectos_approve_plan', { planId: PLAN_ID }));
+  assert.equal(response.statusCode, 403);
+  assert.match(response.body.error.message, /openid/);
+  assert.equal(calls.length, 0);
 });
 
 test('durable ledger cannot substitute a different plan identity or state', async () => {
@@ -242,7 +335,17 @@ test('an approved plan is claimed and executed once and replay is rejected', asy
   let executions = 0;
   const dependencies = {
     organizationId: ORGANIZATION_ID,
-    authenticator: { async authenticate() { return { userId: USER_ID, accessToken: ACCESS_TOKEN, aal: 'aal1', scopes: ALL_SCOPES }; } },
+    authenticator: {
+      async authenticate() {
+        return {
+          userId: USER_ID,
+          accessToken: ACCESS_TOKEN,
+          aal: 'aal1',
+          scopes: IDENTITY_SCOPES,
+          scopeClaimsPresent: true,
+        };
+      },
+    },
     membershipResolver: { async resolve() { return { organizationId: ORGANIZATION_ID, userId: USER_ID, role: 'owner' }; } },
     ledger: {
       async claimPlan() {
@@ -272,6 +375,34 @@ test('an approved plan is claimed and executed once and replay is rejected', asy
   assert.equal(replay.statusCode, 409);
   assert.match(replay.body.error.message, /already claimed/);
   assert.equal(executions, 1);
+});
+
+test('identity-only OAuth grant does not let a non-owner execute a plan', async () => {
+  let claims = 0;
+  const handler = createProjectOsMcpHandler({
+    organizationId: ORGANIZATION_ID,
+    authenticator: {
+      async authenticate() {
+        return {
+          userId: USER_ID,
+          accessToken: ACCESS_TOKEN,
+          scopes: IDENTITY_SCOPES,
+          scopeClaimsPresent: true,
+        };
+      },
+    },
+    membershipResolver: {
+      async resolve() { return { organizationId: ORGANIZATION_ID, userId: USER_ID, role: 'operator' }; },
+    },
+    ledger: {
+      async claimPlan() { claims += 1; throw new Error('must not claim'); },
+    },
+    workloadToken: () => 'server-side-vercel-oidc-token-that-is-never-read-from-the-caller',
+  });
+  const response = await invoke(handler, requestFor('projectos_execute_plan', { planId: PLAN_ID }));
+  assert.equal(response.statusCode, 403);
+  assert.match(response.body.error.message, /owner or admin/);
+  assert.equal(claims, 0);
 });
 
 test('approval authorization depends on owner/admin role, not AAL', () => {
