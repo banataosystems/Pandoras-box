@@ -25,6 +25,17 @@ const {
 
 const PLAN_TTL_MS = 10 * 60 * 1000;
 const MAX_BODY_BYTES = 256 * 1024;
+const DEFAULT_RESOURCE_ORIGIN = "https://mcpmaster.vercel.app";
+const AUTHORIZATION_SERVER = "https://jcyqixttuebxqqfkjonq.supabase.co/auth/v1";
+const IDENTITY_SCOPES = Object.freeze(["openid", "email", "profile"]);
+const LEGACY_IDENTITY_SCOPES = new Set([...IDENTITY_SCOPES, "offline_access"]);
+const MCP_ALLOWED_METHODS = "GET,POST,DELETE,OPTIONS";
+const MCP_ALLOWED_HEADERS = "Authorization,Content-Type,Mcp-Protocol-Version,Last-Event-ID,X-Request-Id";
+const MCP_EXPOSED_HEADERS = "WWW-Authenticate,Mcp-Protocol-Version,X-Request-Id";
+const METADATA_PATHS = new Set([
+    "/.well-known/oauth-protected-resource",
+    "/.well-known/oauth-protected-resource/mcp",
+]);
 const ACTIVE_ROLES = new Set(["owner", "admin", "operator", "member", "viewer"]);
 const EXECUTOR_ROLES = new Set(["owner", "admin"]);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -34,10 +45,76 @@ exports.projectOsMcpVercelConfig = Object.freeze({
     maxDuration: 60,
 });
 
-function noStore(response) {
-    response.setHeader("Cache-Control", "private, no-store, max-age=0");
+function resourceOrigin() {
+    return (process.env.PROJECTOS_MCP_RESOURCE_ORIGIN?.trim() || DEFAULT_RESOURCE_ORIGIN).replace(/\/+$/, "");
+}
+
+function requestHeader(request, name) {
+    const value = request.headers?.[name];
+    return Array.isArray(value) ? value[0] : value;
+}
+
+function requestPath(request) {
+    const value = request.originalUrl || request.url || "/";
+    try {
+        return new URL(value, DEFAULT_RESOURCE_ORIGIN).pathname;
+    } catch {
+        return "/";
+    }
+}
+
+function metadataSelector(request) {
+    const value = request.query?.metadata;
+    return Array.isArray(value) ? undefined : value;
+}
+
+function isMetadataRequest(request) {
+    if (request.method !== "GET") return false;
+    const selector = metadataSelector(request);
+    return selector === "root" || selector === "mcp" || METADATA_PATHS.has(requestPath(request));
+}
+
+function applyMcpBaseHeaders(request, response) {
+    response.setHeader("Cache-Control", "no-store");
     response.setHeader("CDN-Cache-Control", "no-store");
     response.setHeader("X-Content-Type-Options", "nosniff");
+    const suppliedRequestId = requestHeader(request, "x-request-id");
+    response.setHeader(
+        "X-Request-Id",
+        typeof suppliedRequestId === "string" && /^[A-Za-z0-9._:-]{1,128}$/.test(suppliedRequestId)
+            ? suppliedRequestId
+            : randomUUID(),
+    );
+}
+
+function applyMcpCors(request, response, allowedOrigins) {
+    const origin = requestHeader(request, "origin");
+    if (origin) {
+        if (!Array.isArray(allowedOrigins) || !allowedOrigins.includes(origin)) {
+            throw Object.assign(new Error("Forbidden origin"), { status: 403, rpcCode: -32003 });
+        }
+        response.setHeader("Access-Control-Allow-Origin", origin);
+        response.setHeader("Vary", "Origin");
+    }
+    response.setHeader("Access-Control-Allow-Headers", MCP_ALLOWED_HEADERS);
+    response.setHeader("Access-Control-Allow-Methods", MCP_ALLOWED_METHODS);
+    response.setHeader("Access-Control-Expose-Headers", MCP_EXPOSED_HEADERS);
+}
+
+function oauthChallenge() {
+    return `Bearer resource_metadata="${resourceOrigin()}/.well-known/oauth-protected-resource/mcp", scope="${IDENTITY_SCOPES.join(" ")}"`;
+}
+
+function protectedResourceMetadata() {
+    const origin = resourceOrigin();
+    return {
+        resource: `${origin}/mcp`,
+        resource_name: "Banatao Systems ProjectOS",
+        authorization_servers: [AUTHORIZATION_SERVER],
+        scopes_supported: [...IDENTITY_SCOPES],
+        bearer_methods_supported: ["header"],
+        resource_documentation: `${origin}/control-tower`,
+    };
 }
 
 function clearPrivilegedCallerHeaders(request) {
@@ -48,8 +125,7 @@ function clearPrivilegedCallerHeaders(request) {
 }
 
 function authorizationHeader(request) {
-    const value = request.headers.authorization;
-    return Array.isArray(value) ? value[0] : value;
+    return requestHeader(request, "authorization");
 }
 
 async function jsonBody(request) {
@@ -169,6 +245,7 @@ function defaultDependencies() {
     const config = loadOperatorPublicConfig();
     return {
         organizationId: config.organizationId,
+        allowedOrigins: config.allowedOrigins,
         authenticator: new SupabaseBearerAuthenticator({
             supabaseUrl: config.supabaseUrl,
             publishableKey: config.supabasePublishableKey,
@@ -224,11 +301,21 @@ function requiredToolScope(name) {
 }
 
 function assertToolScope(name, actor) {
-    const required = requiredToolScope(name);
     const granted = new Set(Array.isArray(actor.identity?.scopes) ? actor.identity.scopes : []);
     if (!granted.has("openid")) {
         throw Object.assign(new Error("OAuth scope openid is required"), { status: 403, requiredScope: "openid" });
     }
+    const projectScopes = [...granted].filter((scope) => scope.startsWith("projectos:"));
+    if (projectScopes.length === 0) {
+        // Existing ChatGPT installations were consented before ProjectOS action
+        // scopes existed. Keep only that exact identity grant compatible until
+        // staged connector re-consent is complete; any broader or malformed
+        // non-ProjectOS grant remains fail closed.
+        const isBoundedLegacyGrant = IDENTITY_SCOPES.every((scope) => granted.has(scope))
+            && [...granted].every((scope) => LEGACY_IDENTITY_SCOPES.has(scope));
+        if (isBoundedLegacyGrant) return;
+    }
+    const required = requiredToolScope(name);
     if (!required || (!granted.has(required) && !granted.has("projectos:*"))) {
         throw Object.assign(new Error(`OAuth scope ${required || "projectos"} is required`), {
             status: 403,
@@ -329,28 +416,28 @@ async function callTool(name, args, actor, dependencies) {
 function createProjectOsMcpHandler(overrides = {}) {
     const dependencies = { ...defaultDependencies(), ...overrides };
     return async function projectOsMcpHandler(request, response) {
-        noStore(response);
+        applyMcpBaseHeaders(request, response);
         try {
-            if (request.method === "GET") {
-                const resourceOrigin = process.env.PROJECTOS_MCP_RESOURCE_ORIGIN || "https://mcpmaster.vercel.app";
-                response.status(200).json({
-                    resource: `${resourceOrigin}/mcp`,
-                    authorization_servers: ["https://jcyqixttuebxqqfkjonq.supabase.co/auth/v1"],
-                    bearer_methods_supported: ["header"],
-                    scopes_supported: [
-                        "openid", "email", "profile", "offline_access",
-                        "projectos:read", "projectos:plan", "projectos:approve", "projectos:execute",
-                    ],
-                });
+            applyMcpCors(request, response, dependencies.allowedOrigins);
+            if (request.method === "OPTIONS") {
+                response.status(204).end();
                 return;
             }
-            if (request.method !== "POST") {
-                response.setHeader("Allow", "GET, POST");
-                rpcError(response, null, -32600, "Method not allowed", 405);
+            if (isMetadataRequest(request)) {
+                response.status(200).json(protectedResourceMetadata());
                 return;
             }
             const authorization = authorizationHeader(request);
             clearPrivilegedCallerHeaders(request);
+            if (!authorization) {
+                throw Object.assign(new Error("A valid bearer access token is required"), { status: 401 });
+            }
+            const current = await actorFor({ ...request, headers: { ...request.headers, authorization } }, dependencies);
+            if (request.method !== "POST") {
+                response.setHeader("Allow", MCP_ALLOWED_METHODS);
+                rpcError(response, null, -32600, "Method not allowed", 405);
+                return;
+            }
             const body = await jsonBody(request);
             const id = body.id ?? null;
             if (body.jsonrpc !== "2.0" || typeof body.method !== "string") {
@@ -377,23 +464,25 @@ function createProjectOsMcpHandler(overrides = {}) {
                 rpcError(response, id, -32601, "Method not found");
                 return;
             }
-            if (!authorization) {
-                response.setHeader("WWW-Authenticate", 'Bearer resource_metadata="/.well-known/oauth-protected-resource/mcp"');
-                rpcError(response, id, -32001, "An authenticated ProjectOS session is required", 401);
-                return;
-            }
-            const current = await actorFor({ ...request, headers: { ...request.headers, authorization } }, dependencies);
             const params = requiredObject(body.params, "params");
             const name = requiredString(params.name, "params.name");
             const args = params.arguments === undefined ? {} : requiredObject(params.arguments, "params.arguments");
             rpcResult(response, id, await callTool(name, args, current, dependencies));
         } catch (error) {
             const status = Number.isInteger(error?.status) ? error.status : 500;
-            if (status === 401) response.setHeader("WWW-Authenticate", 'Bearer resource_metadata="/.well-known/oauth-protected-resource/mcp"');
+            if (status === 401) response.setHeader("WWW-Authenticate", oauthChallenge());
             if (status === 403 && typeof error?.requiredScope === "string") {
                 response.setHeader("WWW-Authenticate", `Bearer error="insufficient_scope", scope="${error.requiredScope}"`);
             }
-            rpcError(response, null, status >= 500 ? -32603 : -32000, error instanceof Error ? error.message : "ProjectOS MCP request failed", status);
+            rpcError(
+                response,
+                null,
+                Number.isInteger(error?.rpcCode)
+                    ? error.rpcCode
+                    : status === 401 ? -32001 : status >= 500 ? -32603 : -32000,
+                error instanceof Error ? error.message : "ProjectOS MCP request failed",
+                status,
+            );
         }
     };
 }

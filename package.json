@@ -3,7 +3,7 @@
   "version": "1.3.0-observability",
   "private": true,
   "description": "Pandoras-Box control plane with the MCPMaster secure provider gateway runtime",
-  "main": "dist/http-server.js",
+  "main": "vercel-entrypoint.js",
   "workspaces": [
     "apps/meta-business-mcp",
     "packages/shared-security"
