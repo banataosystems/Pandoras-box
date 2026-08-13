@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validatePortfolioRegistry = validatePortfolioRegistry;
 exports.requireManagedRepository = requireManagedRepository;
+const source_authority_js_1 = require("../runtime/source-authority.js");
 const OWNER_REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const PRODUCT_ID = /^[a-z0-9][a-z0-9-]{0,79}$/;
 const SUPABASE_PROJECT_REF = /^[a-z0-9]{20}$/;
@@ -221,6 +222,7 @@ function validatePortfolioRegistry(registry) {
     };
 }
 function requireManagedRepository(registry, repository) {
+    (0, source_authority_js_1.assertOperationalRepository)(repository, 'manage');
     const validation = validatePortfolioRegistry(registry);
     if (!validation.valid)
         throw new Error(`invalid portfolio registry: ${validation.errors.join('; ')}`);

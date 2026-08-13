@@ -30,14 +30,15 @@ function migrationSource(version) {
   return readFileSync(join(repositoryRoot, entry.active.path), 'utf8');
 }
 
-test('active Supabase history maps all 50 live identities plus the AAL1 change', () => {
+test('active Supabase history maps 50 recovered identities plus two applied changes', () => {
   const files = readdirSync(migrationRoot)
     .filter((name) => /^\d{14}_.+\.sql$/.test(name))
     .sort();
 
   assert.equal(manifest.invariants.historical_identity_count, 50);
-  assert.equal(manifest.invariants.active_file_count, 51);
-  assert.equal(files.length, 51);
+  assert.equal(manifest.invariants.active_file_count, 52);
+  assert.equal(manifest.invariants.applied_change_count, 2);
+  assert.equal(files.length, 52);
   assert.equal(manifest.history.length, 50);
   assert.equal(new Set(manifest.history.map((entry) => entry.version)).size, 50);
   assert.deepEqual(
@@ -45,8 +46,15 @@ test('active Supabase history maps all 50 live identities plus the AAL1 change',
     [...manifest.history.map((entry) => entry.version)].sort(),
   );
   assert.equal(manifest.live_chain.first, '20260724010000');
-  assert.equal(manifest.live_chain.last, '20260810104737');
+  assert.equal(manifest.live_chain.last, '20260813105011');
+  assert.equal(manifest.live_chain.historical_recovery_last, '20260810104737');
+  assert.equal(manifest.live_chain.migration_count, 52);
   assert.equal(manifest.pending_change.version, '20260812034825');
+  assert.equal(manifest.pending_change.provider_version, '20260813014555');
+  assert.equal(manifest.pending_change.live_at_capture, true);
+  assert.equal(manifest.source_authority_change.version, '20260813105011');
+  assert.equal(manifest.source_authority_change.provider_version, '20260813105011');
+  assert.equal(manifest.source_authority_change.live_at_capture, true);
 
   for (const entry of manifest.history) {
     const payload = readFileSync(join(repositoryRoot, entry.active.path));
@@ -60,6 +68,22 @@ test('active Supabase history maps all 50 live identities plus the AAL1 change',
   const pending = readFileSync(join(repositoryRoot, manifest.pending_change.path));
   assert.equal(pending.length, manifest.pending_change.bytes);
   assert.equal(sha256(pending), manifest.pending_change.sha256);
+  assert.equal(pending.length, manifest.pending_change.provider_bytes);
+  assert.equal(sha256(pending), manifest.pending_change.provider_sha256);
+
+  const sourceAuthority = readFileSync(
+    join(repositoryRoot, manifest.source_authority_change.path),
+  );
+  assert.equal(sourceAuthority.length, manifest.source_authority_change.bytes);
+  assert.equal(sha256(sourceAuthority), manifest.source_authority_change.sha256);
+  const providerSourceAuthority = Buffer.from(
+    sourceAuthority.toString('utf8').replace(/\n$/, ''),
+  );
+  assert.equal(providerSourceAuthority.length, manifest.source_authority_change.provider_bytes);
+  assert.equal(
+    sha256(providerSourceAuthority),
+    manifest.source_authority_change.provider_sha256,
+  );
 
   const chain = files
     .map((filename) => {
@@ -68,7 +92,7 @@ test('active Supabase history maps all 50 live identities plus the AAL1 change',
     })
     .join('\n') + '\n';
   assert.equal(sha256(Buffer.from(chain)), replayResult.chain_sha256);
-  assert.equal(replayResult.migration_count, 51);
+  assert.equal(replayResult.migration_count, 52);
   assert.equal(replayResult.provider_equivalence, false);
   assert.equal(manifest.validation.authorization_smoke, 'pass');
   assert.deepEqual(replayResult.assertions.authorization_smoke, {
@@ -77,6 +101,12 @@ test('active Supabase history maps all 50 live identities plus the AAL1 change',
     anonymous_owner: 'denied',
     high_risk_requester_as_approver: 'denied',
     audit_event_appended: true,
+  });
+  assert.deepEqual(replayResult.assertions.source_authority, {
+    owner_wildcard: 'mbanatao/*',
+    historical_binding_count: 14,
+    canonical_fxpass_binding: 'active',
+    mixed_case_repository_insert: 'denied',
   });
 });
 

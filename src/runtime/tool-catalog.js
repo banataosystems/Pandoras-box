@@ -12,6 +12,7 @@ const supabase_auth_security_js_1 = require("../tools/supabase-auth-security.js"
 const supabase_js_1 = require("../tools/supabase.js");
 const tool_manifest_js_1 = require("./tool-manifest.js");
 const result_redaction_js_1 = require("./result-redaction.js");
+const source_authority_js_1 = require("./source-authority.js");
 const githubDefinitions = {
     ...github_js_1.githubTools,
     // The server method and executor case already existed, but the tool was never
@@ -106,6 +107,9 @@ function assertGitHubAccess(definition, args, configuration) {
         if (!allowlist.has(fullName)) {
             throw new Error(`GitHub account ${configuration.id} is not allowed to access ${owner}/${repo}`);
         }
+        if (definition.manifest.mutation) {
+            (0, source_authority_js_1.assertOperationalRepository)(`${owner}/${repo}`, 'mutate');
+        }
     }
 }
 function selectedSupabaseAccount(configuration, args) {
@@ -175,7 +179,9 @@ function repositoryFromApiUrl(value) {
 }
 function filterGitHubResult(toolName, result, configuration) {
     const allowlist = allowedRepositorySet(configuration);
-    const repositoryAllowed = (fullName) => (typeof fullName === 'string' && allowlist.has(normalizedRepository(fullName)));
+    const repositoryAllowed = (fullName) => (typeof fullName === 'string'
+        && allowlist.has(normalizedRepository(fullName))
+        && (0, source_authority_js_1.isOperationalRepository)(fullName));
     if (toolName === 'github.list-repositories' && Array.isArray(result)) {
         return result.filter((repository) => (repository && typeof repository === 'object'
             && repositoryAllowed(repository.full_name)));

@@ -1,6 +1,6 @@
 # Deprecated Source Denylist
 
-**Effective:** 2026-08-08  
+**Effective:** 2026-08-13
 **Project:** `mcpmaster-pandoras-box`  
 **Mode:** fail closed
 
@@ -12,11 +12,12 @@
 
 ## Operationally blacklisted legacy sources
 
-The following are **historical evidence only** and must never be automatically selected as the current source, default remote, build source, release source, or project-status authority:
+The following owner namespace is **historical evidence only** and must never be automatically selected as the current source, default remote, build source, release source, or project-status authority:
 
-- `mbanatao/mcpmaster`
-- `mbanatao/Memory`
-- Vercel Git metadata identifying `githubOrg=mbanatao` with `githubRepo=mcpmaster` or `Memory`
+- every repository matching `mbanatao/*`, case-insensitively;
+- all Vercel Git metadata identifying `githubOrg=mbanatao`, regardless of repository name.
+
+This owner-wide rule supersedes the earlier named-repository denylist for `mbanatao/mcpmaster` and `mbanatao/Memory`.
 
 Legacy hostnames containing `mbanatao` may remain reachable during migration or for OAuth/rollback continuity. A hostname is **not** proof that the legacy Git repository is canonical.
 
@@ -56,4 +57,4 @@ When evidence conflicts, resolve in this order:
 
 Do **not** delete old commits, deployment records, hashes, or recovery snapshots merely to remove confusion. They are quarantined from operational authority, not erased.
 
-Any tool, agent, or human process that attempts to use a deprecated source operationally must fail closed and require an explicit, separately recorded owner decision to reverse this policy.
+Any tool, agent, or human process that attempts to use a deprecated source operationally must fail closed and require an explicit, separately recorded owner decision to reverse this policy. Direct reads may remain available only when the caller deliberately names a repository for one of the permitted historical purposes above; discovery, routing, and every mutation exclude the owner namespace.
