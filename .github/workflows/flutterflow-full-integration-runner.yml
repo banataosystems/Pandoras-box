@@ -1,0 +1,136 @@
+name: Build governed FlutterFlow integration
+
+on:
+  push:
+    branches:
+      - codex/flutterflow-full-integration-final-20260814
+    paths:
+      - .github/workflows/flutterflow-full-integration-runner.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact branch without third-party actions
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: codex/flutterflow-full-integration-final-20260814
+        run: |
+          set -euo pipefail
+          git init repo
+          cd repo
+          git config user.name "Banatao Systems ProjectOS"
+          git config user.email "projectos@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}" main
+          git checkout -B "${TARGET_BRANCH}" "refs/remotes/origin/${TARGET_BRANCH}"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+
+      - name: Apply reviewed FlutterFlow provider patch
+        shell: bash
+        env:
+          HELPER_BRANCH: codex/flutterflow-readiness-provider
+        run: |
+          set -euo pipefail
+          cd repo
+          git fetch --no-tags origin "refs/heads/${HELPER_BRANCH}:refs/remotes/origin/${HELPER_BRANCH}"
+          git show "refs/remotes/origin/${HELPER_BRANCH}:.github/workflows/flutterflow-full-integration.yml" > /tmp/flutterflow-helper.yml
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          text = Path("/tmp/flutterflow-helper.yml").read_text()
+          marker = "      - name: Extend FlutterFlow Project API provider\n        shell: python\n        run: |\n"
+          if marker not in text:
+              raise SystemExit("reviewed FlutterFlow patch marker changed")
+          start = text.index(marker) + len(marker)
+          end_marker = "\n      - name:"
+          end = text.find(end_marker, start)
+          if end < 0:
+              raise SystemExit("reviewed FlutterFlow patch terminator missing")
+          script = textwrap.dedent(text[start:end])
+          nonblank = next((line for line in script.splitlines() if line.strip()), "")
+          if nonblank.startswith("    "):
+              script = "\n".join(
+                  line[4:] if line.startswith("    ") else line
+                  for line in script.splitlines()
+              ) + "\n"
+          required = [
+              'ff_path = Path("src/tools/flutterflow.js")',
+              "validateProjectYaml",
+              "updateProjectByYaml",
+              "flutterflow.list-files",
+              "flutterflow.read-project-yaml",
+              "flutterflow.validate-project-yaml",
+              "flutterflow.update-project-yaml",
+          ]
+          missing = [item for item in required if item not in script]
+          if missing:
+              raise SystemExit("reviewed FlutterFlow patch is incomplete: " + ", ".join(missing))
+          if not script.lstrip().startswith("from pathlib import Path"):
+              raise SystemExit("reviewed FlutterFlow patch has unexpected leading content")
+          Path("/tmp/apply-flutterflow-integration.py").write_text(script)
+          print(f"reviewed_patch_bytes={len(script.encode())}")
+          PY
+          python /tmp/apply-flutterflow-integration.py
+
+      - name: Bound source delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd repo
+          git diff --name-only | sort | tee /tmp/flutterflow-changed.txt
+          cat > /tmp/flutterflow-expected.txt <<'EOF'
+          docs/integrations/FLUTTERFLOW_READINESS_PROVIDER.md
+          src/runtime/tool-manifest.js
+          src/tools/flutterflow.js
+          test/flutterflow-full-integration.test.js
+          vercel.json
+          EOF
+          diff -u /tmp/flutterflow-expected.txt /tmp/flutterflow-changed.txt
+          git diff --check
+
+      - name: Verify exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd repo
+          node --version
+          npm --version
+          npm ci
+          npm run check
+          npm test
+          npm audit --omit=dev --audit-level=high
+          git diff --check
+
+      - name: Publish verified five-file candidate only
+        shell: bash
+        env:
+          TARGET_BRANCH: codex/flutterflow-full-integration-final-20260814
+        run: |
+          set -euo pipefail
+          cd repo
+          BASE_SHA="$(git rev-parse refs/remotes/origin/main)"
+          git rm .github/workflows/flutterflow-full-integration-runner.yml
+          git add docs/integrations/FLUTTERFLOW_READINESS_PROVIDER.md \
+                  src/runtime/tool-manifest.js \
+                  src/tools/flutterflow.js \
+                  test/flutterflow-full-integration.test.js \
+                  vercel.json
+          git diff --cached --check
+          git diff --cached --name-only "${BASE_SHA}" | sort > /tmp/final-delta.txt
+          cat > /tmp/expected-final-delta.txt <<'EOF'
+          docs/integrations/FLUTTERFLOW_READINESS_PROVIDER.md
+          src/runtime/tool-manifest.js
+          src/tools/flutterflow.js
+          test/flutterflow-full-integration.test.js
+          vercel.json
+          EOF
+          diff -u /tmp/expected-final-delta.txt /tmp/final-delta.txt
+          git commit -m "feat: govern full FlutterFlow Project API integration"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
