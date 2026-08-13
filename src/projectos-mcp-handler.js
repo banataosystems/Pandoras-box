@@ -38,6 +38,7 @@ const METADATA_PATHS = new Set([
 ]);
 const ACTIVE_ROLES = new Set(["owner", "admin", "operator", "member", "viewer"]);
 const EXECUTOR_ROLES = new Set(["owner", "admin"]);
+const LEGACY_PLAN_TOOL_PREFIX = "projectos_plan_";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 exports.projectOsMcpVercelConfig = Object.freeze({
@@ -161,7 +162,7 @@ function rpcError(response, id, code, message, status = 400) {
 }
 
 function publicTools() {
-    return [
+    const controls = [
         {
             name: "projectos_tool_catalog",
             description: "List ProjectOS provider tools and their enforced risk, scope, allowlist, and approval policy.",
@@ -210,6 +211,33 @@ function publicTools() {
             },
         },
     ];
+    const providerTools = getAllTools().flatMap((name) => {
+        const definition = toolRegistry[name];
+        if (classifyToolRisk(name) === "read") {
+            return [{
+                name,
+                description: `${definition.description} [ProjectOS risk: read]`,
+                inputSchema: definition.inputSchema,
+            }];
+        }
+        return [{
+            name: legacyPlanToolName(name),
+            description: `Create a durable ProjectOS plan for ${name}. This does not execute the operation until an authorized approval and execution call occur.`,
+            inputSchema: definition.inputSchema,
+        }];
+    });
+    return [...controls, ...providerTools];
+}
+
+function legacyPlanToolName(toolName) {
+    return `${LEGACY_PLAN_TOOL_PREFIX}${toolName.replace(".", "_")}`;
+}
+
+function legacyPlannedTool(name) {
+    if (!name.startsWith(LEGACY_PLAN_TOOL_PREFIX)) return undefined;
+    return getAllTools().find((toolName) => (
+        classifyToolRisk(toolName) !== "read" && legacyPlanToolName(toolName) === name
+    ));
 }
 
 function requiredString(value, name) {
@@ -296,6 +324,10 @@ function requiredToolScope(name) {
         case "projectos_execute_plan":
             return "projectos:execute";
         default:
+            if (legacyPlannedTool(name)) return "projectos:plan";
+            if (toolRegistry[name]) {
+                return classifyToolRisk(name) === "read" ? "projectos:read" : "projectos:plan";
+            }
             return undefined;
     }
 }
@@ -324,8 +356,38 @@ function assertToolScope(name, actor) {
     }
 }
 
+async function createDurablePlan(tool, toolArgs, dependencies) {
+    if (!toolRegistry[tool]) throw Object.assign(new Error(`Unknown tool: ${tool}`), { status: 400 });
+    const payloadHash = executionPayloadHash(tool, toolArgs);
+    return dependencies.ledger.createPlan(workloadToken(dependencies), {
+        requestId: randomUUID(),
+        tool,
+        risk: classifyToolRisk(tool),
+        args: toolArgs,
+        payloadHash,
+        expiresAt: new Date(dependencies.now() + PLAN_TTL_MS).toISOString(),
+    });
+}
+
 async function callTool(name, args, actor, dependencies) {
     assertToolScope(name, actor);
+    const plannedTool = legacyPlannedTool(name);
+    if (plannedTool) {
+        return toolResult({ plan: await createDurablePlan(plannedTool, args, dependencies) });
+    }
+    if (toolRegistry[name]) {
+        if (classifyToolRisk(name) !== "read") {
+            throw Object.assign(new Error("A durable ProjectOS plan is required before any provider mutation"), {
+                status: 409,
+            });
+        }
+        const token = workloadToken(dependencies);
+        return toolResult(await dependencies.execute(
+            name,
+            args,
+            dependencies.toolConfiguration(name, { vercelOidcToken: token }),
+        ));
+    }
     switch (name) {
         case "projectos_tool_catalog":
             return toolResult({
@@ -346,17 +408,7 @@ async function callTool(name, args, actor, dependencies) {
         case "projectos_create_plan": {
             const tool = requiredString(args.tool, "tool");
             const toolArgs = requiredObject(args.args, "args");
-            if (!toolRegistry[tool]) throw Object.assign(new Error(`Unknown tool: ${tool}`), { status: 400 });
-            const payloadHash = executionPayloadHash(tool, toolArgs);
-            const plan = await dependencies.ledger.createPlan(workloadToken(dependencies), {
-                requestId: randomUUID(),
-                tool,
-                risk: classifyToolRisk(tool),
-                args: toolArgs,
-                payloadHash,
-                expiresAt: new Date(dependencies.now() + PLAN_TTL_MS).toISOString(),
-            });
-            return toolResult({ plan });
+            return toolResult({ plan: await createDurablePlan(tool, toolArgs, dependencies) });
         }
         case "projectos_approve_plan": {
             if (!canApproveProjectOsPlan(actor)) {
