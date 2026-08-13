@@ -88,12 +88,16 @@ class _ProofStep extends StatelessWidget {
         children: [
           Icon(icon, size: 13, color: foreground),
           const SizedBox(width: PandoraSpacing.xxs),
-          Text(
-            stage.label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: foreground,
-                  fontWeight: FontWeight.w600,
-                ),
+          Flexible(
+            child: Text(
+              stage.label,
+              maxLines: compact ? 1 : 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: foreground,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
           ),
         ],
       ),
