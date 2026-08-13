@@ -8,3 +8,5 @@ Temporary transfer-only link for the already verified GitHub Actions artifact.
 - Artifact: [pandora-mobile-android-debug](https://nightly.link/banataosystems/Pandoras-box/actions/artifacts/9184656076.zip)
 
 This file does not change application or production state.
+
+Transfer marker: verified-artifact-mirror
