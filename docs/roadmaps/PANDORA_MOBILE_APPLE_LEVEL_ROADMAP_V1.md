@@ -2,113 +2,112 @@
 
 **Status:** Owner-approved roadmap source candidate  
 **Created:** 2026-08-14 Asia/Manila  
-**Project:** MCPMaster / Pandora's Box  
-**Canonical application repository:** `banataosystems/Pandoras-box`  
-**Roadmap baseline:** `main@1cfccdc37f77a314f2afb5f56a2f23f953e19f8b`  
-**Canonical mobile source:** `apps/pandora-mobile`  
-**Current mobile package version:** `0.1.1+2`  
-**Primary audience:** Pandora owner/operator on Android first, then adaptive tablet/web/iOS-compatible architecture  
-**Product standard:** Apple-level clarity, restraint, trust, interaction quality, accessibility, and finish without imitating iOS literally.
+**Canonical repo:** `banataosystems/Pandoras-box`  
+**Baseline:** `main@1cfccdc37f77a314f2afb5f56a2f23f953e19f8b`  
+**Mobile source:** `apps/pandora-mobile`  
+**Current mobile:** `0.1.1+2`  
 
----
+## North star
 
-## 1. Executive intent
+Transform Pandora Mobile from a secure operator prototype into the owner's calm, premium operating system for the entire project portfolio.
 
-Pandora Mobile must evolve from a secure functional operator prototype into the owner's calm, premium operating system for the entire Banatao Systems project portfolio.
+**Raw system data → owner understanding → safe decision → governed action → verifiable evidence.**
 
-The product must let the owner understand the whole system in seconds, make high-risk decisions with complete context, instruct Pandora naturally, and inspect evidence without being forced to understand backend implementation details.
+Apple-level is a quality bar, not an iOS copy: extreme clarity, restraint, consistent hierarchy, excellent feedback, accessibility, native Android behavior, and meticulous finish.
 
-The defining transformation is:
+## Non-negotiable product principles
 
-> **Raw system data → owner understanding → safe decision → governed action → verifiable evidence.**
+1. Owner meaning before machine structure.
+2. “Needs you” is the highest-value state.
+3. Proof before confidence.
+4. Progressive disclosure.
+5. Server authorization remains authoritative.
+6. No manual project/action/approval IDs in primary flows.
+7. Calm over spectacle.
+8. Android-native behavior with Pandora-native identity.
+9. Every loading/empty/stale/error/degraded/success state is designed.
+10. Every releasable artifact is bound to exact source, tests, signing identity, and rollback.
 
-The redesign is not a cosmetic reskin. It is a product, information-architecture, interaction, design-system, application-architecture, accessibility, testing, and release-engineering program.
+## Target navigation
 
-The target experience is:
+**Phone:** Home · Projects · Command · Approvals · Activity
 
-- calm rather than cinematic;
-- human-readable rather than API-shaped;
-- evidence-first rather than confidence-theater;
-- decision-first rather than dashboard-first;
-- progressive rather than overwhelming;
-- premium without ornamental excess;
-- adaptive to Android while preserving a coherent cross-platform product identity;
-- secure without forcing the owner to reason about internal IDs, JSON, providers, or transport mechanics.
+**Secondary:** Connections · Safety · Settings · Account · Notifications · Developer Diagnostics
 
----
+**Large screen:** navigation rail plus list-detail layouts instead of stretched phone cards.
 
-## 2. Current authoritative baseline
+## Source preservation
 
-### 2.1 Canonical source
+- Open PR #8 contains useful premium terminology/design/test concepts but is stale and dirty. Salvage concepts and tests; do not merge it wholesale.
+- Open PR #12 records the approved spiral-apple product mark. Reconcile the exact asset against current main, generate deterministic derivatives, then visually verify on device.
+- Uploaded `mcpmaster-main (3).zip` is design archaeology only. Never flat-merge or restore `mbanatao/*` source authority.
 
-Current source authority is:
+## Proof ladder
 
-`banataosystems/Pandoras-box main@1cfccdc37f77a314f2afb5f56a2f23f953e19f8b`
+Every project, feature, action, and release must distinguish:
 
-The current mobile client is under:
+`Documented → Implemented → Tested → Deployed → Production verified`
 
-`apps/pandora-mobile`
+Never collapse these into a generic green “done” state.
 
-The current merge includes the Android owner-API 404 repair. The client targets the existing Supabase `pandora-owner-api` as its primary owner API and retains the Vercel compatibility route as a future fallback.
+## Execution phases
 
-### 2.2 Current verification state
+- **Phase 0:** baseline, salvage map, identity reconciliation, acceptance matrix
+- **Phase 1:** architecture, typed models, system themes, design tokens, shared components, Diagnostics boundary
+- **Phase 2:** premium Home + Projects
+- **Phase 3:** natural-language Command + plan review
+- **Phase 4:** evidence-rich Approval queue/detail
+- **Phase 5:** Activity + Connections + Safety + Settings
+- **Phase 6:** brand + motion + accessibility + adaptive layouts
+- **Phase 7:** performance + optimized Android packaging/signing
+- **Phase 8:** exact-candidate release proof
+- **Phase 9:** daily briefing, notifications, evidence packets, read-only offline, continuous learning
 
-The current corrected Android client has reached:
+## PR strategy
 
-#**Documented → Implemented → Tested → Merged**
+Do not build the redesign in one giant PR:
 
-It is **not yet production-verified on device**. The remaining proof gate is a successful authenticated owner journey using the corrected APK and live owner API.
+A. Foundation  
+B. Home  
+C. Projects  
+D. Command  
+E. Approvals  
+F. Activity / Connections / Safety  
+G. Brand / accessibility / adaptive  
+H. Release engineering
 
-No future roadmap milestone may collapse the following states into one generic “done” value:
+Each PR must branch from current canonical main, preserve exact parent/head, stay bounded, pass exact-head CI, preserve rollback, and avoid production mutation.
 
-1. Documented
-2. Implemented
-3. Tested
-4. Deployed / distributed
-5. Production verified
+## Immediate implementation slice
 
-### 2.3 Existing product capability
+Next branch after roadmap landing:
 
-The current app already has valuable primitives:
+`feature/pandora-mobile-premium-foundation`
 
-- Supabase authentication;
-- owner API integration;
-- Home / project / action / approval / connection / activity / safety data access;
-- Ask Pandora;
-- governed action initiation;
-- approval decisions;
-- explicit organization binding;
-- fail-closed authentication and backend authorization;
-- CI that runs Flutter dependency resolution, analysis, tests, Web build, and Android APKbuild;
-- ProjectOS security regression coverage.
+Scope:
+- reconcile PR #8 concepts and PR #12 identity;
+- modularize app;
+- introduce design tokens and system light/dark themes;
+- add typed core models;
+- add proof/status/freshness/loading/empty/error components;
+- move raw JSON behind Developer Diagnostics;
+- redesign Home and Projects;
+- add golden/accessibility tests;
+- produce exact-head Android test artifact;
+- verify on the owner’s real Android device;
+- stop before production/store release.
 
-The redesign must preserve those capabilities while changing how they are presented and orchestrated.
+## Release boundary
 
-### 2.4 Current weaknesses to eliminate
+Final production/store release requires all applicable gates: exact source, CI, visual, accessibility, authenticated device journey, security regression, runtime identity, rollback proof, independent review, and separate owner authorization for one exact release candidate.
 
-The prototype currently exposes system machinery instead of owner meaning:
+## Detailed plan files
 
-- raw JSON is the default UI for major screens; 
-- API field names are exposed directly;
-- technical IDs are manually entered;
-- approvals lack sufficient contextual review;
-- a monolithic `main.dart` owns too much product behavior;
-- API responses are handled too dynamically;
-- dark mode is forced;
-- runtime endpoints and source details occupy primary product space;
-- loading, empty, stale, and failure states are generic;
-- interaction motion and haptics are largely default;
-- brand assets and launcher identity are unfinished;
-- accessibility has not been acceptance-tested;
-- phone, large-screen, and tablet adaptations are not proven;
-- the distributed Android build remains a large debug/test artifact rather than an optimized release-signed product.
-
----
-
-## 3. Source-recovery and design-work preservation policy
-
-The redesign must waste none of the useful prior work, but it must also preserve source authority.
-
-### 3.1 Open PR #8 — premium FlutterFlow owner-app candidate
-
-Open PR #8, `feature/flutterflow-pandora-mobile-v1@f73c477d6eb2e287c59c895bc1c5017ab4b17980`, contains useful conceptual work:
+- `docs/roadmaps/pandora-mobile-v1/01_PRODUCT_UX.md`
+- `docs/roadmaps/pandora-mobile-v1/02_DESIGN_BRAND.md`
+- `docs/roadmaps/pandora-mobile-v1/03_ARCHITECTURE_DATA.md`
+- `docs/roadmaps/pandora-mobile-v1/04_PHASES_0_2.md`
+- `docs/roadmaps/pandora-mobile-v1/05_PHASES_3_5.md`
+- `docs/roadmaps/pandora-mobile-v1/06_PHASES_6_9.md`
+- `docs/roadmaps/pandora-mobile-v1/07_TEST_RELEASE_GATES.md`
+- `docs/roadmaps/pandora-mobile-v1/08_MEMORY_CAPTURE.md`
