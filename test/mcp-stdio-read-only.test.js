@@ -3,10 +3,12 @@
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
 
-const {
-  availableTools,
-  executeStdioTool,
-} = require("../dist/mcp-stdio.js");
+const stdioRuntimePath = require.resolve("../dist/mcp-stdio.js");
+
+function loadFreshStdioRuntime() {
+  delete require.cache[stdioRuntimePath];
+  return require(stdioRuntimePath);
+}
 
 test("stdio remains read-only when the legacy write environment flag is set", async () => {
   const previous = process.env.MCP_ALLOW_WRITES;
@@ -15,6 +17,7 @@ test("stdio remains read-only when the legacy write environment flag is set", as
   let executionCalls = 0;
 
   try {
+    const { availableTools, executeStdioTool } = loadFreshStdioRuntime();
     const listed = new Set(availableTools().map((tool) => tool.name));
     assert.ok(listed.has("github.get-repository"));
     assert.equal(listed.has("github.create-issue"), false);
@@ -40,6 +43,7 @@ test("stdio remains read-only when the legacy write environment flag is set", as
     assert.equal(configurationCalls, 0);
     assert.equal(executionCalls, 0);
   } finally {
+    delete require.cache[stdioRuntimePath];
     if (previous === undefined) {
       delete process.env.MCP_ALLOW_WRITES;
     } else {
@@ -49,6 +53,7 @@ test("stdio remains read-only when the legacy write environment flag is set", as
 });
 
 test("stdio continues to execute registered read tools", async () => {
+  const { executeStdioTool } = loadFreshStdioRuntime();
   const calls = [];
   const response = await executeStdioTool(
     "github.get-repository",
