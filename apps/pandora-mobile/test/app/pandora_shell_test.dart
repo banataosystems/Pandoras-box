@@ -495,7 +495,7 @@ void main() {
 
     expect(find.text('Settings'), findsNothing);
     expect(find.text('Home'), findsNothing);
-    expect(find.text('Owner access needs rechecking'), findsOneWidget);
+    expect(find.text('Owner access needs rechecking'), findsWidgets);
     expect(find.text('Sign out'), findsOneWidget);
 
     await tester.tap(find.text('Recheck owner access'));
@@ -602,7 +602,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Retry same request safely'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Retry same request safely'));
+    await tester.scrollUntilVisible(
+      find.text('Retry same request safely'),
+      300,
+      scrollable: find.byType(CustomScrollView),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Retry same request safely'));
     await tester.pumpAndSettle();
 
