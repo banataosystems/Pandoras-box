@@ -25,9 +25,11 @@ void main() {
         textScaler: textScaler,
       ),
     );
-    await precacheImage(
-      const AssetImage(PandoraMark.assetPath),
-      tester.element(find.byKey(catalogKey)),
+    await tester.runAsync(
+      () => precacheImage(
+        const AssetImage(PandoraMark.assetPath),
+        tester.element(find.byKey(catalogKey)),
+      ),
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
