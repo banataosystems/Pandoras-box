@@ -1,0 +1,73 @@
+name: Preserve FlutterFlow repair evidence
+
+on:
+  push:
+    branches:
+      - codex/flutterflow-full-integration-candidate-20260814
+    paths:
+      - .github/workflows/flutterflow-repair-evidence.yml
+
+permissions:
+  contents: write
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Compile repair and commit report
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: codex/flutterflow-full-integration-candidate-20260814
+          HELPER_BRANCH: codex/flutterflow-readiness-provider
+        run: |
+          set -euo pipefail
+          git init repo
+          cd repo
+          git config user.name "Banatao Systems ProjectOS"
+          git config user.email "projectos@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags origin \
+            "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}" \
+            "refs/heads/${HELPER_BRANCH}:refs/remotes/origin/${HELPER_BRANCH}"
+          git checkout -B "${TARGET_BRANCH}" "refs/remotes/origin/${TARGET_BRANCH}"
+          git show "refs/remotes/origin/${HELPER_BRANCH}:.github/workflows/flutterflow-full-integration.yml" > /tmp/helper.yml
+          awk '
+            /^      - name: Extend FlutterFlow Project API provider$/ { step=1; next }
+            step && /^        run: \|$/ { body=1; next }
+            body && /^      - name:/ { exit }
+            body {
+              if (substr($0,1,10) == "          ") print substr($0,11);
+              else print $0;
+            }
+          ' /tmp/helper.yml > /tmp/apply.py
+          mkdir -p recovery/evidence/flutterflow
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess, sys
+          p=Path("/tmp/apply.py")
+          t=p.read_text()
+          lines=t.splitlines()
+          m=[]
+          for i in range(len(lines)-2):
+            if lines[i].strip()=="'''" and lines[i+1].strip()=='")':
+              j=i+2
+              while j<len(lines) and not lines[j].strip():
+                j+=1
+              if j<len(lines) and lines[j].lstrip().startswith("wf = Path("):
+                m.append(i)
+          report=[f"matches={m}"]
+          if len(m)==1:
+            i=m[0]; prefix=lines[i][:len(lines[i])-len(lines[i].lstrip())]
+            lines[i:i+2]=[prefix+"''')"]
+            p.write_text("\n".join(lines)+("\n" if t.endswith("\n") else ""))
+            r=subprocess.run([sys.executable,"-m","py_compile","/tmp/apply.py"],text=True,capture_output=True)
+            report.append(f"compile_status={r.returncode}")
+            if r.stderr:
+              report.append("stderr:"); report.extend(r.stderr.splitlines())
+          Path("recovery/evidence/flutterflow/repair-compile-report.txt").write_text("\n".join(report)+"\n")
+          PY
+          git add recovery/evidence/flutterflow/repair-compile-report.txt
+          git commit -m "evidence: preserve FlutterFlow repair compile report"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
