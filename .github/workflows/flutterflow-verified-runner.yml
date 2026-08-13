@@ -35,7 +35,7 @@ jobs:
           git checkout -B "${TARGET_BRANCH}" "refs/remotes/origin/${TARGET_BRANCH}"
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
 
-      - name: Recover, repair, and compile reviewed patch
+      - name: Recover and repair reviewed patch
         shell: bash
         env:
           HELPER_BRANCH: codex/flutterflow-readiness-provider
@@ -54,28 +54,40 @@ jobs:
           ' /tmp/helper.yml > /tmp/apply.py
           python - <<'PY'
           from pathlib import Path
+
           path = Path("/tmp/apply.py")
           text = path.read_text()
+
+          opener_bad = "test_path.write_text(r''\"use strict\";"
+          opener_good = "test_path.write_text(r'''\"use strict\";"
+          opener_count = text.count(opener_bad)
+          if opener_count != 1:
+              raise SystemExit(f"expected exactly one malformed test fixture opener, found {opener_count}")
+          text = text.replace(opener_bad, opener_good, 1)
+
           lines = text.splitlines()
           matches = []
           for index in range(len(lines) - 2):
               if lines[index].strip() != "'''":
                   continue
-              if lines[index + 1].strip() != '\")':
+              if lines[index + 1].strip() != '")':
                   continue
               next_index = index + 2
               while next_index < len(lines) and not lines[next_index].strip():
                   next_index += 1
               if next_index < len(lines) and lines[next_index].lstrip().startswith("wf = Path("):
                   matches.append(index)
+
           if len(matches) != 1:
               raise SystemExit(f"expected exactly one malformed test fixture tail, found {len(matches)}")
+
           index = matches[0]
-          indent = lines[index][:len(lines[index]) - len(lines[index].lstrip())]
+          indent = lines[index][: len(lines[index]) - len(lines[index].lstrip())]
           lines[index:index + 2] = [indent + "''')"]
           repaired = "\n".join(lines) + ("\n" if text.endswith("\n") else "")
           path.write_text(repaired)
-          print("repaired_exact_tail_count=1")
+          print("repaired_test_fixture_opener=1")
+          print("repaired_test_fixture_tail=1")
           PY
           python -m py_compile /tmp/apply.py
 
@@ -89,7 +101,7 @@ jobs:
       - name: Bound patch source delta
         shell: bash
         run: |
-          set -euo pipefall
+          set -euo pipefail
           cd repo
           git diff --name-only | sort > /tmp/actual.txt
           cat > /tmp/expected.txt <<'EOF'
