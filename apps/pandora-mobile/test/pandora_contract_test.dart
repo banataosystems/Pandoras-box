@@ -6,6 +6,10 @@ void main() {
     expect(PandoraConfig.supabaseUrl, 'https://jcyqixttuebxqqfkjonq.supabase.co');
     expect(
       PandoraConfig.ownerApiBaseUrl,
+      'https://jcyqixttuebxqqfkjonq.supabase.co/functions/v1/pandora-owner-api',
+    );
+    expect(
+      PandoraConfig.ownerApiFallbackBaseUrl,
       'https://mcpmaster.vercel.app/api/operator',
     );
     expect(
@@ -15,10 +19,16 @@ void main() {
     expect(PandoraConfig.supabasePublishableKey, startsWith('sb_publishable_'));
   });
 
+  test('verified owner routes are ordered and deduplicated', () {
+    expect(PandoraConfig.ownerApiBaseUrls, hasLength(2));
+    expect(PandoraConfig.ownerApiBaseUrls.first, contains('pandora-owner-api'));
+    expect(PandoraConfig.ownerApiBaseUrls.last, endsWith('/api/operator'));
+  });
+
   test('client defaults contain no deprecated operational owner', () {
     final combined = <String>[
       PandoraConfig.supabaseUrl,
-      PandoraConfig.ownerApiBaseUrl,
+      ...PandoraConfig.ownerApiBaseUrls,
       PandoraConfig.organizationId,
     ].join(' ');
     expect(combined.toLowerCase(), isNot(contains('mbanatao')));
