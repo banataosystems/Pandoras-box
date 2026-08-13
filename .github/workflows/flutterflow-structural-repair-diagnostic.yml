@@ -1,0 +1,78 @@
+name: Diagnose structural FlutterFlow repair
+
+on:
+  push:
+    branches:
+      - codex/flutterflow-full-integration-candidate-20260814
+    paths:
+      - .github/workflows/flutterflow-structural-repair-diagnostic.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Compile repaired patch and preserve result
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: codex/flutterflow-full-integration-candidate-20260814
+          HELPER_BRANCH: codex/flutterflow-readiness-provider
+        run: |
+          set -euo pipefail
+          git init repo
+          cd repo
+          git config user.name "Banatao Systems ProjectOS"
+          git config user.email "projectos@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags origin \
+            "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}" \
+            "refs/heads/${HELPER_BRANCH}:refs/remotes/origin/${HELPER_BRANCH}"
+          git checkout -B "${TARGET_BRANCH}" "refs/remotes/origin/${TARGET_BRANCH}"
+          git show "refs/remotes/origin/${HELPER_BRANCH}:.github/workflows/flutterflow-full-integration.yml" > /tmp/helper.yml
+          awk '
+            /^      - name: Extend FlutterFlow Project API provider$/ { step=1; next }
+            step && /^        run: \|$/ { body=1; next }
+            body && /^      - name:/ { exit }
+            body {
+              if (substr($0,1,10) == "          ") print substr($0,11);
+              else print $0;
+            }
+          ' /tmp/helper.yml > /tmp/apply.py
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess, sys
+          p = Path("/tmp/apply.py")
+          text = p.read_text()
+          lines = text.splitlines()
+          matches = []
+          for i in range(len(lines) - 2):
+              if lines[i].strip() == "'''" and lines[i + 1].strip() == '")':
+                  j = i + 2
+                  while j < len(lines) and not lines[j].strip():
+                    j += 1
+                if j < len(lines) and lines[j].lstrip().startswith("wf = Path("):
+                    matches.append(i)
+          report = [f"matches={matches}"]
+          if len(matches) == 1:
+              i = matches[0]
+              indent = lines[i][:len(lines[i]) - len(lines[i].lstrip())]
+              lines[i:i+2] = [indent + "''')"]
+              p.write_text("\n".join(lines) + ("\n" if text.endswith("\n") else ""))
+              r = subprocess.run([sys.executable, "-m", "py_compile", str(p)], text=True, capture_output=True)
+              report.append(f"compile_status={r.returncode}")
+              if r.stderr:
+                  report.append("stderr:")
+                  report.extend(r.stderr.splitlines())
+              if r.stdout:
+                  report.append("stdout:")
+                  report.extend(r.stdout.splitlines())
+          Path("recovery/evidence/flutterflow/structural-repair-compile.txt").parent.mkdir(parents=True, exist_ok=True)
+          Path("recovery/evidence/flutterflow/structural-repair-compile.txt").write_text("\n".join(report) + "\n")
+          PY
+          git add recovery/evidence/flutterflow/structural-repair-compile.txt
+          git commit -m "evidence: compile structurally repaired FlutterFlow patch"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
