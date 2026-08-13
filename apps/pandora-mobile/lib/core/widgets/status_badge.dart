@@ -2,13 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../design/pandora_tokens.dart';
 
-enum PandoraStatusTone {
-  neutral,
-  informative,
-  verified,
-  attention,
-  critical,
-}
+enum PandoraStatusTone { neutral, informative, verified, attention, critical }
 
 class StatusBadge extends StatelessWidget {
   const StatusBadge({
@@ -90,19 +84,50 @@ class StatusBadge extends StatelessWidget {
 }
 
 PandoraStatusTone statusToneFor(String status) {
-  final normalized = status.toLowerCase();
-  if (RegExp(r'blocked|failed|error|critical|denied').hasMatch(normalized)) {
+  final words = status
+      .toLowerCase()
+      .split(RegExp(r'[^a-z0-9]+'))
+      .where((word) => word.isNotEmpty)
+      .toSet();
+  bool hasAny(Set<String> candidates) =>
+      words.intersection(candidates).isNotEmpty;
+  if (hasAny({
+    'blocked',
+    'failed',
+    'error',
+    'critical',
+    'denied',
+    'unhealthy',
+    'unprotected',
+  })) {
     return PandoraStatusTone.critical;
   }
-  if (RegExp(r'attention|pending|waiting|stale|warning|expired')
-      .hasMatch(normalized)) {
+  if (hasAny({
+    'attention',
+    'pending',
+    'waiting',
+    'stale',
+    'warning',
+    'expired',
+  })) {
     return PandoraStatusTone.attention;
   }
-  if (RegExp(r'verified|healthy|protected|ready|complete|active')
-      .hasMatch(normalized)) {
+  if (words.contains('not') ||
+      words.contains('unverified') ||
+      words.contains('inactive')) {
+    return PandoraStatusTone.neutral;
+  }
+  if (hasAny({
+    'verified',
+    'healthy',
+    'protected',
+    'ready',
+    'complete',
+    'active',
+  })) {
     return PandoraStatusTone.verified;
   }
-  if (RegExp(r'working|running|progress|connected').hasMatch(normalized)) {
+  if (hasAny({'working', 'running', 'progress', 'connected'})) {
     return PandoraStatusTone.informative;
   }
   return PandoraStatusTone.neutral;

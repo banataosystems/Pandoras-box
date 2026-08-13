@@ -18,9 +18,82 @@ class DeveloperDiagnosticsScreen extends StatefulWidget {
 
 class _DeveloperDiagnosticsScreenState
     extends State<DeveloperDiagnosticsScreen> {
+  Future<bool>? _authorization;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _authorization ??= _verifyOwnerAccess();
+  }
+
+  Future<bool> _verifyOwnerAccess() async {
+    final dependencies = PandoraDependencies.of(context);
+    if (dependencies.auth.currentSession == null) return false;
+    try {
+      await dependencies.repository.home();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _retryAuthorization() {
+    setState(() => _authorization = _verifyOwnerAccess());
+  }
+
   @override
   Widget build(BuildContext context) {
-    final diagnostics = PandoraDependencies.of(context).diagnostics;
+    final dependencies = PandoraDependencies.of(context);
+    if (dependencies.auth.currentSession == null) {
+      return const PandoraPage(
+        title: 'Developer diagnostics',
+        child: PandoraSurface(
+          title: 'Authentication required',
+          child: Text('Sign in again before viewing diagnostic metadata.'),
+        ),
+      );
+    }
+    return FutureBuilder<bool>(
+      future: _authorization,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const PandoraPage(
+            title: 'Developer diagnostics',
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.data != true) {
+          return PandoraPage(
+            title: 'Developer diagnostics',
+            child: PandoraSurface(
+              title: 'Owner access could not be verified',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Diagnostic metadata stays hidden until the live owner '
+                    'API verifies this session and organization.',
+                  ),
+                  const SizedBox(height: PandoraSpacing.md),
+                  OutlinedButton(
+                    onPressed: _retryAuthorization,
+                    child: const Text('Verify owner access'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return _buildAuthorized(context, dependencies);
+      },
+    );
+  }
+
+  Widget _buildAuthorized(
+    BuildContext context,
+    PandoraDependencies dependencies,
+  ) {
+    final diagnostics = dependencies.diagnostics;
     final events = diagnostics.events;
     return PandoraPage(
       title: 'Developer diagnostics',
@@ -46,7 +119,9 @@ class _DeveloperDiagnosticsScreenState
             child: Column(
               children: [
                 DetailRow(
-                    label: 'App version', value: PandoraConfig.appVersion),
+                  label: 'App version',
+                  value: PandoraConfig.appVersion,
+                ),
                 DetailRow(
                   label: 'Source revision',
                   value: PandoraConfig.sourceRevision,

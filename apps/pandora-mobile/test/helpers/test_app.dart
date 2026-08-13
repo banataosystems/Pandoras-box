@@ -12,6 +12,7 @@ Widget testApp({
       theme: PandoraTheme.porcelain,
       darkTheme: PandoraTheme.graphite,
       themeMode: themeMode,
+      themeAnimationDuration: Duration.zero,
       builder: (context, builtChild) => MediaQuery(
         data: MediaQuery.of(context).copyWith(
           textScaler: textScaler,

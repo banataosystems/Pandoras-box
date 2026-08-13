@@ -4,11 +4,7 @@ import '../design/pandora_tokens.dart';
 import '../models/pandora_models.dart';
 
 class FreshnessLabel extends StatelessWidget {
-  const FreshnessLabel({
-    super.key,
-    required this.freshness,
-    this.now,
-  });
+  const FreshnessLabel({super.key, required this.freshness, this.now});
 
   final FreshnessInfo freshness;
   final DateTime? now;
@@ -67,10 +63,17 @@ String _displayLabel(
 
 String _relativeTime(DateTime value, DateTime now) {
   final difference = now.difference(value);
-  if (difference.isNegative || difference.inMinutes < 1)
+  if (difference.isNegative || difference.inMinutes < 1) {
     return 'Verified just now';
-  if (difference.inMinutes < 60) return 'Verified ${difference.inMinutes}m ago';
-  if (difference.inHours < 24) return 'Verified ${difference.inHours}h ago';
-  if (difference.inDays < 7) return 'Verified ${difference.inDays}d ago';
+  }
+  if (difference.inMinutes < 60) {
+    return 'Verified ${difference.inMinutes}m ago';
+  }
+  if (difference.inHours < 24) {
+    return 'Verified ${difference.inHours}h ago';
+  }
+  if (difference.inDays < 7) {
+    return 'Verified ${difference.inDays}d ago';
+  }
   return 'Verified ${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 }

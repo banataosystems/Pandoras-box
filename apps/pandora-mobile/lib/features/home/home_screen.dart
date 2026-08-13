@@ -46,11 +46,10 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             tooltip: 'Open Settings',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const SettingsScreen(),
-              ),
-            ),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute<void>(
+                builder: (_) => const SettingsScreen())),
             icon: const Icon(Icons.settings_outlined),
           ),
           IconButton(
@@ -94,9 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: PandoraSpacing.md),
                 ],
                 _HomeContent(
-                  summary: summary,
-                  refreshing: controller.isLoading,
-                ),
+                    summary: summary, refreshing: controller.isLoading),
               ],
             );
           },
@@ -141,7 +138,7 @@ class _HomeContent extends StatelessWidget {
                 ? 'Nothing is waiting for an owner decision.'
                 : 'The highest-value decision waiting for you.',
             leading: Icon(
-              Icons.person_alert_outlined,
+              Icons.priority_high_rounded,
               color: context.pandoraPalette.attention,
             ),
             child: summary.priority == null
@@ -153,10 +150,8 @@ class _HomeContent extends StatelessWidget {
           const SizedBox(height: PandoraSpacing.xl),
           Semantics(
             header: true,
-            child: Text(
-              'Portfolio',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            child: Text('Portfolio',
+                style: Theme.of(context).textTheme.titleLarge),
           ),
           const SizedBox(height: PandoraSpacing.sm),
           if (summary.topProjects.isEmpty)
@@ -207,8 +202,9 @@ class _PriorityCard extends StatelessWidget {
           Text(approval.reason),
           const SizedBox(height: PandoraSpacing.sm),
           StatusBadge(
-              label: approval.risk.label,
-              tone: statusToneFor(approval.risk.label)),
+            label: approval.risk.label,
+            tone: statusToneFor(approval.risk.label),
+          ),
         ],
       );
 }
@@ -224,9 +220,13 @@ class _CounterRow extends StatelessWidget {
           final cards = [
             _CounterCard(label: 'Approvals', value: summary.approvalCount),
             _CounterCard(
-                label: 'Active projects', value: summary.activeProjectCount),
+              label: 'Active projects',
+              value: summary.activeProjectCount,
+            ),
             _CounterCard(
-                label: 'Needs attention', value: summary.needsAttentionCount),
+              label: 'Needs attention',
+              value: summary.needsAttentionCount,
+            ),
           ];
           if (constraints.maxWidth < 460) {
             return Column(

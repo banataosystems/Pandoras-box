@@ -9,6 +9,34 @@ Object? fixture(String name) => jsonDecode(
       File('test/fixtures/owner_api/$name.json').readAsStringSync(),
     );
 
+Map<String, Object?> canonicalIntakeReceipt() => <String, Object?>{
+      'reply': 'Pandora recorded the request and will prepare a plan.',
+      'needsApproval': false,
+      'actionId': 'action-fixture-1',
+      'approvalId': null,
+      'status': <String, Object?>{
+        'whatChanged': 'A governed intake record was created.',
+        'whereWeAre': 'Planning',
+        'whatIsDone': 'The request was accepted.',
+        'whatIsHappeningNow': 'Pandora is checking preconditions.',
+        'whatIsStoppingUs': null,
+        'whatIWillDoNext': 'Show the plan before any protected change.',
+      },
+    };
+
+void expectContractField(Object? value, String field) {
+  expect(
+    () => IntakeReceipt.fromJson(value),
+    throwsA(
+      isA<PandoraModelContractException>().having(
+        (error) => error.field,
+        'field',
+        field,
+      ),
+    ),
+  );
+}
+
 void main() {
   test('canonical project fixture parses without claiming unverified progress',
       () {
@@ -134,6 +162,45 @@ void main() {
     expect(receipt.approvalId, 'approval-fixture-1');
     expect(receipt.status.whatIWillDoNext, contains('plan'));
     expect(receipt.requestId, 'request-fixture-1');
+  });
+
+  test('intake receipt never invents a recorded-success reply', () {
+    final json = canonicalIntakeReceipt()..remove('reply');
+    expectContractField(json, 'intake.reply');
+  });
+
+  test('intake receipt requires a canonical boolean and action identity', () {
+    final nonBoolean = canonicalIntakeReceipt()..['needsApproval'] = 'false';
+    expectContractField(nonBoolean, 'intake.needsApproval');
+
+    final missingActionId = canonicalIntakeReceipt()..remove('actionId');
+    expectContractField(missingActionId, 'intake.actionId');
+  });
+
+  test('intake receipt requires the complete canonical status', () {
+    final json = canonicalIntakeReceipt();
+    asJsonMap(json['status']).remove('whatIsDone');
+    expectContractField(json, 'intake.status.whatIsDone');
+  });
+
+  test('approval-bearing intake receipt requires an approval identity', () {
+    final json = canonicalIntakeReceipt()
+      ..['needsApproval'] = true
+      ..['approvalId'] = null;
+    expectContractField(json, 'intake.approvalId');
+  });
+
+  test('approval summary never invents a canonical identity', () {
+    expect(
+      () => ApprovalSummary.fromJson(<String, Object?>{}),
+      throwsA(
+        isA<PandoraModelContractException>().having(
+          (error) => error.field,
+          'field',
+          'approval.id',
+        ),
+      ),
+    );
   });
 
   test('remaining canonical summary fixtures parse to typed owner models', () {

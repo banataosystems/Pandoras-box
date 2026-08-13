@@ -51,4 +51,29 @@ void main() {
     expect(controller.data, 'newer');
     controller.dispose();
   });
+
+  for (final kind in [
+    PandoraApiErrorKind.sessionExpired,
+    PandoraApiErrorKind.forbidden,
+  ]) {
+    test('$kind clears protected prior data', () async {
+      var calls = 0;
+      final controller = ScreenController<String>(() async {
+        calls += 1;
+        if (calls == 1) return snapshot('protected');
+        throw PandoraApiError(
+          kind: kind,
+          message: 'Access is no longer authorized.',
+          code: 'AUTHORIZATION_CHANGED',
+        );
+      });
+
+      await controller.load();
+      await controller.refresh();
+
+      expect(controller.data, isNull);
+      expect(controller.error?.kind, kind);
+      controller.dispose();
+    });
+  }
 }

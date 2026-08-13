@@ -44,10 +44,9 @@ class _CommandScreenState extends State<CommandScreen> {
     });
     _submissionKey ??= _idempotencyKeys.create('command');
     try {
-      final receipt = await PandoraDependencies.of(context).repository.ask(
-            message: objective,
-            idempotencyKey: _submissionKey,
-          );
+      final receipt = await PandoraDependencies.of(
+        context,
+      ).repository.ask(message: objective, idempotencyKey: _submissionKey);
       if (mounted) {
         setState(() {
           _receipt = receipt;
@@ -68,18 +67,26 @@ class _CommandScreenState extends State<CommandScreen> {
       }
     } catch (_) {
       if (mounted) {
-        setState(
-          () {
-            _outcomeUnknown = true;
-            _error =
-                'Pandora could not confirm whether that request was received. '
-                'Check Activity before reconciling this same request.';
-          },
-        );
+        setState(() {
+          _outcomeUnknown = true;
+          _error =
+              'Pandora could not confirm whether that request was received. '
+              'Check Activity before reconciling this same request.';
+        });
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  void _finishReconciliation() {
+    setState(() {
+      _outcomeUnknown = false;
+      _submissionKey = null;
+      _error =
+          'No new request was sent. After checking Activity, edit or prepare '
+          'a new request only if the original is not present.';
+    });
   }
 
   @override
@@ -119,9 +126,11 @@ class _CommandScreenState extends State<CommandScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.arrow_forward_rounded),
-                    label: Text(_submitting
-                        ? 'Recording request…'
-                        : 'Prepare the request'),
+                    label: Text(
+                      _submitting
+                          ? 'Recording request…'
+                          : 'Prepare the request',
+                    ),
                   ),
                 ],
               ),
@@ -139,9 +148,9 @@ class _CommandScreenState extends State<CommandScreen> {
               if (_outcomeUnknown) ...[
                 const SizedBox(height: PandoraSpacing.sm),
                 OutlinedButton.icon(
-                  onPressed: _submitting ? null : _submit,
-                  icon: const Icon(Icons.sync_rounded),
-                  label: const Text('Reconcile the same request'),
+                  onPressed: _submitting ? null : _finishReconciliation,
+                  icon: const Icon(Icons.check_circle_outline_rounded),
+                  label: const Text('I checked Activity'),
                 ),
               ],
             ],

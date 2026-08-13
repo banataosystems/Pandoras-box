@@ -7,10 +7,8 @@ import 'loadable.dart';
 typedef ScreenLoader<T> = Future<RepositorySnapshot<T>> Function();
 
 class ScreenController<T> extends ChangeNotifier {
-  ScreenController(
-    this._loader, {
-    DateTime Function()? clock,
-  }) : _clock = clock ?? DateTime.now;
+  ScreenController(this._loader, {DateTime Function()? clock})
+      : _clock = clock ?? DateTime.now;
 
   final ScreenLoader<T> _loader;
   final DateTime Function() _clock;
@@ -45,7 +43,10 @@ class ScreenController<T> extends ChangeNotifier {
       _state = LoadableSuccess<T>(result);
     } on PandoraRepositoryException catch (error) {
       if (!_isCurrent(generation)) return;
-      _state = LoadableFailure<T>(failure: error, previous: previous);
+      _state = LoadableFailure<T>(
+        failure: error,
+        previous: _mayRetainPrevious(error) ? previous : null,
+      );
     } catch (_) {
       if (!_isCurrent(generation)) return;
       _state = LoadableFailure<T>(
@@ -61,6 +62,14 @@ class ScreenController<T> extends ChangeNotifier {
   }
 
   bool _isCurrent(int generation) => !_disposed && generation == _generation;
+
+  bool _mayRetainPrevious(PandoraRepositoryException error) =>
+      switch (error.kind) {
+        PandoraApiErrorKind.sessionExpired ||
+        PandoraApiErrorKind.forbidden =>
+          false,
+        _ => true,
+      };
 
   @override
   void dispose() {

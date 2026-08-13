@@ -1,8 +1,10 @@
 typedef JsonMap = Map<String, Object?>;
 
 class PandoraModelContractException implements Exception {
-  const PandoraModelContractException(
-      {required this.code, required this.field});
+  const PandoraModelContractException({
+    required this.code,
+    required this.field,
+  });
 
   final String code;
   final String field;
@@ -14,9 +16,7 @@ class PandoraModelContractException implements Exception {
 JsonMap asJsonMap(Object? value) {
   if (value is Map<String, Object?>) return value;
   if (value is Map) {
-    return value.map(
-      (key, item) => MapEntry(key.toString(), item),
-    );
+    return value.map((key, item) => MapEntry(key.toString(), item));
   }
   return const <String, Object?>{};
 }
@@ -106,8 +106,9 @@ enum EvidenceStage {
       };
 
   static EvidenceStage? parse(Object? value) {
-    final normalized =
-        jsonText(value).toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+    final normalized = jsonText(
+      value,
+    ).toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
     return switch (normalized) {
       'documented' || 'planned' => documented,
       'implemented' || 'built' => implemented,
@@ -203,10 +204,11 @@ class FreshnessInfo {
     return FreshnessInfo(
       state: state,
       lastVerifiedAt: jsonDateTime(
-        firstJsonValue(
-          json,
-          const ['lastVerifiedAt', 'last_verified_at', 'lastCheckedAt'],
-        ),
+        firstJsonValue(json, const [
+          'lastVerifiedAt',
+          'last_verified_at',
+          'lastCheckedAt',
+        ]),
       ),
       staleAfter: staleAfter,
     );
@@ -261,10 +263,13 @@ class ProjectSummary {
     );
     return ProjectSummary(
       id: requiredJsonText(
-        json,
-        const ['id', 'projectKey', 'project_key'],
-        field: 'project.id',
-      ),
+          json,
+          const [
+            'id',
+            'projectKey',
+            'project_key',
+          ],
+          field: 'project.id'),
       name: requiredJsonText(json, const ['name'], field: 'project.name'),
       purpose: jsonText(
         firstJsonValue(json, const ['plainPurpose', 'purpose', 'objective']),
@@ -278,21 +283,23 @@ class ProjectSummary {
         firstJsonValue(json, const ['plainStatus', 'status']),
         fallback: 'Not verified',
       ),
-      progressPercent: progress == null ? null : progress.clamp(0, 100).toInt(),
+      progressPercent: progress?.clamp(0, 100).toInt(),
       progressVerified: jsonBool(json['progressVerified']) &&
           progress != null &&
           freshness.isFresh,
       blocker: _nullableText(
-        firstJsonValue(
-          json,
-          const ['whatIsStoppingUs', 'blocker', 'blockedBy'],
-        ),
+        firstJsonValue(json, const [
+          'whatIsStoppingUs',
+          'blocker',
+          'blockedBy',
+        ]),
       ),
       nextAction: _nullableText(
-        firstJsonValue(
-          json,
-          const ['whatIWillDoNext', 'nextAction', 'next_action'],
-        ),
+        firstJsonValue(json, const [
+          'whatIWillDoNext',
+          'nextAction',
+          'next_action',
+        ]),
       ),
       repository: _nullableText(json['repository']),
       evidenceStages: _evidenceStageStatuses(json),
@@ -414,15 +421,15 @@ class ProjectDetail {
       summary: ProjectSummary.fromJson(json),
       objective: _nullableText(json['objective']),
       roadmapVersion: _nullableText(json['roadmapVersion']),
-      phases: asJsonList(json['phases'])
-          .map(ProjectPhase.fromJson)
-          .toList(growable: false),
-      tasks: asJsonList(json['tasks'])
-          .map(ProjectTask.fromJson)
-          .toList(growable: false),
-      evidence: asJsonList(json['evidence'])
-          .map(EvidenceItem.fromJson)
-          .toList(growable: false),
+      phases: asJsonList(
+        json['phases'],
+      ).map(ProjectPhase.fromJson).toList(growable: false),
+      tasks: asJsonList(
+        json['tasks'],
+      ).map(ProjectTask.fromJson).toList(growable: false),
+      evidence: asJsonList(
+        json['evidence'],
+      ).map(EvidenceItem.fromJson).toList(growable: false),
     );
   }
 }
@@ -490,9 +497,7 @@ class ActionDefinition {
         json['executionMode'],
         fallback: 'Plan first',
       ),
-      extraIdentityCheckRequired: jsonBool(
-        json['extraIdentityCheckRequired'],
-      ),
+      extraIdentityCheckRequired: jsonBool(json['extraIdentityCheckRequired']),
     );
   }
 }
@@ -517,27 +522,37 @@ class IntakeStatus {
   factory IntakeStatus.fromJson(Object? value) {
     final json = asJsonMap(value);
     return IntakeStatus(
-      whatChanged: jsonText(
-        json['whatChanged'],
-        fallback: 'No change has been confirmed yet.',
-      ),
-      whereWeAre: jsonText(
-        json['whereWeAre'],
-        fallback: 'Pandora is checking the request.',
-      ),
-      whatIsDone: jsonText(
-        json['whatIsDone'],
-        fallback: 'Nothing has been marked complete.',
-      ),
-      whatIsHappeningNow: jsonText(
-        json['whatIsHappeningNow'],
-        fallback: 'The next state has not been verified.',
-      ),
+      whatChanged: requiredJsonText(
+          json,
+          const <String>[
+            'whatChanged',
+          ],
+          field: 'intake.status.whatChanged'),
+      whereWeAre: requiredJsonText(
+          json,
+          const <String>[
+            'whereWeAre',
+          ],
+          field: 'intake.status.whereWeAre'),
+      whatIsDone: requiredJsonText(
+          json,
+          const <String>[
+            'whatIsDone',
+          ],
+          field: 'intake.status.whatIsDone'),
+      whatIsHappeningNow: requiredJsonText(
+          json,
+          const <String>[
+            'whatIsHappeningNow',
+          ],
+          field: 'intake.status.whatIsHappeningNow'),
       whatIsStoppingUs: _nullableText(json['whatIsStoppingUs']),
-      whatIWillDoNext: jsonText(
-        json['whatIWillDoNext'],
-        fallback: 'Pandora will show the next safe step.',
-      ),
+      whatIWillDoNext: requiredJsonText(
+          json,
+          const <String>[
+            'whatIWillDoNext',
+          ],
+          field: 'intake.status.whatIWillDoNext'),
     );
   }
 }
@@ -546,29 +561,48 @@ class IntakeReceipt {
   const IntakeReceipt({
     required this.reply,
     required this.needsApproval,
+    required this.actionId,
     required this.status,
-    this.actionId,
     this.approvalId,
     this.requestId,
   });
 
   final String reply;
   final bool needsApproval;
-  final String? actionId;
+  final String actionId;
   final String? approvalId;
   final String? requestId;
   final IntakeStatus status;
 
   factory IntakeReceipt.fromJson(Object? value, {String? requestId}) {
     final json = asJsonMap(value);
+    final needsApproval = requiredJsonBool(
+      json,
+      'needsApproval',
+      field: 'intake.needsApproval',
+    );
+    final approvalId = _nullableText(json['approvalId']);
+    if (needsApproval && approvalId == null) {
+      throw const PandoraModelContractException(
+        code: 'MISSING_REQUIRED_FIELD',
+        field: 'intake.approvalId',
+      );
+    }
     return IntakeReceipt(
-      reply: jsonText(
-        json['reply'],
-        fallback: 'Pandora recorded the request.',
-      ),
-      needsApproval: jsonBool(json['needsApproval']),
-      actionId: _nullableText(json['actionId']),
-      approvalId: _nullableText(json['approvalId']),
+      reply: requiredJsonText(
+          json,
+          const <String>[
+            'reply',
+          ],
+          field: 'intake.reply'),
+      needsApproval: needsApproval,
+      actionId: requiredJsonText(
+          json,
+          const <String>[
+            'actionId',
+          ],
+          field: 'intake.actionId'),
+      approvalId: approvalId,
       requestId: requestId,
       status: IntakeStatus.fromJson(json['status']),
     );
@@ -610,12 +644,9 @@ class ApprovalSummary {
     final json = asJsonMap(value);
     final rollback = _nullableText(json['howWeCanUndoIt']);
     return ApprovalSummary(
-      id: jsonText(json['id'], fallback: 'unknown-approval'),
+      id: requiredJsonText(json, const <String>['id'], field: 'approval.id'),
       projectId: _nullableText(json['projectId']),
-      action: jsonText(
-        json['whatWillHappen'],
-        fallback: 'Protected change',
-      ),
+      action: jsonText(json['whatWillHappen'], fallback: 'Protected change'),
       reason: jsonText(
         json['whyINeedYou'],
         fallback: 'Pandora needs an owner decision.',
@@ -846,9 +877,9 @@ class SafetySection {
     return SafetySection(
       id: jsonText(json['id'], fallback: 'safety'),
       title: jsonText(json['title'], fallback: 'Safety'),
-      items: asJsonList(json['items'])
-          .map(SafetyItem.fromJson)
-          .toList(growable: false),
+      items: asJsonList(
+        json['items'],
+      ).map(SafetyItem.fromJson).toList(growable: false),
     );
   }
 }
@@ -915,12 +946,12 @@ class HomeSummary {
       activeProjectCount: jsonInt(counters['activeProjects']) ?? 0,
       needsAttentionCount: jsonInt(counters['needsAttention']) ?? 0,
       priority: priority,
-      topProjects: asJsonList(json['topProjects'])
-          .map(ProjectSummary.fromJson)
-          .toList(growable: false),
-      recentActivity: asJsonList(json['recentActivity'])
-          .map(AuditEvent.fromJson)
-          .toList(growable: false),
+      topProjects: asJsonList(
+        json['topProjects'],
+      ).map(ProjectSummary.fromJson).toList(growable: false),
+      recentActivity: asJsonList(
+        json['recentActivity'],
+      ).map(AuditEvent.fromJson).toList(growable: false),
     );
   }
 }
@@ -945,16 +976,26 @@ String requiredJsonText(
   return value;
 }
 
-List<String> _stringList(Object? value) => asJsonList(value)
-    .map(jsonText)
-    .where((item) => item.isNotEmpty)
-    .toList(growable: false);
+bool requiredJsonBool(JsonMap json, String key, {required String field}) {
+  final value = json[key];
+  if (value is! bool) {
+    throw PandoraModelContractException(
+      code: 'MISSING_REQUIRED_FIELD',
+      field: field,
+    );
+  }
+  return value;
+}
+
+List<String> _stringList(Object? value) => asJsonList(
+      value,
+    ).map(jsonText).where((item) => item.isNotEmpty).toList(growable: false);
 
 List<EvidenceStageStatus> _evidenceStageStatuses(JsonMap json) {
-  final raw = firstJsonValue(
-    json,
-    const <String>['evidenceStages', 'proofStages'],
-  );
+  final raw = firstJsonValue(json, const <String>[
+    'evidenceStages',
+    'proofStages',
+  ]);
   final supplied = <EvidenceStageStatus>[];
   if (raw is Map) {
     for (final entry in raw.entries) {

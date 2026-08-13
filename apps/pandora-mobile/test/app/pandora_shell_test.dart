@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pandora_mobile/app/pandora_app.dart';
 import 'package:pandora_mobile/app/pandora_dependencies.dart';
 import 'package:pandora_mobile/app/pandora_shell.dart';
 import 'package:pandora_mobile/core/data/pandora_repository.dart';
@@ -10,11 +11,17 @@ import 'package:pandora_mobile/core/security/pandora_auth.dart';
 import '../helpers/test_app.dart';
 
 class _Auth implements PandoraAuth {
+  const _Auth({
+    this.session = const PandoraSession(userId: 'fixture'),
+  });
+
+  final PandoraSession? session;
+
   @override
   Stream<PandoraSession?> get changes => const Stream<PandoraSession?>.empty();
 
   @override
-  PandoraSession? get currentSession => const PandoraSession(userId: 'fixture');
+  PandoraSession? get currentSession => session;
 
   @override
   Future<void> requestPasswordReset(String email) async {}
@@ -145,6 +152,26 @@ class _Repository implements PandoraRepository {
 }
 
 void main() {
+  testWidgets('PandoraApp follows system brightness', (tester) async {
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    addTearDown(
+      tester.platformDispatcher.clearPlatformBrightnessTestValue,
+    );
+    await tester.pumpWidget(
+      PandoraApp(
+        auth: const _Auth(session: null),
+        repository: _Repository(),
+        diagnostics: DiagnosticsStore(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      Theme.of(tester.element(find.byType(Scaffold))).brightness,
+      Brightness.dark,
+    );
+  });
+
   testWidgets('tabs load lazily and preserve their first mounted state', (
     tester,
   ) async {

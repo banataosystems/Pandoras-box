@@ -135,8 +135,9 @@ class PandoraApiClient {
         request.bodyBytes = utf8.encode(jsonEncode(body));
       }
       if (idempotencyKey != null) {
-        request.headers['Idempotency-Key'] =
-            _validatedIdempotencyKey(idempotencyKey);
+        request.headers['Idempotency-Key'] = _validatedIdempotencyKey(
+          idempotencyKey,
+        );
       }
 
       final streamed =
@@ -144,8 +145,10 @@ class PandoraApiClient {
       final responseStatusCode = streamed.statusCode;
       statusCode = responseStatusCode;
       requestId = _safeMetadata(streamed.headers['x-request-id']);
-      final bytes =
-          await _readResponse(streamed).timeout(_remaining(stopwatch));
+      final bytes = await _readResponse(
+        streamed,
+        method: method,
+      ).timeout(_remaining(stopwatch));
       final responseText = utf8.decode(bytes, allowMalformed: false).trim();
       Object? decoded;
       if (responseText.isNotEmpty) {
@@ -153,12 +156,12 @@ class PandoraApiClient {
           decoded = jsonDecode(responseText);
         } on FormatException {
           if (responseStatusCode >= 200 && responseStatusCode < 300) {
-            throw PandoraApiError(
-              kind: PandoraApiErrorKind.contract,
-              message: 'Pandora returned an unreadable response.',
-              code: 'INVALID_JSON_RESPONSE',
+            throw _responseReadError(
+              method: method,
               statusCode: responseStatusCode,
               requestId: requestId,
+              message: 'Pandora returned an unreadable response.',
+              code: 'INVALID_JSON_RESPONSE',
             );
           }
         }
@@ -291,12 +294,12 @@ class PandoraApiClient {
       );
       throw error;
     } on FormatException {
-      final error = PandoraApiError(
-        kind: PandoraApiErrorKind.contract,
-        message: 'Pandora returned an unreadable response.',
-        code: 'INVALID_RESPONSE_ENCODING',
+      final error = _responseReadError(
+        method: method,
         statusCode: statusCode,
         requestId: requestId,
+        message: 'Pandora returned an unreadable response.',
+        code: 'INVALID_RESPONSE_ENCODING',
       );
       _recordTransportFailure(
         startedAt,
@@ -333,19 +336,22 @@ class PandoraApiClient {
     }
   }
 
-  Future<Uint8List> _readResponse(http.StreamedResponse response) async {
+  Future<Uint8List> _readResponse(
+    http.StreamedResponse response, {
+    required String method,
+  }) async {
     final builder = BytesBuilder(copy: false);
     var received = 0;
     await for (final chunk in response.stream) {
       received += chunk.length;
       if (received > maxResponseBytes) {
-        throw PandoraApiError(
-          kind: PandoraApiErrorKind.contract,
+        throw _responseReadError(
+          method: method,
+          statusCode: response.statusCode,
+          requestId: _safeMetadata(response.headers['x-request-id']),
           message:
               'Pandora returned more data than this screen can safely load.',
           code: 'RESPONSE_TOO_LARGE',
-          statusCode: response.statusCode,
-          requestId: _safeMetadata(response.headers['x-request-id']),
         );
       }
       builder.add(chunk);
@@ -375,8 +381,9 @@ class PandoraApiClient {
 
   Duration _remaining(Stopwatch stopwatch) {
     final remaining = timeout - stopwatch.elapsed;
-    if (remaining <= Duration.zero)
+    if (remaining <= Duration.zero) {
       throw TimeoutException('Request timed out.');
+    }
     return remaining;
   }
 
@@ -415,6 +422,30 @@ class PandoraApiClient {
         message: message,
         code: code,
       );
+
+  PandoraApiError _responseReadError({
+    required String method,
+    required int? statusCode,
+    required String? requestId,
+    required String message,
+    required String code,
+  }) {
+    final successfulMutation = method == 'POST' &&
+        statusCode != null &&
+        statusCode >= 200 &&
+        statusCode < 300;
+    return PandoraApiError(
+      kind: successfulMutation
+          ? PandoraApiErrorKind.ambiguousMutation
+          : PandoraApiErrorKind.contract,
+      message: successfulMutation
+          ? 'Pandora received the request, but this app could not confirm its resulting state.'
+          : message,
+      code: code,
+      statusCode: statusCode,
+      requestId: requestId,
+    );
+  }
 
   void _recordTransportFailure(
     DateTime startedAt,

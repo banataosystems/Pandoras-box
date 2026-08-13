@@ -29,8 +29,9 @@ void main() {
     expect(find.bySemanticsLabel('Needs attention'), findsOneWidget);
   });
 
-  testWidgets('proof ladder announces independent stage states',
-      (tester) async {
+  testWidgets('proof ladder announces independent stage states', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       testApp(
         child: const Scaffold(
@@ -40,9 +41,7 @@ void main() {
     );
 
     expect(
-      find.bySemanticsLabel(
-        RegExp(r'Tested: Failed\. Deployed: Not checked'),
-      ),
+      find.bySemanticsLabel(RegExp(r'Tested: Failed\. Deployed: Not checked')),
       findsOneWidget,
     );
     expect(find.byIcon(Icons.close_rounded), findsOneWidget);
@@ -87,7 +86,19 @@ void main() {
     );
 
     expect(retries, 0);
+    expect(find.bySemanticsLabel('Try again'), findsOneWidget);
     await tester.tap(find.text('Try again'));
     expect(retries, 1);
+  });
+
+  test('negated truth labels never receive verified tone', () {
+    for (final status in [
+      'Not verified',
+      'Unhealthy',
+      'Unprotected',
+      'Inactive',
+    ]) {
+      expect(statusToneFor(status), isNot(PandoraStatusTone.verified));
+    }
   });
 }

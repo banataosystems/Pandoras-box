@@ -71,7 +71,7 @@ abstract final class PandoraTheme {
         elevation: 0,
         color: palette.strongSurface,
         surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.black.withOpacity(0.08),
+        shadowColor: Colors.black.withValues(alpha: 0.08),
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: PandoraRadius.cardBorder,

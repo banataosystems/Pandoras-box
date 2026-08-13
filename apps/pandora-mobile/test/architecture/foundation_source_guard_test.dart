@@ -67,4 +67,16 @@ void main() {
     expect(source, isNot(contains('ownerApiBaseUrls')));
     expect(source, isNot(contains('mcpmaster.vercel.app/api/operator')));
   });
+
+  test('memory cache is limited to explicitly safe summary lists', () {
+    final source =
+        File('lib/core/data/read_only_memory_cache.dart').readAsStringSync();
+    expect(source, contains('List<ProjectSummary>'));
+    expect(source, contains('List<AuditEvent>'));
+    expect(source, contains('List<ConnectionSummary>'));
+    expect(source, isNot(contains('ProjectDetail')));
+    expect(source, isNot(contains('ApprovalSummary')));
+    expect(source, isNot(contains('SafetyOverview')));
+    expect(source, isNot(contains('IntakeReceipt')));
+  });
 }

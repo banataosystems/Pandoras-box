@@ -76,34 +76,24 @@ class RemotePandoraRepository implements PandoraRepository {
     bool allowCached = false,
   }) async {
     final projectId = _requiredIdentifier(id, 'projectId');
-    try {
-      final response = await _client.getJson(
-        pathSegments: <String>['projects', projectId],
-        operation: 'project.load',
-        routeTemplate: '/projects/:id',
-      );
-      final model = _parse(
-        response,
-        '/projects/:id',
-        () => ProjectDetail.fromJson(
-          _requiredMap(response, '/projects/:id'),
-        ),
-      );
-      final snapshot = _snapshot(
-        model,
-        response,
-        verifiedAt: model.summary.freshness.lastVerifiedAt,
-        staleAfter: model.summary.freshness.staleAfter,
-      );
-      _cache.putProject(projectId, snapshot);
-      return snapshot;
-    } on PandoraApiError catch (error) {
-      final cached = _cache.project(projectId);
-      if (allowCached && cached != null && _canUseCache(error)) {
-        return cached.asDegradedCache(error.message);
-      }
-      rethrow;
-    }
+    final response = await _client.getJson(
+      pathSegments: <String>['projects', projectId],
+      operation: 'project.load',
+      routeTemplate: '/projects/:id',
+    );
+    final model = _parse(
+      response,
+      '/projects/:id',
+      () => ProjectDetail.fromJson(
+        _requiredMap(response, '/projects/:id'),
+      ),
+    );
+    return _snapshot(
+      model,
+      response,
+      verifiedAt: model.summary.freshness.lastVerifiedAt,
+      staleAfter: model.summary.freshness.staleAfter,
+    );
   }
 
   @override
@@ -312,11 +302,23 @@ class RemotePandoraRepository implements PandoraRepository {
       '/approvals/:id/decide',
       () {
         final json = _requiredMap(response, '/approvals/:id/decide');
-        if (!jsonBool(json['ok'])) {
+        if (json['ok'] != true) {
           throw _contractError(
             response,
             'APPROVAL_RESPONSE_INVALID',
             'Pandora could not confirm that decision.',
+          );
+        }
+        final expectedDecision = switch (decision) {
+          ApprovalDecision.approve => 'approved',
+          ApprovalDecision.reject => 'denied',
+        };
+        final returnedDecision = json['decision'];
+        if (returnedDecision != expectedDecision) {
+          throw _contractError(
+            response,
+            'APPROVAL_RESPONSE_INVALID',
+            'Pandora returned a different approval decision.',
           );
         }
         final approval = json['approval'];
@@ -327,9 +329,19 @@ class RemotePandoraRepository implements PandoraRepository {
             'Pandora did not return the updated approval.',
           );
         }
+        final approvalJson = asJsonMap(approval);
+        final returnedApprovalId = approvalJson['id'];
+        final approvalDecision = approvalJson['decision'];
+        if (returnedApprovalId != id || approvalDecision != expectedDecision) {
+          throw _contractError(
+            response,
+            'APPROVAL_RESPONSE_INVALID',
+            'Pandora returned a different updated approval.',
+          );
+        }
         return ApprovalDecisionResult(
-          decision: jsonText(json['decision'], fallback: decision.wireValue),
-          approval: ApprovalSummary.fromJson(approval),
+          decision: expectedDecision,
+          approval: ApprovalSummary.fromJson(approvalJson),
           requestId: response.requestId,
         );
       },
@@ -500,11 +512,6 @@ class RemotePandoraRepository implements PandoraRepository {
       );
     }
     return text;
-  }
-
-  static String? _nullableText(Object? value) {
-    final text = jsonText(value);
-    return text.isEmpty ? null : text;
   }
 
   @override

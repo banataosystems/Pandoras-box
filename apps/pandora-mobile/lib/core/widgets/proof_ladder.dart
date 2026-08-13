@@ -4,11 +4,7 @@ import '../design/pandora_tokens.dart';
 import '../models/pandora_models.dart';
 
 class ProofLadder extends StatelessWidget {
-  const ProofLadder({
-    super.key,
-    required this.stages,
-    this.compact = false,
-  });
+  const ProofLadder({super.key, required this.stages, this.compact = false});
 
   final List<EvidenceStageStatus> stages;
   final bool compact;
@@ -85,16 +81,12 @@ class _ProofStep extends StatelessWidget {
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(PandoraRadius.control),
-        border: Border.all(color: foreground.withOpacity(0.35)),
+        border: Border.all(color: foreground.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 13,
-            color: foreground,
-          ),
+          Icon(icon, size: 13, color: foreground),
           const SizedBox(width: PandoraSpacing.xxs),
           Text(
             stage.label,
