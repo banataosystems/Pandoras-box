@@ -1,0 +1,72 @@
+name: FlutterFlow final patch diagnostic
+
+on:
+  push:
+    branches:
+      - codex/flutterflow-full-integration-final-20260814
+    paths:
+      - .github/workflows/flutterflow-final-diagnostic.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Capture exact patch error
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: codex/flutterflow-full-integration-final-20260814
+          HELPER_BRANCH: codex/flutterflow-readiness-provider
+        run: |
+          set -euo pipefail
+          git init repo
+          cd repo
+          git config user.name "Banatao Systems ProjectOS"
+          git config user.email "projectos@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}" "refs/heads/${HELPER_BRANCH}:refs/remotes/origin/${HELPER_BRANCH}"
+          git checkout -B "${TARGET_BRANCH}" "refs/remotes/origin/${TARGET_BRANCH}"
+          git show "refs/remotes/origin/${HELPER_BRANCH}:.github/workflows/flutterflow-full-integration.yml" > /tmp/ff-helper.yml
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess, sys
+
+          text = Path("/tmp/ff-helper.yml").read_text()
+          marker = "      - name: Extend FlutterFlow Project API provider\n        shell: python\n        run: |\n"
+          out = []
+          out.append(f"current_head={subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip()}")
+          out.append(f"marker_count={text.count(marker)}")
+          if marker not in text:
+              out.append("failure=marker-missing")
+          else:
+              start = text.index(marker) + len(marker)
+              end = text.find("\n      - name:", start)
+              out.append(f"end_pos={end}")
+              block = text[start:end if end >= 0 else len(text)]
+              script = textwrap.dedent(block)
+              out.append(f"dedented_first_repr={script.splitlines()[0]!/}")
+              nonblank = next((line for line in script.splitlines() if line.strip()), "")
+              out.append(f"nonblank_leading_spaces={len(nonblank)-len(nonblank.lstrip(' '))}")
+              if nonblank.startswith("    "):
+                  script = "\n".join(line[4:] if line.startswith("    ") else line for line in script.splitlines()) + "\n"
+              out.append(f"normalized_first_repr={script.splitlines()[0]!/}")
+              Path("/tmp/apply-ff.py").write_text(script)
+              run = subprocess.run([sys.executable,"/tmp/apply-ff.py"], text=True, capture_output=True)
+              out.append(f"returncode={run.returncode}")
+              if run.stdout:
+                  out.append("stdout:")
+                  out.extend(run.stdout.splitlines()[-20:])
+              if run.stderr:
+                  out.append("stderr:")
+                  out.extend(run.stderr.splitlines()[-40:])
+          Path("/tmp/ff-diag.txt").write_text("\n".join(out) + "\n")
+          PY
+          mkdir -p recovery/evidence/flutterflow
+          cp /tmp/ff-diag.txt recovery/evidence/flutterflow/final-patch-exception.txt
+          git add recovery/evidence/flutterflow/final-patch-exception.txt
+          git commit -m "evidence: capture final FlutterFlow patch exception"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
