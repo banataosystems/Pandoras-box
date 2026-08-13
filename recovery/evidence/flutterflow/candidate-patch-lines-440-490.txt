@@ -1,0 +1,41 @@
+apply_lines=479
+        expectedSchemaFingerprint: "old-fingerprint",
+      },
+      configuration(),
+      fetchFn,
+    ),
+    /schema fingerprint changed/,
+  );
+  assert.equal(calls, 1);
+});
+
+test("missing write scope fails before provider access", async () => {
+  let calls = 0;
+  await assert.rejects(
+    executeFlutterFlowTool(
+      "flutterflow.update-project-yaml",
+      {
+        accountId: "pandora-mobile",
+        projectId: "pandoras-box-gj9hnb",
+        fileKey: "app-state",
+        fileContent: "fields: []\n",
+        expectedSchemaFingerprint: "fingerprint-13",
+      },
+      configuration(["projects:read", "project_schema:read"]),
+      async () => {
+        calls += 1;
+        throw new Error("must not call provider");
+      },
+  ),
+  /missing required scope: project_schema:write/,
+  );
+  assert.equal(calls, 0);
+});
+'''
+")
+
+wf = Path(".github/workflows/flutterflow-full-integration.yml")
+if wf.exists():
+    wf.unlink()
+PY
+
