@@ -1,0 +1,58 @@
+name: Pandora mobile integration
+
+on:
+  pull_request:
+    paths:
+      - 'apps/pandora-mobile/**'
+      - '.github/workflows/pandora-mobile-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.3.1
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          cache: true
+      - name: Materialize disposable Flutter platforms
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .pandora-mobile-build
+          mkdir .pandora-mobile-build
+          cd .pandora-mobile-build
+          flutter create --platforms=android,web --org com.banataosystems --project-name pandora_mobile .
+          rm -rf lib test pubspec.yaml
+          cp -R ../apps/pandora-mobile/lib ./lib
+          cp -R ../apps/pandora-mobile/test ./test
+          cp ../apps/pandora-mobile/pubspec.yaml ./pubspec.yaml
+      - name: Resolve dependencies
+        working-directory: .pandora-mobile-build
+        run: flutter pub get
+      - name: Analyze
+        working-directory: .pandora-mobile-build
+        run: flutter analyze
+      - name: Test
+        working-directory: .pandora-mobile-build
+        run: flutter test
+      - name: Build web
+        working-directory: .pandora-mobile-build
+        run: flutter build web --release
+      - name: Build Android debug APK
+        working-directory: .pandora-mobile-build
+        run: flutter build apk --debug
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: pandora-mobile-web
+          path: .pandora-mobile-build/build/web
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: pandora-mobile-android-debug
+          path: .pandora-mobile-build/build/app/outputs/flutter-apk/app-debug.apk
