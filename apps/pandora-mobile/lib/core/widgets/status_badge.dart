@@ -48,6 +48,7 @@ class StatusBadge extends StatelessWidget {
         ),
     };
     return Semantics(
+      container: true,
       label: label,
       excludeSemantics: true,
       child: DecoratedBox(
