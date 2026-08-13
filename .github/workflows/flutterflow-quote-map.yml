@@ -1,0 +1,47 @@
+name: Map FlutterFlow triple-quote boundaries
+
+on:
+  push:
+    branches:
+      - codex/flutterflow-full-integration-candidate-20260814
+    paths:
+      - .github/workflows/flutterflow-quote-map.yml
+
+permissions:
+  contents: write
+
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Preserve quote map
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: codex/flutterflow-full-integration-candidate-20260814
+          HELPER_BRANCH: codex/flutterflow-readiness-provider
+        run: |
+          set -euo pipefail
+          git init repo
+          cd repo
+          git config user.name "Banatao Systems ProjectOS"
+          git config user.email "projectos@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}" "refs/heads/${HELPER_BRANCH}:refs/remotes/origin/${HELPER_BRANCH}"
+          git checkout -B "${TARGET_BRANCH}" "refs/remotes/origin/${TARGET_BRANCH}"
+          git show "refs/remotes/origin/${HELPER_BRANCH}:.github/workflows/flutterflow-full-integration.yml" > /tmp/helper.yml
+          awk '
+            /^      - name: Extend FlutterFlow Project API provider$/ { step=1; next }
+            step && /^        run: \|$/ { body=1; next }
+            body && /^      - name:/ { exit }
+            body {
+              if (substr($0,1,10) == "          ") print substr($0,11);
+              else print $0;
+            }
+          ' /tmp/helper.yml > /tmp/apply.py
+          mkdir -p recovery/evidence/flutterflow
+          sed -n "/'\'\'/=" /tmp/apply.py > recovery/evidence/flutterflow/triple-single-quote-map.txt
+          sed -n "/\"\"\"/=" /tmp/apply.py > recovery/evidence/flutterflow/triple-double-quote-map.txt
+          git add recovery/evidence/flutterflow/triple--single-quote-map.txt recovery/evidence/flutterflow/triple-double-quote-map.txt
+          git commit -m "evidence: map FlutterFlow triple-quote boundaries"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
