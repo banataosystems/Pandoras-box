@@ -1,0 +1,87 @@
+apply_lines=479
+    assert.ok(getToolManifest(name), `${name} manifest`);
+  }
+  const update = getToolManifest("flutterflow.update-project-yaml");
+  assert.equal(update.risk, "write");
+  assert.equal(update.mutation, true);
+  assert.deepEqual(
+    update.requiredProviderScopes,
+    ["projects:read", "project_schema:read", "project_schema:write"],
+  );
+});
+
+test("update validates, binds schema fingerprint, then writes exactly one YAML file", async () => {
+  const calls = [];
+  const fetchFn = async (url, init) => {
+    calls.push({ url: String(url), init });
+    if (String(url).includes("/listPartitionedFileNames")) {
+      return jsonResponse({
+        success: true,
+        reason: null,
+        value: {
+          versionInfo: {
+            partitionerVersion: 13,
+            projectSchemaFingerprint: "fingerprint-13",
+          },
+          fileNames: ["app-state"],
+        },
+      });
+    }
+    if (String(url).includes("/validateProjectYaml")) return jsonResponse({ success: true, reason: null, value: "" });
+    if (String(url).includes("/updateProjectByYaml")) return jsonResponse({ success: true, reason: null, value: "" });
+    throw new Error(`unexpected URL ${url}`);
+  };
+
+  const result = await executeFlutterFlowTool(
+    "flutterflow.update-project-yaml",
+    {
+      accountId: "pandora-mobile",
+      projectId: "pandoras-box-gj9hnb",
+      fileKey: "app-state",
+      fileContent: "fields: []\n",
+      expectedSchemaFingerprint: "fingerprint-13",
+    },
+    configuration(),
+    fetchFn,
+  );
+
+  assert.equal(result.updated, true);
+  assert.equal(result.validated, true);
+  assert.equal(calls.length, 3);
+  assert.match(calls[0].url, /listPartitionedFileNames/);
+  assert.match(calls[1].url, /validateProjectYaml/);
+  assert.match(calls[2].url, /updateProjectByYaml/);
+  assert.deepEqual(JSON.parse(calls[2].init.body), {
+    projectId: "pandoras-box-gj9hnb",
+    fileKeyToContent: { "app-state": "fields: []\n" },
+  });
+});
+
+test("stale schema fingerprint fails before validation or write", async () => {
+  let calls = 0;
+  const fetchFn = async () => {
+    calls += 1;
+    return jsonResponse({
+      success: true,
+      reason: null,
+      value: {
+        versionInfo: { partitionerVersion: 13, projectSchemaFingerprint: "new-fingerprint" },
+        fileNames: ["app-state"],
+    },
+  });
+  };
+
+  await assert.rejects(
+    executeFlutterFlowTool(
+      "flutterflow.update-project-yaml",
+      {
+        accountId: "pandora-mobile",
+        projectId: "pandoras-box-gj9hnb",
+        fileKey: "app-state",
+        fileContent: "fields: []\n",
+        expectedSchemaFingerprint: "old-fingerprint",
+      },
+      configuration(),
+      fetchFn,
+    ),
+    /schema fingerprint changed/,
