@@ -45,7 +45,9 @@ class _AuthGateState extends State<AuthGate> {
           if (session?.userId != _sessionUserId) {
             final repository = dependencies.repository;
             if (repository is AuthenticatedIdentityBoundary) {
-              repository.beginAuthenticatedIdentityEpoch();
+              final identityBoundary =
+                  repository as AuthenticatedIdentityBoundary;
+              identityBoundary.beginAuthenticatedIdentityEpoch();
             } else {
               repository.clearReadOnlyCache();
             }
@@ -68,8 +70,11 @@ class _AuthGateState extends State<AuthGate> {
       _authorizationSubscription?.cancel();
       _repository = repository;
       if (repository is AuthorizationInvalidationSource) {
-        _authorizationSubscription =
-            repository.authorizationInvalidations.listen((invalidation) {
+        final invalidationSource =
+            repository as AuthorizationInvalidationSource;
+        _authorizationSubscription = invalidationSource
+            .authorizationInvalidations
+            .listen((invalidation) {
           dependencies.diagnostics.clear();
           _authorizationFailure = invalidation;
           _authorizationAttempt += 1;
