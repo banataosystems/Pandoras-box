@@ -1,0 +1,87 @@
+apply_lines=479
+vercel = json.loads(vercel_path.read_text())
+raw_accounts = vercel["env"]["FLUTTERFLOW_ACCOUNTS_JSON"]
+accounts = json.loads(raw_accounts)
+matched = False
+for account in accounts:
+    if account.get("id") == "pandora-mobile":
+        scopes = list(dict.fromkeys(account.get("grantedScopes", [])))
+        if "project_schema:write" not in scopes:
+            scopes.append("project_schema:write")
+        account["grantedScopes"] = scopes
+        matched = True
+if not matched:
+    raise SystemExit("pandora-mobile FlutterFlow binding missing; refusing blind patch")
+vercel["env"]["FLUTTERFLOW_ACCOUNTS_JSON"] = json.dumps(accounts, separators=(",", ":"))
+vercel_path.write_text(json.dumps(vercel, indent=2) + "\n")
+
+docs_path = Path("docs/integrations/FLUTTERFLOW_READINESS_PROVIDER.md")
+docs = docs_path.read_text()
+marker = "## Governed write integration"
+if marker not in docs:
+    docs += r'''
+
+## Governed write integration
+
+The official FlutterFlow Project API supports a complete YAML control loop:
+list file keys -> read one YAML -> validate candidate YAML -> update YAML.
+
+Pandora exposes that loop only for exact allowlisted project IDs. `flutterflow.update-project-yaml`
+is classified as a mutating ProjectOS write, requires `project_schema:write`, validates first,
+and requires the caller to bind the plan to the immediately observed
+`projectSchemaFingerprint`. If the fingerprint changes, the update fails closed before the
+provider write.
+
+This does not claim an undocumented FlutterFlow clone, web/mobile deployment, App Store,
+or Play Store API.Another layer is still needed for those release capabilities. The existing `pandoras-box-gj9hnb`
+is a Library until a normal application clone exists.
+ '''
+    docs_path.write_text(docs)
+
+test_path = Path("test/flutterflow-full-integration.test.js")
+test_path.write_text(r''"use strict";
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+
+const {
+  FlutterFlowMCPServer,
+  executeFlutterFlowTool,
+  flutterFlowTools,
+} = require("../src/tools/flutterflow.js");
+const { getToolManifest } = require("../src/runtime/tool-manifest.js");
+
+function configuration(scopes = ["projects:read", "project_schema:read", "project_schema:write"]) {
+  return {
+    accounts: [{
+      id: "pandora-mobile",
+      label: "Pandora Mobile",
+      authMode: "api_token",
+      token: "test-token-12345678901234567890",
+      baseUrl: https://api.flutterflow.io/v2,
+      allowedProjectIds: ["pandoras-box-gj9hnb"],
+      grantedScopes: scopes,
+  }],
+  timeoutMs: 5_000,
+  maxResponseBytes: 1_000_000,
+  };
+}
+
+function jsonResponse(value, status = 200) {
+  return new Response(JSON.stringify(value),{ status, headers: { "content-type": "application/json" } });
+}
+
+test("registers the complete documented FlutterFlow Project API control loop", () => {
+  for (const name of [
+    "flutterflow.list-files",
+    "flutterflow.read-project-yaml",
+    "flutterflow.validate-project-yaml",
+    "flutterflow.update-project-yaml",
+  ]) {
+    assert.ok(flutterFlowTools[name], name);
+    assert.ok(getToolManifest(name), `${name} manifest`);
+  }
+  const update = getToolManifest("flutterflow.update-project-yaml");
+  assert.equal(update.risk, "write");
+  assert.equal(update.mutation, true);
+  assert.deepEqual(
