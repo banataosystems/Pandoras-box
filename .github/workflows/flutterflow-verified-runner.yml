@@ -1,0 +1,130 @@
+name: Build verified FlutterFlow full integration
+
+on:
+  push:
+    branches:
+      - codex/flutterflow-full-integration-verified-20260814
+    paths:
+      - .github/workflows/flutterflow-verified-runner.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact isolated branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: codex/flutterflow-full-integration-verified-20260814
+          HELPER_BRANCH: codex/flutterflow-readiness-provider
+        run: |
+          set -euo pipefail
+          git init repo
+          cd repo
+          git config user.name "Banatao Systems ProjectOS"
+          git config user.email "projectos@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags origin \
+            "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}" \
+            "refs/heads/${HELPER_BRANCH}:refs/remotes/origin/${HELPER_BRANCH}" \
+            main
+          git checkout -B "${TARGET_BRANCH}" "refs/remotes/origin/${TARGET_BRANCH}"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+
+      - name: Recover, repair, and compile reviewed patch
+        shell: bash
+        env:
+          HELPER_BRANCH: codex/flutterflow-readiness-provider
+        run: |
+          set -euo pipefail
+          cd repo
+          git show "refs/remotes/origin/${HELPER_BRANCH}:.github/workflows/flutterflow-full-integration.yml" > /tmp/helper.yml
+          awk '
+            /^      - name: Extend FlutterFlow Project API provider$/ { step=1; next }
+            step && /^        run: \|$/ { body=1; next }
+            body && /^      - name:/ { exit }
+            body {
+              if (substr($0,1,10) == "          ") print substr($0,11);
+              else print $0;
+            }
+          ' /tmp/helper.yml > /tmp/apply.py
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("/tmp/apply.py")
+          text = path.read_text()
+          bad = "\n\'\'\'\n\")\n\nwf = Path("
+          good = "\n\'\'\)\n\nwf = Path("
+          count = text.count(bad)
+          if count != 1:
+              raise SystemExit(f"expected exactly one malformed test fixture tail, found {count}")
+          repaired = text.replace(bad, good, 1)
+          path.write_text(repaired)
+          print(f"repaired_exact_tail_count={count}")
+          PY
+          python -m py_compile /tmp/apply.py
+
+      - name: Apply reviewed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd repo
+          python /tmp/apply.py
+
+      - name: Bound patch source delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd repo
+          git diff --name-only | sort > /tmp/actual.txt
+          cat > /tmp/expected.txt <<'EOF'
+          docs/integrations/FLUTTTERFLOW_READINESS_PROVIDER.md
+          src/runtime/tool-manifest.js
+          src/tools/flutterflow.js
+          test/flutterflow-full-integration.test.js
+          vercel.json
+          EOF
+          diff -u /tmp/expected.txt /tmp/actual.txt
+          git diff --check
+
+      - name: Verify exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd repo
+          npm ci
+          npm run check
+          npm test
+          npm audit --omit=dev --audit-level=high
+          git diff --check
+
+      - name: Publish verified five-file candidate only
+        shell: bash
+        env:
+          TARGET_BRANCH: codex/flutterflow-full-integration-verified-20260814
+        run: |
+          set -euo pipefail
+          cd repo
+          BASE_SHA="$(git rev-parse refs/remotes/origin/main)"
+          git rm .github/workflows/flutterflow-verified-runner.yml
+          git add \
+            docs/integrations/FLUTTERFLOW_READINESS_PROVIDER.md \
+            src/runtime/tool-manifest.js \
+            src/tools/flutterflow.js \
+            test/flutterflow-full-integration.test.js \
+            vercel.json
+          git diff --cached --check
+          git diff --cached --name-only "${BASE_SHA}" | sort > /tmp/final.txt
+          cat > /tmp/expected-final.txt <<'EOF'
+          docs/integrations/FLUTTERFLOW_READINESS_PROVIDER.md
+          src/runtime/tool-manifest.js
+          src/tools/flutterflow.js
+          test/flutterflow-full-integration.test.js
+          vercel.json
+          EOF
+          diff -u /tmp/expected-final.txt /tmp/final.txt
+          git commit -m "feat: govern full FlutterFlow Project API integration"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
