@@ -602,13 +602,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Retry same request safely'), findsOneWidget);
 
-    await tester.scrollUntilVisible(
-      find.text('Retry same request safely'),
-      300,
-      scrollable: find.byType(CustomScrollView),
+    final retryButton =
+        find.widgetWithText(OutlinedButton, 'Retry same request safely');
+    await tester.drag(
+      find.byType(CustomScrollView),
+      const Offset(0, -400),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Retry same request safely'));
+    await tester.tap(retryButton);
     await tester.pumpAndSettle();
 
     expect(repository.idempotencyKeys, hasLength(2));
