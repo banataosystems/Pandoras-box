@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/pandora_dependencies.dart';
@@ -16,14 +18,28 @@ class DeveloperDiagnosticsScreen extends StatefulWidget {
       _DeveloperDiagnosticsScreenState();
 }
 
-class _DeveloperDiagnosticsScreenState
-    extends State<DeveloperDiagnosticsScreen> {
+class _DeveloperDiagnosticsScreenState extends State<DeveloperDiagnosticsScreen>
+    with WidgetsBindingObserver {
+  static const _authorizationTtl = Duration(seconds: 30);
+
   Future<bool>? _authorization;
+  Timer? _authorizationTimer;
+  String? _sessionUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _authorization ??= _verifyOwnerAccess();
+    final userId = PandoraDependencies.of(context).auth.currentSession?.userId;
+    if (_authorization == null || userId != _sessionUserId) {
+      _sessionUserId = userId;
+      _startAuthorizationCheck(notify: false);
+    }
   }
 
   Future<bool> _verifyOwnerAccess() async {
@@ -37,8 +53,35 @@ class _DeveloperDiagnosticsScreenState
     }
   }
 
+  void _startAuthorizationCheck({required bool notify}) {
+    _authorizationTimer?.cancel();
+    final check = _verifyOwnerAccess();
+    void assign() => _authorization = check;
+    if (notify) {
+      setState(assign);
+    } else {
+      assign();
+    }
+    check.then((allowed) {
+      if (!mounted || !identical(_authorization, check) || !allowed) return;
+      _authorizationTimer = Timer(_authorizationTtl, _retryAuthorization);
+    });
+  }
+
   void _retryAuthorization() {
-    setState(() => _authorization = _verifyOwnerAccess());
+    if (mounted) _startAuthorizationCheck(notify: true);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _retryAuthorization();
+  }
+
+  @override
+  void dispose() {
+    _authorizationTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override
@@ -101,8 +144,8 @@ class _DeveloperDiagnosticsScreenState
           'Temporary support metadata. Credentials, request bodies, and raw responses are never stored here.',
       actions: [
         IconButton(
-          tooltip: 'Refresh diagnostics',
-          onPressed: () => setState(() {}),
+          tooltip: 'Reverify and refresh diagnostics',
+          onPressed: _retryAuthorization,
           icon: const Icon(Icons.refresh_rounded),
         ),
         IconButton(

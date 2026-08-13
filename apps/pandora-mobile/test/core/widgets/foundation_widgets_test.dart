@@ -101,4 +101,12 @@ void main() {
       expect(statusToneFor(status), isNot(PandoraStatusTone.verified));
     }
   });
+
+  test('risk and health language maps to truthful severity tones', () {
+    expect(statusToneFor('High risk'), PandoraStatusTone.critical);
+    expect(statusToneFor('Problem'), PandoraStatusTone.critical);
+    expect(statusToneFor('Medium risk'), PandoraStatusTone.attention);
+    expect(statusToneFor('Degraded'), PandoraStatusTone.attention);
+    expect(statusToneFor('Not blocked'), PandoraStatusTone.neutral);
+  });
 }

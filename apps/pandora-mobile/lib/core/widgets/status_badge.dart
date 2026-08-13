@@ -93,11 +93,18 @@ PandoraStatusTone statusToneFor(String status) {
       .toSet();
   bool hasAny(Set<String> candidates) =>
       words.intersection(candidates).isNotEmpty;
+  if (words.contains('not') ||
+      words.contains('unverified') ||
+      words.contains('inactive')) {
+    return PandoraStatusTone.neutral;
+  }
   if (hasAny({
     'blocked',
     'failed',
     'error',
     'critical',
+    'high',
+    'problem',
     'denied',
     'unhealthy',
     'unprotected',
@@ -111,13 +118,10 @@ PandoraStatusTone statusToneFor(String status) {
     'stale',
     'warning',
     'expired',
+    'medium',
+    'degraded',
   })) {
     return PandoraStatusTone.attention;
-  }
-  if (words.contains('not') ||
-      words.contains('unverified') ||
-      words.contains('inactive')) {
-    return PandoraStatusTone.neutral;
   }
   if (hasAny({
     'verified',

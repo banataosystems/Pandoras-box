@@ -134,15 +134,25 @@ class _HomeContent extends StatelessWidget {
           const SizedBox(height: PandoraSpacing.md),
           PandoraSurface(
             title: 'Needs you',
-            subtitle: summary.priority == null
-                ? 'Nothing is waiting for an owner decision.'
-                : 'The highest-value decision waiting for you.',
+            subtitle: summary.priority != null
+                ? 'The highest-value decision waiting for you.'
+                : !summary.countersVerified
+                    ? 'Owner decision state is not verified.'
+                    : summary.approvalCount == 0
+                        ? 'Nothing is waiting for an owner decision.'
+                        : '${summary.approvalCount} owner decision${summary.approvalCount == 1 ? '' : 's'} need review.',
             leading: Icon(
               Icons.priority_high_rounded,
               color: context.pandoraPalette.attention,
             ),
             child: summary.priority == null
-                ? const Text('Pandora will keep watching your projects.')
+                ? Text(
+                    !summary.countersVerified
+                        ? 'Refresh before relying on this briefing.'
+                        : summary.approvalCount == 0
+                            ? 'Pandora will keep watching your projects.'
+                            : 'Open Approvals to inspect the verified queue.',
+                  )
                 : _PriorityCard(approval: summary.priority!),
           ),
           const SizedBox(height: PandoraSpacing.md),
@@ -218,14 +228,23 @@ class _CounterRow extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
         builder: (context, constraints) {
           final cards = [
-            _CounterCard(label: 'Approvals', value: summary.approvalCount),
+            _CounterCard(
+              label: 'Approvals',
+              value: summary.countersVerified
+                  ? '${summary.approvalCount}'
+                  : 'Not verified',
+            ),
             _CounterCard(
               label: 'Active projects',
-              value: summary.activeProjectCount,
+              value: summary.countersVerified
+                  ? '${summary.activeProjectCount}'
+                  : 'Not verified',
             ),
             _CounterCard(
               label: 'Needs attention',
-              value: summary.needsAttentionCount,
+              value: summary.countersVerified
+                  ? '${summary.needsAttentionCount}'
+                  : 'Not verified',
             ),
           ];
           if (constraints.maxWidth < 460) {
@@ -257,7 +276,7 @@ class _CounterCard extends StatelessWidget {
   const _CounterCard({required this.label, required this.value});
 
   final String label;
-  final int value;
+  final String value;
 
   @override
   Widget build(BuildContext context) => PandoraSurface(
@@ -265,7 +284,7 @@ class _CounterCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(child: Text(label)),
-            Text('$value', style: Theme.of(context).textTheme.headlineSmall),
+            Text(value, style: Theme.of(context).textTheme.headlineSmall),
           ],
         ),
       );

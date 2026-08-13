@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../diagnostics/diagnostic_event.dart';
+import '../diagnostics/diagnostics_sanitizer.dart';
 import 'pandora_api_error.dart';
 import 'session_token_provider.dart';
 
@@ -13,12 +14,14 @@ class PandoraApiResponse {
     required this.data,
     required this.statusCode,
     required this.duration,
+    required this.identityEpoch,
     this.requestId,
   });
 
   final Object? data;
   final int statusCode;
   final Duration duration;
+  final int identityEpoch;
   final String? requestId;
 }
 
@@ -67,6 +70,7 @@ class PandoraApiClient {
   final bool _ownsHttpClient;
   final DiagnosticsSink _diagnostics;
   final DateTime Function() _clock;
+  var _identityEpoch = 0;
 
   Future<PandoraApiResponse> getJson({
     required List<String> pathSegments,
@@ -107,6 +111,7 @@ class PandoraApiClient {
     Map<String, Object?>? body,
     String? idempotencyKey,
   }) async {
+    final identityEpoch = _identityEpoch;
     final startedAt = _clock();
     final stopwatch = Stopwatch()..start();
     var diagnosticsRecorded = false;
@@ -169,12 +174,23 @@ class PandoraApiClient {
       requestId ??= _requestIdFromBody(decoded);
 
       if (responseStatusCode < 200 || responseStatusCode >= 300) {
-        final error = _errorFromResponse(
+        final responseError = _errorFromResponse(
           statusCode: responseStatusCode,
           decoded: decoded,
           requestId: requestId,
         );
-        _record(
+        final error = method == 'POST' && responseStatusCode >= 500
+            ? PandoraApiError(
+                kind: PandoraApiErrorKind.ambiguousMutation,
+                message:
+                    'Pandora could not confirm whether that request completed.',
+                code: responseError.code,
+                statusCode: responseStatusCode,
+                requestId: requestId,
+              )
+            : responseError;
+        _recordIfCurrent(
+          identityEpoch: identityEpoch,
           occurredAt: startedAt,
           operation: operation,
           method: method,
@@ -189,7 +205,8 @@ class PandoraApiClient {
         throw error;
       }
 
-      _record(
+      _recordIfCurrent(
+        identityEpoch: identityEpoch,
         occurredAt: startedAt,
         operation: operation,
         method: method,
@@ -204,11 +221,13 @@ class PandoraApiClient {
         data: decoded,
         statusCode: responseStatusCode,
         duration: stopwatch.elapsed,
+        identityEpoch: identityEpoch,
         requestId: requestId,
       );
     } on PandoraApiError catch (error) {
       if (!diagnosticsRecorded) {
-        _record(
+        _recordIfCurrent(
+          identityEpoch: identityEpoch,
           occurredAt: startedAt,
           operation: operation,
           method: method,
@@ -228,6 +247,7 @@ class PandoraApiClient {
         code: 'INVALID_CLIENT_REQUEST',
       );
       _recordTransportFailure(
+        identityEpoch,
         startedAt,
         stopwatch,
         operation,
@@ -245,6 +265,7 @@ class PandoraApiClient {
         code: 'INVALID_JSON_REQUEST',
       );
       _recordTransportFailure(
+        identityEpoch,
         startedAt,
         stopwatch,
         operation,
@@ -264,6 +285,7 @@ class PandoraApiClient {
             : 'Pandora took too long to respond.',
       );
       _recordTransportFailure(
+        identityEpoch,
         startedAt,
         stopwatch,
         operation,
@@ -283,6 +305,7 @@ class PandoraApiClient {
             : 'Pandora cannot reach that service right now.',
       );
       _recordTransportFailure(
+        identityEpoch,
         startedAt,
         stopwatch,
         operation,
@@ -302,6 +325,7 @@ class PandoraApiClient {
         code: 'INVALID_RESPONSE_ENCODING',
       );
       _recordTransportFailure(
+        identityEpoch,
         startedAt,
         stopwatch,
         operation,
@@ -321,6 +345,7 @@ class PandoraApiClient {
             : 'Pandora cannot load that information right now.',
       );
       _recordTransportFailure(
+        identityEpoch,
         startedAt,
         stopwatch,
         operation,
@@ -430,16 +455,14 @@ class PandoraApiClient {
     required String message,
     required String code,
   }) {
-    final successfulMutation = method == 'POST' &&
-        statusCode != null &&
-        statusCode >= 200 &&
-        statusCode < 300;
+    final ambiguousMutation =
+        method == 'POST' && (statusCode == null || statusCode >= 200);
     return PandoraApiError(
-      kind: successfulMutation
+      kind: ambiguousMutation
           ? PandoraApiErrorKind.ambiguousMutation
           : PandoraApiErrorKind.contract,
-      message: successfulMutation
-          ? 'Pandora received the request, but this app could not confirm its resulting state.'
+      message: ambiguousMutation
+          ? 'Pandora may have received the request, but this app could not confirm its resulting state.'
           : message,
       code: code,
       statusCode: statusCode,
@@ -448,6 +471,7 @@ class PandoraApiClient {
   }
 
   void _recordTransportFailure(
+    int identityEpoch,
     DateTime startedAt,
     Stopwatch stopwatch,
     String operation,
@@ -457,7 +481,8 @@ class PandoraApiClient {
     int? statusCode,
     String? requestId,
   ) {
-    _record(
+    _recordIfCurrent(
+      identityEpoch: identityEpoch,
       occurredAt: startedAt,
       operation: operation,
       method: method,
@@ -468,6 +493,36 @@ class PandoraApiClient {
       requestId: requestId,
       errorCode: error.code,
     );
+  }
+
+  void _recordIfCurrent({
+    required int identityEpoch,
+    required DateTime occurredAt,
+    required String operation,
+    required String method,
+    required String routeTemplate,
+    required DiagnosticOutcome outcome,
+    required Duration duration,
+    int? statusCode,
+    String? requestId,
+    String? errorCode,
+  }) {
+    if (identityEpoch != _identityEpoch) return;
+    _record(
+      occurredAt: occurredAt,
+      operation: operation,
+      method: method,
+      routeTemplate: routeTemplate,
+      outcome: outcome,
+      duration: duration,
+      statusCode: statusCode,
+      requestId: requestId,
+      errorCode: errorCode,
+    );
+  }
+
+  void beginAuthenticatedIdentityEpoch() {
+    _identityEpoch += 1;
   }
 
   void _record({
@@ -507,6 +562,7 @@ class PandoraApiClient {
   /// Callers provide only bounded metadata; response payloads are deliberately
   /// not accepted by this API.
   void recordContractFailure({
+    required int identityEpoch,
     required String operation,
     required String routeTemplate,
     required int statusCode,
@@ -514,7 +570,8 @@ class PandoraApiClient {
     required Duration duration,
     String? requestId,
   }) {
-    _record(
+    _recordIfCurrent(
+      identityEpoch: identityEpoch,
       occurredAt: _clock(),
       operation: operation,
       method: 'PARSE',
@@ -605,7 +662,10 @@ class PandoraApiClient {
   static String _safeMessage(String? value, {required String fallback}) {
     final text = value?.trim() ?? '';
     if (text.isEmpty) return fallback;
-    return text.length <= 500 ? text : '${text.substring(0, 500)}…';
+    final sanitized = const DiagnosticsSanitizer(
+      maxStringLength: 500,
+    ).sanitizeText(text);
+    return sanitized;
   }
 
   static String _safeCode(String? value, {required String fallback}) {

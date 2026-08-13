@@ -104,15 +104,20 @@ class _DetailContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tasks = detail.tasks;
-    final done = tasks
-        .where((item) => item.status.toLowerCase().contains('complete'))
+    final done =
+        tasks.where((item) => item.state == ProjectTaskState.complete).toList();
+    final blocked =
+        tasks.where((item) => item.state == ProjectTaskState.blocked).toList();
+    final inProgress = tasks.where((item) => item.state.isActive).toList();
+    final notActive = tasks
+        .where(
+          (item) =>
+              item.state == ProjectTaskState.notStarted ||
+              item.state == ProjectTaskState.cancelled,
+        )
         .toList();
-    final blocked = tasks
-        .where((item) => item.status.toLowerCase().contains('blocked'))
-        .toList();
-    final inProgress = tasks
-        .where((item) => !done.contains(item) && !blocked.contains(item))
-        .toList();
+    final unknown =
+        tasks.where((item) => item.state == ProjectTaskState.unknown).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -136,22 +141,45 @@ class _DetailContent extends StatelessWidget {
         ),
         const SizedBox(height: PandoraSpacing.md),
         _TaskSection(
-            title: 'Done', tasks: done, empty: 'No work is verified complete.'),
+          title: 'Done',
+          tasks: done,
+          empty: 'No work is verified complete.',
+        ),
         const SizedBox(height: PandoraSpacing.md),
         _TaskSection(
-            title: 'In progress',
-            tasks: inProgress,
-            empty: 'No active work was returned.'),
+          title: 'In progress',
+          tasks: inProgress,
+          empty: 'No active work was returned.',
+        ),
         const SizedBox(height: PandoraSpacing.md),
         _TaskSection(
-            title: 'Blocked',
-            tasks: blocked,
-            empty: 'No blockers were returned.'),
+          title: 'Blocked',
+          tasks: blocked,
+          empty: 'No blockers were returned.',
+        ),
+        if (notActive.isNotEmpty) ...[
+          const SizedBox(height: PandoraSpacing.md),
+          _TaskSection(
+            title: 'Not active',
+            tasks: notActive,
+            empty: 'No inactive work was returned.',
+          ),
+        ],
+        if (unknown.isNotEmpty) ...[
+          const SizedBox(height: PandoraSpacing.md),
+          _TaskSection(
+            title: 'Status not verified',
+            tasks: unknown,
+            empty: 'No unrecognized task states were returned.',
+          ),
+        ],
         const SizedBox(height: PandoraSpacing.md),
         PandoraSurface(
           title: 'Next autonomous action',
-          child: Text(detail.summary.nextAction ??
-              'No verified next action was recorded.'),
+          child: Text(
+            detail.summary.nextAction ??
+                'No verified next action was recorded.',
+          ),
         ),
         const SizedBox(height: PandoraSpacing.md),
         PandoraSurface(
@@ -182,8 +210,11 @@ class _DetailContent extends StatelessWidget {
 }
 
 class _TaskSection extends StatelessWidget {
-  const _TaskSection(
-      {required this.title, required this.tasks, required this.empty});
+  const _TaskSection({
+    required this.title,
+    required this.tasks,
+    required this.empty,
+  });
 
   final String title;
   final List<ProjectTask> tasks;
@@ -201,7 +232,8 @@ class _TaskSection extends StatelessWidget {
                       contentPadding: EdgeInsets.zero,
                       title: Text(tasks[index].title),
                       subtitle: Text(
-                          '${tasks[index].status} · ${tasks[index].risk.label}'),
+                        '${tasks[index].status} · ${tasks[index].risk.label}',
+                      ),
                     ),
                     if (index != tasks.length - 1) const Divider(),
                   ],

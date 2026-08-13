@@ -45,4 +45,14 @@ void main() {
 
     expect(sanitized.toString(), contains(DiagnosticsSanitizer.truncated));
   });
+
+  test('removes query data from URLs embedded in prose', () {
+    final sanitized = sanitizer.sanitizeText(
+      'Retry https://example.invalid/path?token=private&owner=owner@example.com now.',
+    );
+
+    expect(sanitized, contains('https://example.invalid/path?redacted'));
+    expect(sanitized, isNot(contains('token=private')));
+    expect(sanitized, isNot(contains('owner@example.com')));
+  });
 }

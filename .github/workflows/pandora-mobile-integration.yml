@@ -29,6 +29,8 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ env.SOURCE_SHA }}
+      - name: Verify exact source checkout
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
       - name: Verify approved brand assets
         run: node scripts/verify-pandora-brand-assets.mjs
       - name: Install pinned Flutter
@@ -55,7 +57,12 @@ jobs:
           fi
       - name: Resolve dependencies
         working-directory: .pandora-mobile-build
-        run: flutter pub get
+        run: |
+          set -euo pipefail
+          test -f pubspec.lock
+          cp pubspec.lock pubspec.lock.expected
+          flutter pub get --enforce-lockfile
+          cmp pubspec.lock.expected pubspec.lock
       - name: Check formatting
         working-directory: .pandora-mobile-build
         run: dart format --output=none --set-exit-if-changed lib test

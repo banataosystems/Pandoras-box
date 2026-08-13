@@ -3,10 +3,7 @@ import '../network/pandora_api_error.dart';
 
 typedef PandoraRepositoryException = PandoraApiError;
 
-enum RepositorySource {
-  network,
-  memoryCache,
-}
+enum RepositorySource { network, memoryCache }
 
 class RepositorySnapshot<T> {
   const RepositorySnapshot({
@@ -168,4 +165,33 @@ abstract interface class PandoraRepository {
   void clearReadOnlyCache();
 
   void dispose();
+}
+
+/// Emits whenever owner authorization becomes invalid so every mounted
+/// protected surface can be discarded together, not only the screen that
+/// happened to observe the 401/403 response.
+abstract interface class AuthorizationInvalidationSource {
+  Stream<AuthorizationInvalidation> get authorizationInvalidations;
+}
+
+/// Starts a new authenticated identity epoch. Results and diagnostics from
+/// requests started before this boundary must not reach the next owner.
+abstract interface class AuthenticatedIdentityBoundary {
+  void beginAuthenticatedIdentityEpoch();
+}
+
+class StaleAuthenticatedIdentityException implements Exception {
+  const StaleAuthenticatedIdentityException();
+}
+
+class AuthorizationInvalidation {
+  const AuthorizationInvalidation({
+    required this.generation,
+    required this.kind,
+    required this.message,
+  });
+
+  final int generation;
+  final PandoraApiErrorKind kind;
+  final String message;
 }

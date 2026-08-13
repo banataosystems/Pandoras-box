@@ -100,8 +100,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     if (controller.degradedReason != null ||
                         controller.error != null) ...[
                       DegradedContentNotice(
-                        message: controller.degradedReason ??
-                            controller.error!.message,
+                        message: _degradedMessage(controller),
                         onRetry: controller.refresh,
                       ),
                       const SizedBox(height: PandoraSpacing.md),
@@ -154,8 +153,10 @@ class _ActivityRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(event.summary,
-                      style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    event.summary,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                   const SizedBox(height: PandoraSpacing.xxs),
                   Text(
                     '${event.actor} · ${event.type}',
@@ -195,4 +196,11 @@ class _ActivityRow extends StatelessWidget {
 String _safeError(Object? error) {
   if (error is PandoraRepositoryException) return error.message;
   return 'Pandora could not verify activity. Try again.';
+}
+
+String _degradedMessage(ScreenController<List<AuditEvent>> controller) {
+  final reason = controller.degradedReason ?? controller.error!.message;
+  if (!controller.isCached || controller.snapshot == null) return reason;
+  final capturedAt = controller.snapshot!.fetchedAt.toLocal().toIso8601String();
+  return '$reason Cached snapshot from $capturedAt.';
 }

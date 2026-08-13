@@ -35,32 +35,31 @@ Object? firstJsonValue(JsonMap json, Iterable<String> keys) {
 }
 
 String jsonText(Object? value, {String fallback = ''}) {
-  if (value == null) return fallback;
-  final text = value.toString().trim();
+  if (value is! String) return fallback;
+  final text = value.trim();
   return text.isEmpty || text.toLowerCase() == 'null' ? fallback : text;
 }
 
-int? jsonInt(Object? value) {
+int? strictJsonInt(Object? value) {
   if (value is int) return value;
-  if (value is num) return value.round();
-  return int.tryParse(jsonText(value));
+  if (value is num) {
+    if (!value.isFinite || value != value.truncateToDouble()) return null;
+    return value.toInt();
+  }
+  return null;
 }
 
 double? jsonDouble(Object? value) {
   if (value is num) return value.toDouble();
-  return double.tryParse(jsonText(value));
+  return null;
 }
 
 bool jsonBool(Object? value, {bool fallback = false}) {
-  if (value is bool) return value;
-  final normalized = jsonText(value).toLowerCase();
-  if (normalized == 'true' || normalized == '1') return true;
-  if (normalized == 'false' || normalized == '0') return false;
-  return fallback;
+  return value is bool ? value : fallback;
 }
 
 DateTime? jsonDateTime(Object? value) {
-  final text = jsonText(value);
+  final text = value is String ? value.trim() : '';
   return text.isEmpty ? null : DateTime.tryParse(text)?.toLocal();
 }
 
@@ -236,7 +235,7 @@ class ProjectSummary {
   final String purpose;
   final String phase;
   final String status;
-  final int? progressPercent;
+  final double? progressPercent;
   final bool progressVerified;
   final String? blocker;
   final String? nextAction;
@@ -244,9 +243,19 @@ class ProjectSummary {
   final List<EvidenceStageStatus> evidenceStages;
   final FreshnessInfo freshness;
 
-  String get progressLabel => progressVerified && progressPercent != null
-      ? '$progressPercent% verified'
-      : 'Progress not verified';
+  String get progressLabel {
+    if (!progressVerified || progressPercent == null) {
+      return 'Progress not verified';
+    }
+    final value = progressPercent!;
+    final display = value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value
+            .toStringAsFixed(2)
+            .replaceFirst(RegExp(r'0+$'), '')
+            .replaceFirst(RegExp(r'\.$'), '');
+    return '$display% verified';
+  }
 
   EvidenceClaimState evidenceState(EvidenceStage stage) {
     for (final status in evidenceStages) {
@@ -258,9 +267,15 @@ class ProjectSummary {
   factory ProjectSummary.fromJson(Object? value) {
     final json = asJsonMap(value);
     final freshness = FreshnessInfo.fromJson(json);
-    final progress = jsonInt(
+    final progress = jsonDouble(
       firstJsonValue(json, const ['progressPercent', 'progress_percent']),
     );
+    final validProgress = progress != null &&
+            progress.isFinite &&
+            progress >= 0 &&
+            progress <= 100
+        ? progress
+        : null;
     return ProjectSummary(
       id: requiredJsonText(
           json,
@@ -283,9 +298,9 @@ class ProjectSummary {
         firstJsonValue(json, const ['plainStatus', 'status']),
         fallback: 'Not verified',
       ),
-      progressPercent: progress?.clamp(0, 100).toInt(),
-      progressVerified: jsonBool(json['progressVerified']) &&
-          progress != null &&
+      progressPercent: validProgress,
+      progressVerified: json['progressVerified'] == true &&
+          validProgress != null &&
           freshness.isFresh,
       blocker: _nullableText(
         firstJsonValue(json, const [
@@ -332,11 +347,43 @@ class ProjectPhase {
   }
 }
 
+enum ProjectTaskState {
+  notStarted,
+  ready,
+  inProgress,
+  waitingReview,
+  waitingApproval,
+  blocked,
+  complete,
+  cancelled,
+  unknown;
+
+  bool get isActive => switch (this) {
+        ready || inProgress || waitingReview || waitingApproval => true,
+        _ => false,
+      };
+
+  static ProjectTaskState parse(Object? value) {
+    return switch (value) {
+      'not_started' => notStarted,
+      'ready' => ready,
+      'in_progress' => inProgress,
+      'waiting_review' => waitingReview,
+      'waiting_approval' => waitingApproval,
+      'blocked' => blocked,
+      'complete' => complete,
+      'cancelled' => cancelled,
+      _ => unknown,
+    };
+  }
+}
+
 class ProjectTask {
   const ProjectTask({
     required this.id,
     required this.title,
     required this.status,
+    required this.state,
     required this.risk,
     this.completionCriteria,
     this.headSha,
@@ -345,6 +392,7 @@ class ProjectTask {
   final String id;
   final String title;
   final String status;
+  final ProjectTaskState state;
   final ActionRisk risk;
   final String? completionCriteria;
   final String? headSha;
@@ -355,6 +403,7 @@ class ProjectTask {
       id: jsonText(firstJsonValue(json, const ['task_key', 'id'])),
       title: jsonText(json['title'], fallback: 'Untitled work'),
       status: humanizeToken(json['status'], fallback: 'Not verified'),
+      state: ProjectTaskState.parse(json['status']),
       risk: ActionRisk.parse(json['risk_class']),
       completionCriteria: _nullableText(json['completion_criteria']),
       headSha: _nullableText(json['current_head_sha']),
@@ -497,7 +546,10 @@ class ActionDefinition {
         json['executionMode'],
         fallback: 'Plan first',
       ),
-      extraIdentityCheckRequired: jsonBool(json['extraIdentityCheckRequired']),
+      extraIdentityCheckRequired: jsonBool(
+        json['extraIdentityCheckRequired'],
+        fallback: true,
+      ),
     );
   }
 }
@@ -609,6 +661,24 @@ class IntakeReceipt {
   }
 }
 
+enum ApprovalState {
+  pending,
+  approved,
+  denied,
+  expired,
+  revoked,
+  unknown;
+
+  static ApprovalState parse(Object? value) => switch (value) {
+        'pending' => pending,
+        'approved' => approved,
+        'denied' => denied,
+        'expired' => expired,
+        'revoked' => revoked,
+        _ => unknown,
+      };
+}
+
 class ApprovalSummary {
   const ApprovalSummary({
     required this.id,
@@ -618,6 +688,7 @@ class ApprovalSummary {
     required this.risk,
     required this.reversible,
     required this.decision,
+    required this.state,
     this.projectId,
     this.rollback,
     this.expiresAt,
@@ -633,16 +704,35 @@ class ApprovalSummary {
   final bool reversible;
   final String? rollback;
   final String decision;
+  final ApprovalState state;
   final DateTime? expiresAt;
   final DateTime? createdAt;
 
   bool get isExpired => isExpiredAt(DateTime.now());
 
-  bool isExpiredAt(DateTime now) => expiresAt?.isBefore(now) ?? false;
+  bool isExpiredAt(DateTime now) =>
+      expiresAt != null && !expiresAt!.isAfter(now);
+
+  bool canDecideAt(DateTime now) =>
+      state == ApprovalState.pending &&
+      expiresAt != null &&
+      expiresAt!.isAfter(now);
+
+  String decisionBlockReasonAt(DateTime now) {
+    if (state != ApprovalState.pending) {
+      return state == ApprovalState.unknown
+          ? 'Decision disabled — state not verified'
+          : 'Decision disabled — ${state.name}';
+    }
+    if (expiresAt == null) return 'Decision disabled — expiry not verified';
+    if (!expiresAt!.isAfter(now)) return 'Expired — decision disabled';
+    return '';
+  }
 
   factory ApprovalSummary.fromJson(Object? value) {
     final json = asJsonMap(value);
     final rollback = _nullableText(json['howWeCanUndoIt']);
+    final state = ApprovalState.parse(json['decision']);
     return ApprovalSummary(
       id: requiredJsonText(json, const <String>['id'], field: 'approval.id'),
       projectId: _nullableText(json['projectId']),
@@ -658,7 +748,8 @@ class ApprovalSummary {
       risk: ActionRisk.parse(json['riskLevel']),
       reversible: jsonBool(json['reversible']) && rollback != null,
       rollback: rollback,
-      decision: humanizeToken(json['decision'], fallback: 'Pending'),
+      decision: humanizeToken(json['decision'], fallback: 'Not verified'),
+      state: state,
       expiresAt: jsonDateTime(json['expiresAt']),
       createdAt: jsonDateTime(json['createdAt']),
     );
@@ -908,6 +999,7 @@ class HomeSummary {
     required this.approvalCount,
     required this.activeProjectCount,
     required this.needsAttentionCount,
+    this.countersVerified = true,
     required this.topProjects,
     required this.recentActivity,
     this.priority,
@@ -919,6 +1011,7 @@ class HomeSummary {
   final int approvalCount;
   final int activeProjectCount;
   final int needsAttentionCount;
+  final bool countersVerified;
   final ApprovalSummary? priority;
   final List<ProjectSummary> topProjects;
   final List<AuditEvent> recentActivity;
@@ -931,6 +1024,14 @@ class HomeSummary {
     final priority = priorityJson['id'] == null
         ? null
         : ApprovalSummary.fromJson(priorityJson);
+    final approvalCount = strictJsonInt(counters['approvals']);
+    final activeProjectCount = strictJsonInt(counters['activeProjects']);
+    final needsAttentionCount = strictJsonInt(counters['needsAttention']);
+    final countersVerified = <int?>[
+      approvalCount,
+      activeProjectCount,
+      needsAttentionCount,
+    ].every((count) => count != null && count >= 0);
     return HomeSummary(
       healthState: jsonText(health['state'], fallback: 'not_checked'),
       healthLabel: jsonText(
@@ -942,9 +1043,10 @@ class HomeSummary {
         'lastVerifiedAt': health['lastCheckedAt'],
         'dataFreshness': health['dataFreshness'],
       }),
-      approvalCount: jsonInt(counters['approvals']) ?? 0,
-      activeProjectCount: jsonInt(counters['activeProjects']) ?? 0,
-      needsAttentionCount: jsonInt(counters['needsAttention']) ?? 0,
+      approvalCount: approvalCount ?? 0,
+      activeProjectCount: activeProjectCount ?? 0,
+      needsAttentionCount: needsAttentionCount ?? 0,
+      countersVerified: countersVerified,
       priority: priority,
       topProjects: asJsonList(
         json['topProjects'],
@@ -957,7 +1059,7 @@ class HomeSummary {
 }
 
 String? _nullableText(Object? value) {
-  final text = jsonText(value);
+  final text = value is String ? value.trim() : '';
   return text.isEmpty ? null : text;
 }
 
@@ -966,7 +1068,8 @@ String requiredJsonText(
   Iterable<String> keys, {
   required String field,
 }) {
-  final value = jsonText(firstJsonValue(json, keys));
+  final raw = firstJsonValue(json, keys);
+  final value = raw is String ? raw.trim() : '';
   if (value.isEmpty) {
     throw PandoraModelContractException(
       code: 'MISSING_REQUIRED_FIELD',

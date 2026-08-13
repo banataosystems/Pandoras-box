@@ -59,8 +59,8 @@ class _CommandScreenState extends State<CommandScreen> {
         setState(() {
           _outcomeUnknown = error.outcomeMayBeUnknown;
           _error = error.outcomeMayBeUnknown
-              ? '${error.message} Check Activity, then reconcile this same request. '
-                  'Pandora will reuse its request identity instead of creating another.'
+              ? '${error.message} Check Activity first. If it is not recorded, '
+                  'retry here; Pandora will reuse the same request identity.'
               : error.message;
           if (!error.outcomeMayBeUnknown) _submissionKey = null;
         });
@@ -71,7 +71,8 @@ class _CommandScreenState extends State<CommandScreen> {
           _outcomeUnknown = true;
           _error =
               'Pandora could not confirm whether that request was received. '
-              'Check Activity before reconciling this same request.';
+              'Check Activity first. If it is not recorded, retry here with '
+              'the same request identity.';
         });
       }
     } finally {
@@ -79,14 +80,12 @@ class _CommandScreenState extends State<CommandScreen> {
     }
   }
 
-  void _finishReconciliation() {
+  Future<void> _retrySameRequest() async {
     setState(() {
       _outcomeUnknown = false;
-      _submissionKey = null;
-      _error =
-          'No new request was sent. After checking Activity, edit or prepare '
-          'a new request only if the original is not present.';
+      _error = null;
     });
+    await _submit();
   }
 
   @override
@@ -148,9 +147,9 @@ class _CommandScreenState extends State<CommandScreen> {
               if (_outcomeUnknown) ...[
                 const SizedBox(height: PandoraSpacing.sm),
                 OutlinedButton.icon(
-                  onPressed: _submitting ? null : _finishReconciliation,
-                  icon: const Icon(Icons.check_circle_outline_rounded),
-                  label: const Text('I checked Activity'),
+                  onPressed: _submitting ? null : _retrySameRequest,
+                  icon: const Icon(Icons.replay_rounded),
+                  label: const Text('Retry same request safely'),
                 ),
               ],
             ],

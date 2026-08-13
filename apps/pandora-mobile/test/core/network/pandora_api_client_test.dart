@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:pandora_mobile/core/data/pandora_repository.dart';
 import 'package:pandora_mobile/core/data/remote_pandora_repository.dart';
+import 'package:pandora_mobile/core/diagnostics/diagnostics_sanitizer.dart';
 import 'package:pandora_mobile/core/diagnostics/diagnostics_store.dart';
 import 'package:pandora_mobile/core/network/pandora_api_client.dart';
 import 'package:pandora_mobile/core/network/pandora_api_error.dart';
@@ -292,6 +294,44 @@ void main() {
     repository.dispose();
   });
 
+  test('ask receipt with a wrong-type action identity is ambiguous', () async {
+    final api = clientWith(
+      MockClient(
+        (request) async => http.Response(
+          jsonEncode(<String, Object?>{
+            'reply': 'Recorded safely.',
+            'needsApproval': false,
+            'actionId': 123,
+            'status': canonicalIntakeStatus(),
+          }),
+          202,
+          headers: const <String, String>{
+            'x-request-id': 'receipt-wrong-type',
+          },
+        ),
+      ),
+    );
+    final repository = RemotePandoraRepository(client: api);
+
+    await expectLater(
+      repository.ask(message: 'Prepare a safe plan.'),
+      throwsA(
+        isA<PandoraApiError>()
+            .having(
+              (error) => error.kind,
+              'kind',
+              PandoraApiErrorKind.ambiguousMutation,
+            )
+            .having(
+              (error) => error.requestId,
+              'requestId',
+              'receipt-wrong-type',
+            ),
+      ),
+    );
+    repository.dispose();
+  });
+
   test('action receipt without canonical status is ambiguous', () async {
     var calls = 0;
     final api = clientWith(
@@ -463,6 +503,38 @@ void main() {
     );
   }
 
+  test('server plainMessage is sanitized before it reaches the UI', () async {
+    final api = clientWith(
+      MockClient(
+        (request) async => http.Response(
+          jsonEncode(<String, Object?>{
+            'code': 'PRIVATE_DETAIL',
+            'plainMessage':
+                'Contact owner@example.com with Bearer private-token at '
+                    'https://example.invalid/retry?access_token=private.',
+          }),
+          400,
+        ),
+      ),
+    );
+
+    try {
+      await api.getJson(
+        pathSegments: const <String>['home'],
+        operation: 'home.load',
+        routeTemplate: '/home',
+      );
+      fail('Expected PandoraApiError.');
+    } on PandoraApiError catch (error) {
+      expect(error.message, contains(DiagnosticsSanitizer.redacted));
+      expect(error.message, contains('https://example.invalid/retry?redacted'));
+      expect(error.message, isNot(contains('owner@example.com')));
+      expect(error.message, isNot(contains('private-token')));
+      expect(error.message, isNot(contains('access_token=private')));
+    }
+    api.close();
+  });
+
   test(
     'timed-out POST is ambiguous, sent once, and never auto-retried',
     () async {
@@ -494,6 +566,100 @@ void main() {
       api.close();
     },
   );
+
+  for (final status in <int>[500, 502, 503, 504]) {
+    test('POST $status retains an ambiguous mutation outcome', () async {
+      var calls = 0;
+      final api = clientWith(
+        MockClient((request) async {
+          calls += 1;
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'code': 'FIXTURE_$status',
+              'plainMessage': 'The provider failed after receiving the call.',
+            }),
+            status,
+            headers: const <String, String>{'x-request-id': 'post-5xx-fixture'},
+          );
+        }),
+      );
+
+      await expectLater(
+        api.postJson(
+          pathSegments: const <String>['ask'],
+          operation: 'command.submit',
+          routeTemplate: '/ask',
+          idempotencyKey: 'post-5xx-key',
+          body: const <String, Object?>{'message': 'Prepare a plan.'},
+        ),
+        throwsA(
+          isA<PandoraApiError>()
+              .having(
+                (error) => error.kind,
+                'kind',
+                PandoraApiErrorKind.ambiguousMutation,
+              )
+              .having(
+                (error) => error.outcomeMayBeUnknown,
+                'outcomeMayBeUnknown',
+                isTrue,
+              )
+              .having((error) => error.retryable, 'retryable', isFalse)
+              .having(
+                (error) => error.requestId,
+                'requestId',
+                'post-5xx-fixture',
+              ),
+        ),
+      );
+      expect(calls, 1);
+      api.close();
+    });
+  }
+
+  final unreadableServerFailures = <String, http.Response>{
+    'invalid UTF-8': http.Response.bytes(
+      const <int>[0xff],
+      500,
+      headers: const <String, String>{'x-request-id': 'post-500-encoding'},
+    ),
+    'oversize body': http.Response.bytes(
+      List<int>.filled(1025, 0x61),
+      503,
+      headers: const <String, String>{'x-request-id': 'post-503-size'},
+    ),
+  };
+  for (final entry in unreadableServerFailures.entries) {
+    test('POST 5xx with ${entry.key} remains ambiguous', () async {
+      var calls = 0;
+      final api = clientWith(
+        MockClient((request) async {
+          calls += 1;
+          return entry.value;
+        }),
+        maxResponseBytes: 1024,
+      );
+
+      await expectLater(
+        api.postJson(
+          pathSegments: const <String>['ask'],
+          operation: 'command.submit',
+          routeTemplate: '/ask',
+          idempotencyKey: 'post-unreadable-key',
+          body: const <String, Object?>{'message': 'Prepare a plan.'},
+        ),
+        throwsA(
+          isA<PandoraApiError>().having(
+            (error) => error.kind,
+            'kind',
+            PandoraApiErrorKind.ambiguousMutation,
+          ),
+        ),
+      );
+      expect(calls, 1);
+      api.close();
+    });
+  }
 
   test('missing session fails before the network is touched', () async {
     var calls = 0;
@@ -572,4 +738,266 @@ void main() {
       repository.dispose();
     },
   );
+
+  test('a 401 or 403 purges every protected read-only cache', () async {
+    var projectsStatus = 200;
+    var homeStatus = 200;
+    final api = clientWith(
+      MockClient((request) async {
+        if (request.url.path.endsWith('/projects')) {
+          if (projectsStatus == 200) {
+            return http.Response(
+              jsonEncode(<Object?>[
+                <String, Object?>{
+                  'id': 'project-fixture-1',
+                  'name': 'Pandora Mobile',
+                  'dataFreshness': 'fresh',
+                },
+              ]),
+              200,
+            );
+          }
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'code': 'FIXTURE_$projectsStatus',
+              'plainMessage': 'Projects are unavailable.',
+            }),
+            projectsStatus,
+          );
+        }
+        return http.Response(
+          jsonEncode(<String, Object?>{
+            'code': 'FIXTURE_$homeStatus',
+            'plainMessage': 'Owner access changed.',
+          }),
+          homeStatus,
+        );
+      }),
+    );
+    final repository = RemotePandoraRepository(client: api);
+    final invalidations = <AuthorizationInvalidation>[];
+    final subscription = repository.authorizationInvalidations.listen(
+      invalidations.add,
+    );
+
+    await repository.projects();
+    homeStatus = 403;
+    await expectLater(
+      repository.home(),
+      throwsA(
+        isA<PandoraApiError>().having(
+          (error) => error.kind,
+          'kind',
+          PandoraApiErrorKind.forbidden,
+        ),
+      ),
+    );
+    expect(invalidations, hasLength(1));
+    expect(invalidations.single.generation, 1);
+    expect(invalidations.single.kind, PandoraApiErrorKind.forbidden);
+
+    projectsStatus = 503;
+    await expectLater(
+      repository.projects(allowCached: true),
+      throwsA(
+        isA<PandoraApiError>().having(
+          (error) => error.kind,
+          'kind',
+          PandoraApiErrorKind.unavailable,
+        ),
+      ),
+    );
+
+    await subscription.cancel();
+    repository.dispose();
+  });
+
+  test('a prior identity cannot repopulate cache or diagnostics after clear',
+      () async {
+    final delayed = Completer<http.Response>();
+    var calls = 0;
+    final diagnostics = DiagnosticsStore();
+    final api = clientWith(
+      MockClient((request) async {
+        calls += 1;
+        if (calls == 1) return delayed.future;
+        return http.Response(
+          jsonEncode(<String, Object?>{
+            'code': 'UNAVAILABLE',
+            'plainMessage': 'Projects are unavailable.',
+          }),
+          503,
+        );
+      }),
+      diagnostics: diagnostics,
+    );
+    final repository = RemotePandoraRepository(client: api);
+
+    final oldRequest = repository.projects();
+    await Future<void>.delayed(Duration.zero);
+    repository.beginAuthenticatedIdentityEpoch();
+    diagnostics.clear();
+    delayed.complete(
+      http.Response(
+        jsonEncode(<Object?>[
+          <String, Object?>{
+            'id': 'old-owner-project',
+            'name': 'Private old-owner project',
+          },
+        ]),
+        200,
+      ),
+    );
+
+    await expectLater(
+      oldRequest,
+      throwsA(isA<StaleAuthenticatedIdentityException>()),
+    );
+    expect(diagnostics.events, isEmpty);
+    await expectLater(
+      repository.projects(allowCached: true),
+      throwsA(
+        isA<PandoraApiError>().having(
+          (error) => error.kind,
+          'kind',
+          PandoraApiErrorKind.unavailable,
+        ),
+      ),
+    );
+    repository.dispose();
+  });
+
+  test('authorization invalidation suppresses other in-flight identity data',
+      () async {
+    final delayed = Completer<http.Response>();
+    final diagnostics = DiagnosticsStore();
+    final api = clientWith(
+      MockClient((request) async {
+        if (request.url.path.endsWith('/projects')) return delayed.future;
+        return http.Response(
+          jsonEncode(<String, Object?>{
+            'code': 'OWNER_FORBIDDEN',
+            'plainMessage': 'Owner access changed.',
+          }),
+          403,
+        );
+      }),
+      diagnostics: diagnostics,
+    );
+    final repository = RemotePandoraRepository(client: api);
+    final subscription = repository.authorizationInvalidations.listen(
+      (_) => diagnostics.clear(),
+    );
+
+    final oldRequest = repository.projects();
+    await Future<void>.delayed(Duration.zero);
+    await expectLater(
+      repository.home(),
+      throwsA(
+        isA<PandoraApiError>().having(
+          (error) => error.kind,
+          'kind',
+          PandoraApiErrorKind.forbidden,
+        ),
+      ),
+    );
+    delayed.complete(
+      http.Response(
+        jsonEncode(<Object?>[
+          <String, Object?>{
+            'id': 'old-owner-project',
+            'name': 'Private old-owner project',
+          },
+        ]),
+        200,
+      ),
+    );
+    await expectLater(
+      oldRequest,
+      throwsA(isA<StaleAuthenticatedIdentityException>()),
+    );
+    expect(diagnostics.events, isEmpty);
+
+    await subscription.cancel();
+    repository.dispose();
+  });
+
+  test('ordinary cache clearing cannot suppress a concurrent global 403',
+      () async {
+    final delayed = Completer<http.Response>();
+    final api = clientWith(
+      MockClient((request) async => delayed.future),
+    );
+    final repository = RemotePandoraRepository(client: api);
+    final invalidations = <AuthorizationInvalidation>[];
+    final subscription = repository.authorizationInvalidations.listen(
+      invalidations.add,
+    );
+
+    final request = repository.home();
+    await Future<void>.delayed(Duration.zero);
+    repository.clearReadOnlyCache();
+    delayed.complete(
+      http.Response(
+        jsonEncode(<String, Object?>{
+          'code': 'OWNER_FORBIDDEN',
+          'plainMessage': 'Owner access changed.',
+        }),
+        403,
+      ),
+    );
+
+    await expectLater(
+      request,
+      throwsA(
+        isA<PandoraApiError>().having(
+          (error) => error.kind,
+          'kind',
+          PandoraApiErrorKind.forbidden,
+        ),
+      ),
+    );
+    expect(invalidations, hasLength(1));
+
+    await subscription.cancel();
+    repository.dispose();
+  });
+
+  test('operation-local forbidden errors do not invalidate owner access',
+      () async {
+    final api = clientWith(
+      MockClient(
+        (request) async => http.Response(
+          jsonEncode(<String, Object?>{
+            'code': 'APPROVAL_FORBIDDEN',
+            'plainMessage': 'You cannot decide this approval.',
+          }),
+          403,
+        ),
+      ),
+    );
+    final repository = RemotePandoraRepository(client: api);
+    final invalidations = <AuthorizationInvalidation>[];
+    final subscription = repository.authorizationInvalidations.listen(
+      invalidations.add,
+    );
+
+    await expectLater(
+      repository.decideApproval(
+        approvalId: 'approval-fixture-1',
+        decision: ApprovalDecision.approve,
+      ),
+      throwsA(
+        isA<PandoraApiError>().having(
+          (error) => error.code,
+          'code',
+          'APPROVAL_FORBIDDEN',
+        ),
+      ),
+    );
+    expect(invalidations, isEmpty);
+
+    await subscription.cancel();
+    repository.dispose();
+  });
 }

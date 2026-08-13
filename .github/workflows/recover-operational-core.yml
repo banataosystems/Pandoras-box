@@ -1,24 +1,39 @@
 name: Recover MCPMaster operational core
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
     paths:
       - 'recovery/core-transport/**'
+      - 'patches/**'
+      - 'scripts/check-private-key-literals.sh'
       - '.github/workflows/recover-operational-core.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  recover-core:
+  validate-core:
     runs-on: ubuntu-latest
+    outputs:
+      validated_sha: ${{ steps.validated_source.outputs.sha }}
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          ref: recovery/materialize-source
-          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact source checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record validated source
+        id: validated_source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Verify transport and decode archive
         shell: bash
@@ -61,8 +76,51 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -RIl --exclude='*.md' --exclude='*.patch' --exclude-dir='.git' '-----BEGIN PRIVATE KEY-----' package.json api apps public projectos scripts 2>/dev/null | grep .
+          bash scripts/check-private-key-literals.sh package.json api apps public projectos scripts
           node -e "const p=require('./package.json'); if(!p.name) process.exit(1); console.log(p.name, p.version || '')"
+
+  publish-core:
+    needs: validate-core
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ needs.validate-core.outputs.validated_sha }}
+          fetch-depth: 0
+
+      - name: Verify validated source handoff
+        env:
+          VALIDATED_SHA: ${{ needs.validate-core.outputs.validated_sha }}
+        run: test "$(git rev-parse HEAD)" = "$VALIDATED_SHA"
+
+      - name: Verify transport and decode archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '9b97b4b3d43a4f504c3a41c4b6a0705ba2e02747f67fcf863085354388570fd2  recovery/core-transport/core-000.b64' | sha256sum -c -
+          echo '59e8f31cce7f12f96a58bd6dea3cb3a68a76aee66333295b07fc6c1992c9deaa  recovery/core-transport/core-rest.b64' | sha256sum -c -
+          cat recovery/core-transport/core-000.b64 recovery/core-transport/core-rest.b64 | tr -d '[:space:]' | base64 -d > /tmp/mcp-core.tar.xz
+          echo 'cfd98b1236e735f3bb3a8c0af65fcf60f968a53c12777021ad291e9e5a244643  /tmp/mcp-core.tar.xz' | sha256sum -c -
+          mkdir -p /tmp/mcp-core
+          tar -xJf /tmp/mcp-core.tar.xz -C /tmp/mcp-core
+
+      - name: Restore and validate operational source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -a --ignore-existing /tmp/mcp-core/ ./
+          test -f package.json
+          test -f vercel.json
+          test -f api/mcp.ts
+          test -f apps/meta-business-mcp/src/operator/api.ts
+          test -f public/oauth/consent.html
+          if git apply --check patches/2026-08-08-owner-account-binding.patch 2>/dev/null; then
+            git apply patches/2026-08-08-owner-account-binding.patch
+          fi
+          bash scripts/check-private-key-literals.sh package.json api apps public projectos scripts
 
       - name: Commit recovered operational core
         shell: bash
@@ -70,10 +128,12 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          branch="recovery/materialize-source-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           git add package.json package-lock.json vercel.json tsconfig*.json api apps public projectos scripts || true
           if git diff --cached --quiet; then
             echo 'No operational source changes to commit.'
             exit 0
           fi
           git commit -m 'recovery: restore MCPMaster operational core'
-          git push origin HEAD:recovery/materialize-source
+          git push origin "HEAD:refs/heads/$branch"
+          echo "Published recovered operational source branch: $branch"

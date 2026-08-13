@@ -42,8 +42,14 @@ class DiagnosticsSanitizer {
     r'\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
     caseSensitive: false,
   );
+  static final RegExp _embeddedUrl = RegExp(
+    r'''https?://[^\s<>"']+''',
+    caseSensitive: false,
+  );
 
   Object? sanitize(Object? value) => _sanitize(value, 0);
+
+  String sanitizeText(String value) => _sanitizeString(value);
 
   Object? _sanitize(Object? value, int depth) {
     if (value == null || value is num || value is bool) return value;
@@ -88,6 +94,10 @@ class DiagnosticsSanitizer {
         .replaceAll(_jwt, redacted)
         .replaceAll(_knownSecretPrefix, redacted)
         .replaceAll(_email, redacted);
+    sanitized = sanitized.replaceAllMapped(_embeddedUrl, (match) {
+      final uri = Uri.tryParse(match.group(0)!);
+      return uri == null ? redacted : _sanitizeUri(uri);
+    });
     final uri = Uri.tryParse(sanitized);
     if (uri != null && uri.hasScheme && uri.host.isNotEmpty) {
       sanitized = _sanitizeUri(uri);
