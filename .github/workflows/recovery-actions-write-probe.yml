@@ -1,6 +1,11 @@
 name: Pandora APK delivery
 
 on:
+  push:
+    branches:
+      - artifact/apk-delivery-workflow
+    paths:
+      - '.github/workflows/recovery-actions-write-probe.yml'
   workflow_dispatch:
 
 permissions:
@@ -11,7 +16,7 @@ jobs:
   deliver:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout4
         with:
           fetch-depth: 0
 
@@ -39,7 +44,7 @@ jobs:
 
           rm -rf artifact-delivery
           mkdir -p artifact-delivery
-          split -b 8m -d -a 3 "$apk" artifact-delivery/Pandora.apk.part-
+          split -b 8m -d -a 03 "$apk" artifact-delivery/Pandora.apk.part-
           sha256sum "$apk" | awk '{print $1}' > artifact-delivery/Pandora.apk.sha256
           stat -c '%s' "$apk" > artifact-delivery/Pandora.apk.size
           find artifact-delivery -type f -name 'Pandora.apk.part-*' | sort | wc -l | tr -d ' ' > artifact-delivery/Pandora.apk.parts
