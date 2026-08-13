@@ -26,3 +26,9 @@ The authoritative running system remains the Vercel `mcpmaster` project while so
 - Distinguish documented, implemented, tested, deployed, and production-verified state.
 - Production deployment and Pandora Memory health must be independently verified before being marked complete.
 - Fail closed if any tool tries to restore operational authority to a blacklisted legacy source without a new explicit owner decision.
+
+## FlutterFlow readiness provider
+
+MCPMaster includes a read-only FlutterFlow Project API provider. The non-secret production binding is pinned to project `pandoras-box-gj9hnb`; its bearer token must be supplied only through the protected `FLUTTERFLOW_API_TOKEN` runtime secret. The provider registers no update, export, deploy, or release operation and never interprets Project API access alone as deployment readiness.
+
+See `docs/integrations/FLUTTERFLOW_READINESS_PROVIDER.md` for configuration, evidence gates, and rollback.
