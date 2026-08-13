@@ -101,13 +101,10 @@ Scope:
 
 Final production/store release requires all applicable gates: exact source, CI, visual, accessibility, authenticated device journey, security regression, runtime identity, rollback proof, independent review, and separate owner authorization for one exact release candidate.
 
-## Detailed plan files
+## Detailed roadmap records
 
-- `docs/roadmaps/pandora-mobile-v1/01_PRODUCT_UX.md`
-- `docs/roadmaps/pandora-mobile-v1/02_DESIGN_BRAND.md`
-- `docs/roadmaps/pandora-mobile-v1/03_ARCHITECTURE_DATA.md`
-- `docs/roadmaps/pandora-mobile-v1/04_PHASES_0_2.md`
-- `docs/roadmaps/pandora-mobile-v1/05_PHASES_3_5.md`
-- `docs/roadmaps/pandora-mobile-v1/06_PHASES_6_9.md`
-- `docs/roadmaps/pandora-mobile-v1/07_TEST_RELEASE_GATES.md`
-- `docs/roadmaps/pandora-mobile-v1/08_MEMORY_CAPTURE.md`
+- `docs/roadmaps/pandora-mobile-v1/01_PRODUCT_UX.md` — product and interaction specification
+- `docs/roadmaps/pandora-mobile-v1/02_DESIGN_BRAND.md` — design system, brand, motion, accessibility
+- GitHub issue `#35` — complete execution tracker containing architecture/data rules, PMOB task IDs across phases 0–9, test/release gates, success criteria, immediate implementation slice, and Pandora Memory capture contract.
+
+Issue #35 is the authoritative detailed execution tracker when a child document is absent. This avoids incomplete links and preserves the entire roadmap despite connector write-classification limits.
