@@ -1,0 +1,534 @@
+name: FlutterFlow full integration implementation
+
+on:
+  push:
+    branches:
+      - codex/flutterflow-readiness-provider
+    paths:
+      - .github/workflows/flutterflow-full-integration.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Create exact current-main integration branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B codex/flutterflow-full-integration-20260814 origin/main
+
+      - name: Extend FlutterFlow Project API provider
+        shell: python
+        run: |
+          from pathlib import Path
+          import json
+
+          ff_path = Path("src/tools/flutterflow.js")
+          ff = ff_path.read_text()
+
+          schema_marker = '''const ReadinessArgsSchema = AccountArgsSchema.extend({
+              projectId: ProjectIdSchema,
+          });
+          '''
+          if schema_marker not in ff:
+              raise SystemExit("FlutterFlow schema marker changed; refusing blind patch")
+          schema_add = schema_marker + r'''
+          const FileKeySchema = zod_1.z.string()
+              .min(1)
+              .max(2048)
+              .refine((value) => !value.includes("\0"), "fileKey must not contain NUL")
+              .refine((value) => !["__proto__", "prototype", "constructor"].includes(value), "unsafe fileKey");
+          const ProjectFileArgsSchema = ReadinessArgsSchema.extend({
+              fileKey: FileKeySchema,
+          });
+          const ProjectFileContentArgsSchema = ProjectFileArgsSchema.extend({
+              fileContent: zod_1.z.string().min(1).max(1_000_000),
+          });
+          const UpdateProjectYamlArgsSchema = ProjectFileContentArgsSchema.extend({
+              expectedSchemaFingerprint: zod_1.z.string().min(1).max(512),
+          });
+
+          const ProjectYamlResponseSchema = zod_1.z.object({
+              success: zod_1.z.literal(true),
+              reason: zod_1.z.unknown().nullable().optional(),
+              value: zod_1.z.object({
+                  versionInfo: zod_1.z.object({
+                      partitionerVersion: zod_1.z.number().int().nonnegative(),
+                      projectSchemaFingerprint: zod_1.z.string().min(1).max(512),
+                  }),
+                projectYamlBytes: zod_1.z.string().min(1),
+              }),
+          });
+          const ProjectActionResponseSchema = zod_1.z.object({
+              success: zod_1.z.literal(true),
+              reason: zod_1.z.unknown().nullable().optional(),
+              value: zod_1.z.unknown().optional(),
+          });
+          '''
+          ff = ff.replace(schema_marker, schema_add, 1)
+
+          ff = ff.replace(
+              "            mutations: false,",
+              '            mutations: account.grantedScopes.includes("project_schema:write"),',
+              1,
+          )
+
+          method_marker = '''    async request(account, path, method, query, body) {
+          '''
+          if method_marker not in ff:
+              raise SystemExit("FlutterFlow request marker changed; refusing blind patch")
+
+          methods = r'''
+            async listFiles(accountId, projectId) {
+                const account = this.account(accountId);
+                this.assertProjectAllowed(account, projectId);
+                const response = parseProviderContract(
+                  PartitionedFilesResponseSchema,
+                  await this.request(account, "/listPartitionedFileNames", "GET", { projectId }),
+                );
+                return {
+                    projectId,
+                    schema: {
+                        partitionerVersion: response.value.versionInfo.partitionerVersion,
+                        projectSchemaFingerprint: response.value.versionInfo.projectSchemaFingerprint,
+                    },
+                    fileNames: [...response.value.fileNames],
+                };
+            }
+
+            async readProjectYaml(accountId, projectId, fileKey) {
+                const account = this.account(accountId);
+                this.assertProjectAllowed(account, projectId);
+                const response = parseProviderContract(
+                    ProjectYamlResponseSchema,
+                    await this.request(
+                        account,
+                        "/projectYamls",
+                        "GET",
+                        { projectId, fileName: fileKey },
+                    ),
+                );
+                return {
+                    projectId,
+                    fileKey,
+                    schema: {
+                        partitionerVersion: response.value.versionInfo.partitionerVersion,
+                        projectSchemaFingerprint: response.value.versionInfo.projectSchemaFingerprint,
+                    },
+                    encoding: "base64-zip",
+                    projectYamlBytes: response.value.projectYamlBytes,
+                };
+            }
+
+            async validateProjectYaml(accountId, projectId, fileKey, fileContent) {
+                const account = this.account(accountId);
+                this.assertProjectAllowed(account, projectId);
+                const response = parseProviderContract(
+                  ProjectActionResponseSchema,
+                  await this.request(
+                      account,
+                      "/validateProjectYaml",
+                      "POST",
+                      {},
+                      { projectId, fileKey, fileContent },
+                  ),
+                );
+                return {
+                    valid: true,
+                    projectId,
+                    fileKey,
+                    providerAccepted: response.success === true,
+                };
+            }
+
+            async updateProjectYaml(accountId, projectId, fileKey, fileContent, expectedSchemaFingerprint) {
+                const account = this.account(accountId);
+                this.assertProjectAllowed(account, projectId);
+                if (!account.grantedScopes.includes("project_schema:write")) {
+                    throw new FlutterFlowProjectApiError(
+                        `FlutterFlow account ${account.id} is missing required scope: project_schema:write`,
+                        403,
+                    );
+                }
+
+                const current = await this.listFiles(accountId, projectId);
+                if (current.schema.projectSchemaFingerprint !== expectedSchemaFingerprint) {
+                    throw new FlutterFlowProjectApiError(
+                        "FlutterFlow project schema fingerprint changed; refusing stale write",
+                        409,
+                    );
+                }
+
+                await this.validateProjectYaml(accountId, projectId, fileKey, fileContent);
+
+                const response = parseProviderContract(
+                    ProjectActionResponseSchema,
+                    await this.request(
+                        account,
+                        "/updateProjectByYaml",
+                        "POST",
+                        {},
+                        {
+                          projectId,
+                          fileKeyToContent: {
+                            [fileKey]: fileContent,
+                          },
+                        },
+                    ),
+                );
+
+                return {
+                    updated: response.success === true,
+                    validated: true,
+                    projectId,
+                    fileKey,
+                    schemaFingerprint: expectedSchemaFingerprint,
+                };
+            }
+
+          '''
+          ff = ff.replace(method_marker, methods + method_marker, 1)
+
+          tools_marker = '''};
+
+          async function executeFlutterFlowTool'''
+          if tools_marker not in ff:
+              raise SystemExit("FlutterFlow tool-definition marker changed; refusing blind patch")
+
+          tool_entries = r'''    "flutterflow.list-files": {
+                description: "List exact YAML file keys for one allowlisted FlutterFlow project with schema fingerprint",
+              parameters: {
+                    type: "object",
+                    properties: {
+                        accountId: { type: "string", description: "Configured MCPMaster FlutterFlow account ID" },
+                        projectId: { type: "string", description: "Exact allowlisted FlutterFlow project ID" },
+                    },
+                    required: ["accountId", "projectId"],
+                    additionalProperties: false,
+                },
+            },
+            "flutterflow.read-project-yaml": {
+                description: "Read one exact FlutterFlow project YAML file as the provider returned base64 ZIP payload",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        accountId: { type: "string", description: "Configured MCPMaster FlutterFlow account ID" },
+                        projectId: { type: "string", description: "Exact allowlisted FlutterFlow project ID" },
+                        fileKey: { type: "string", description: "Exact FlutterFlow YAML file key" },
+                    },
+                    required: ["accountId", "projectId", "fileKey"],
+                    additionalProperties: false,
+                },
+            },
+            "flutterflow.validate-project-yaml": {
+                description: "Validate one exact FlutterFlow YAML file before any governed update",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        accountId: { type: "string", description: "Configured MCPMaster FlutterFlow account ID" },
+                        projectId: { type: "string", description: "Exact allowlisted FlutterFlow project ID" },
+                        fileKey: { type: "string", description: "Exact FlutterFlow YAML file key" },
+                        fileContent: { type: "string", description: "Complete candidate YAML content" },
+                    },
+                    required: ["accountId", "projectId", "fileKey", "fileContent"],
+                    additionalProperties: false,
+                },
+            },
+            "flutterflow.update-project-yaml": {
+                description: "Validate then update one exact FlutterFlow YAML file through the official Project API",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        accountId: { type: "string", description: "Configured MCPMaster FlutterFlow account ID" },
+                        projectId: { type: "string", description: "Exact allowlisted FlutterFlow project ID" },
+                        fileKey: { type: "string", description: "Exact FlutterFlow YAML file key" },
+                        fileContent: { type: "string", description: "Complete candidate YAML content" },
+                        expectedSchemaFingerprint: { type: "string", description: "Schema fingerprint observed immediately before planning the write" },
+                    },
+                    required: ["accountId", "projectId", "fileKey", "fileContent", "expectedSchemaFingerprint"],
+                    additionalProperties: false,
+                },
+            },
+        '''
+          ff = ff.replace(tools_marker, tool_entries + tools_marker, 1)
+
+          switch_marker = '''        default:
+                    throw new FlutterFlowProjectApiError(`Unknown FlutterFlow tool: ${tool}`, 404);
+          '''
+          if switch_marker not in ff:
+              raise SystemExit("FlutterFlow executor marker changed; refusing blind patch")
+
+          cases = r'''        case "flutterflow.list-files": {
+                    const input = ReadinessArgsSchema.parse(args);
+                    return server.listFiles(input.accountId, input.projectId);
+                }
+                case "flutterflow.read-project-yaml": {
+                    const input = ProjectFileArgsSchema.parse(args);
+                    return server.readProjectYaml(input.accountId, input.projectId, input.fileKey);
+                }
+                case "flutterflow.validate-project-yaml": {
+                    const input = ProjectFileContentArgsSchema.parse(args);
+                    return server.validateProjectYaml(input.accountId, input.projectId, input.fileKey, input.fileContent);
+                }
+                case "flutterflow.update-project-yaml": {
+                    const input = UpdateProjectYamlArgsSchema.parse(args);
+                    return server.updateProjectYaml(
+                        input.accountId,
+                        input.projectId,
+                          input.fileKey,
+                        input.fileContent,
+                          input.expectedSchemaFingerprint,
+                    );
+                }
+          '''
+          ff = ff.replace(switch_marker, cases + switch_marker, 1)
+          ff_path.write_text(ff)
+
+          manifest_path = Path("src/runtime/tool-manifest.js")
+          manifest = manifest_path.read_text()
+          manifest_marker = "    manifest('flutterflow.inspect-readiness', 'flutterflow', 'read', false, 'project', ['projects:read', 'project_schema:read']),"
+          if manifest_marker not in manifest:
+              raise SystemExit("FlutterFlow manifest marker changed; refusing blind patch")
+          manifest_add = manifest_marker + r'''
+            manifest('flutterflow.list-files', 'flutterflow', 'read', false, 'project', ['projects:read', 'project_schema:read']),
+            manifest('flutterflow.read-project-yaml', 'flutterflow', 'read', false, 'project', ['projects:read', 'project_schema:read']),
+            manifest('flutterflow.validate-project-yaml', 'flutterflow', 'read', false, 'project', ['projects:read', 'project_schema:read']),
+            manifest('flutterflow.update-project-yaml', 'flutterflow', 'write', true, 'project', ['projects:read', 'project_schema:read', 'project_schema:write']),
+          '''
+          manifest = manifest.replace(manifest_marker, manifest_add, 1)
+          manifest_path.write_text(manifest)
+
+          vercel_path = Path("vercel.json")
+          vercel = json.loads(vercel_path.read_text())
+          raw_accounts = vercel["env"]["FLUTTERFLOW_ACCOUNTS_JSON"]
+          accounts = json.loads(raw_accounts)
+          matched = False
+          for account in accounts:
+              if account.get("id") == "pandora-mobile":
+                  scopes = list(dict.fromkeys(account.get("grantedScopes", [])))
+                  if "project_schema:write" not in scopes:
+                      scopes.append("project_schema:write")
+                  account["grantedScopes"] = scopes
+                  matched = True
+          if not matched:
+              raise SystemExit("pandora-mobile FlutterFlow binding missing; refusing blind patch")
+          vercel["env"]["FLUTTERFLOW_ACCOUNTS_JSON"] = json.dumps(accounts, separators=(",", ":"))
+          vercel_path.write_text(json.dumps(vercel, indent=2) + "\n")
+
+          docs_path = Path("docs/integrations/FLUTTERFLOW_READINESS_PROVIDER.md")
+          docs = docs_path.read_text()
+          marker = "## Governed write integration"
+          if marker not in docs:
+              docs += r'''
+
+          ## Governed write integration
+
+          The official FlutterFlow Project API supports a complete YAML control loop:
+          list file keys -> read one YAML -> validate candidate YAML -> update YAML.
+
+          Pandora exposes that loop only for exact allowlisted project IDs. `flutterflow.update-project-yaml`
+          is classified as a mutating ProjectOS write, requires `project_schema:write`, validates first,
+          and requires the caller to bind the plan to the immediately observed
+          `projectSchemaFingerprint`. If the fingerprint changes, the update fails closed before the
+          provider write.
+
+          This does not claim an undocumented FlutterFlow clone, web/mobile deployment, App Store,
+          or Play Store API.Another layer is still needed for those release capabilities. The existing `pandoras-box-gj9hnb`
+          is a Library until a normal application clone exists.
+           '''
+              docs_path.write_text(docs)
+
+          test_path = Path("test/flutterflow-full-integration.test.js")
+          test_path.write_text(r''"use strict";
+
+          const test = require("node:test");
+          const assert = require("node:assert/strict");
+
+          const {
+            FlutterFlowMCPServer,
+            executeFlutterFlowTool,
+            flutterFlowTools,
+          } = require("../src/tools/flutterflow.js");
+          const { getToolManifest } = require("../src/runtime/tool-manifest.js");
+
+          function configuration(scopes = ["projects:read", "project_schema:read", "project_schema:write"]) {
+            return {
+              accounts: [{
+                id: "pandora-mobile",
+                label: "Pandora Mobile",
+                authMode: "api_token",
+                token: "test-token-12345678901234567890",
+                baseUrl: https://api.flutterflow.io/v2,
+                allowedProjectIds: ["pandoras-box-gj9hnb"],
+                grantedScopes: scopes,
+            }],
+            timeoutMs: 5_000,
+            maxResponseBytes: 1_000_000,
+            };
+          }
+
+          function jsonResponse(value, status = 200) {
+            return new Response(JSON.stringify(value),{ status, headers: { "content-type": "application/json" } });
+          }
+
+          test("registers the complete documented FlutterFlow Project API control loop", () => {
+            for (const name of [
+              "flutterflow.list-files",
+              "flutterflow.read-project-yaml",
+              "flutterflow.validate-project-yaml",
+              "flutterflow.update-project-yaml",
+            ]) {
+              assert.ok(flutterFlowTools[name], name);
+              assert.ok(getToolManifest(name), `${name} manifest`);
+            }
+            const update = getToolManifest("flutterflow.update-project-yaml");
+            assert.equal(update.risk, "write");
+            assert.equal(update.mutation, true);
+            assert.deepEqual(
+              update.requiredProviderScopes,
+              ["projects:read", "project_schema:read", "project_schema:write"],
+            );
+          });
+
+          test("update validates, binds schema fingerprint, then writes exactly one YAML file", async () => {
+            const calls = [];
+            const fetchFn = async (url, init) => {
+              calls.push({ url: String(url), init });
+              if (String(url).includes("/listPartitionedFileNames")) {
+                return jsonResponse({
+                  success: true,
+                  reason: null,
+                  value: {
+                    versionInfo: {
+                      partitionerVersion: 13,
+                      projectSchemaFingerprint: "fingerprint-13",
+                    },
+                    fileNames: ["app-state"],
+                  },
+                });
+              }
+              if (String(url).includes("/validateProjectYaml")) return jsonResponse({ success: true, reason: null, value: "" });
+              if (String(url).includes("/updateProjectByYaml")) return jsonResponse({ success: true, reason: null, value: "" });
+              throw new Error(`unexpected URL ${url}`);
+            };
+
+            const result = await executeFlutterFlowTool(
+              "flutterflow.update-project-yaml",
+              {
+                accountId: "pandora-mobile",
+                projectId: "pandoras-box-gj9hnb",
+                fileKey: "app-state",
+                fileContent: "fields: []\n",
+                expectedSchemaFingerprint: "fingerprint-13",
+              },
+              configuration(),
+              fetchFn,
+            );
+
+            assert.equal(result.updated, true);
+            assert.equal(result.validated, true);
+            assert.equal(calls.length, 3);
+            assert.match(calls[0].url, /listPartitionedFileNames/);
+            assert.match(calls[1].url, /validateProjectYaml/);
+            assert.match(calls[2].url, /updateProjectByYaml/);
+            assert.deepEqual(JSON.parse(calls[2].init.body), {
+              projectId: "pandoras-box-gj9hnb",
+              fileKeyToContent: { "app-state": "fields: []\n" },
+            });
+          });
+
+          test("stale schema fingerprint fails before validation or write", async () => {
+            let calls = 0;
+            const fetchFn = async () => {
+              calls += 1;
+              return jsonResponse({
+                success: true,
+                reason: null,
+                value: {
+                  versionInfo: { partitionerVersion: 13, projectSchemaFingerprint: "new-fingerprint" },
+                  fileNames: ["app-state"],
+              },
+            });
+            };
+
+            await assert.rejects(
+              executeFlutterFlowTool(
+                "flutterflow.update-project-yaml",
+                {
+                  accountId: "pandora-mobile",
+                  projectId: "pandoras-box-gj9hnb",
+                  fileKey: "app-state",
+                  fileContent: "fields: []\n",
+                  expectedSchemaFingerprint: "old-fingerprint",
+                },
+                configuration(),
+                fetchFn,
+              ),
+              /schema fingerprint changed/,
+            );
+            assert.equal(calls, 1);
+          });
+
+          test("missing write scope fails before provider access", async () => {
+            let calls = 0;
+            await assert.rejects(
+              executeFlutterFlowTool(
+                "flutterflow.update-project-yaml",
+                {
+                  accountId: "pandora-mobile",
+                  projectId: "pandoras-box-gj9hnb",
+                  fileKey: "app-state",
+                  fileContent: "fields: []\n",
+                  expectedSchemaFingerprint: "fingerprint-13",
+                },
+                configuration(["projects:read", "project_schema:read"]),
+                async () => {
+                  calls += 1;
+                  throw new Error("must not call provider");
+                },
+            ),
+            /missing required scope: project_schema:write/,
+            );
+            assert.equal(calls, 0);
+          });
+          '''
+          ")
+
+          wf = Path(".github/workflows/flutterflow-full-integration.yml")
+          if wf.exists():
+              wf.unlink()
+          PY
+
+      - name: Verify exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm test
+          npm run check
+          npm audit --omit=dev --audit-level=high
+          git diff --check
+
+      - name: Publish reviewed branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Banatao Systems ProjectOS"
+          git config user.email "projectos@users.noreply.github.com"
+          git add src/tools/flutterflow.js src/runtime/tool-manifest.js vercel.json test/flutterflow-full-integration.test.js docs/integrations/FLUTTERFLOW_READINESS_PROVIDER.md
+          git commit -m "feat: govern full FlutterFlow Project API integration"
+          git push --force-with-lease origin codex/flutterflow-full-integration-20260814
