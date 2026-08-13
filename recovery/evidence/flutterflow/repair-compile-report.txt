@@ -1,0 +1,7 @@
+matches=[471]
+compile_status=1
+stderr:
+  File "/tmp/apply.py", line 472
+    ''')
+    ^
+SyntaxError: unterminated triple-quoted string literal (detected at line 478)
