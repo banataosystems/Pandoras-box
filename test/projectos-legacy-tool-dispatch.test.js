@@ -69,7 +69,54 @@ test("tools/list preserves cached provider reads and durable plan aliases", asyn
   assert.ok(tools.has("github.read-repository-api"));
   assert.ok(tools.has("projectos_plan_github_write-repository-api"));
   assert.ok(tools.has("projectos_approve_plan"));
+  assert.ok(tools.has("projectos_list_audit"));
+  assert.ok(tools.has("projectos_verify_audit"));
   assert.equal(tools.has("github.write-repository-api"), false);
+});
+
+test("tool catalog resolves registry names into complete definitions", async () => {
+  const handler = createProjectOsMcpHandler(dependencies());
+  const response = await invoke(handler, request("tools/call", {
+    name: "projectos_tool_catalog",
+    arguments: {},
+  }));
+  assert.equal(response.statusCode, 200);
+  const github = response.body.result.structuredContent.tools.find((tool) => tool.name === "github.get-repository");
+  assert.equal(github.provider, "github");
+  assert.equal(github.risk, "read");
+  assert.ok(Array.isArray(github.requiredProviderScopes));
+});
+
+test("cached audit controls use the server workload identity", async () => {
+  const calls = [];
+  const handler = createProjectOsMcpHandler(dependencies({
+    ledger: {
+      async listAudit(token, limit) {
+        calls.push({ action: "list", token, limit });
+        return [{ sequence: 1 }];
+      },
+      async verifyAudit(token) {
+        calls.push({ action: "verify", token });
+        return { valid: true };
+      },
+    },
+  }));
+  const listed = await invoke(handler, request("tools/call", {
+    name: "projectos_list_audit",
+    arguments: { limit: 7 },
+  }));
+  const verified = await invoke(handler, request("tools/call", {
+    name: "projectos_verify_audit",
+    arguments: {},
+  }));
+  assert.equal(listed.statusCode, 200);
+  assert.deepEqual(listed.body.result.structuredContent.events, [{ sequence: 1 }]);
+  assert.equal(verified.statusCode, 200);
+  assert.deepEqual(verified.body.result.structuredContent.verification, { valid: true });
+  assert.deepEqual(calls, [
+    { action: "list", token: "server-side-vercel-oidc-token", limit: 7 },
+    { action: "verify", token: "server-side-vercel-oidc-token" },
+  ]);
 });
 
 test("cached direct read names execute through server-side provider configuration", async () => {

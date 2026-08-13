@@ -9,6 +9,7 @@ const { randomUUID } = require("node:crypto");
 const { ExecutionLedgerClient } = require("./runtime/execution-ledger-client.js");
 const { buildToolConfiguration } = require("./runtime/service-config.js");
 const { classifyToolRisk } = require("./runtime/tool-policy.js");
+const { resolveVercelWorkloadToken } = require("./runtime/vercel-workload-identity.js");
 const { executeTool, getAllTools, toolRegistry } = require("./tools/index.js");
 const { executionPayloadHash } = require("./http-app.js");
 const { loadOperatorPublicConfig } = require("./operator-public-config.js");
@@ -178,6 +179,20 @@ function publicTools() {
             },
         },
         {
+            name: "projectos_list_audit",
+            description: "List recent hash-linked ProjectOS execution audit events.",
+            inputSchema: {
+                type: "object",
+                properties: { limit: { type: "integer", minimum: 1, maximum: 500 } },
+                additionalProperties: false,
+            },
+        },
+        {
+            name: "projectos_verify_audit",
+            description: "Verify the ProjectOS execution audit hash chain.",
+            inputSchema: { type: "object", additionalProperties: false },
+        },
+        {
             name: "projectos_create_plan",
             description: "Create an exact durable ProjectOS plan. This does not approve or execute it.",
             inputSchema: {
@@ -283,7 +298,7 @@ function defaultDependencies() {
             publishableKey: config.supabasePublishableKey,
         }),
         ledger: new ExecutionLedgerClient(),
-        workloadToken: () => process.env.VERCEL_OIDC_TOKEN?.trim(),
+        workloadToken: resolveVercelWorkloadToken,
         execute: executeTool,
         toolConfiguration: buildToolConfiguration,
         now: Date.now,
@@ -306,8 +321,8 @@ async function actorFor(request, dependencies) {
     return { identity, membership };
 }
 
-function workloadToken(dependencies) {
-    const token = dependencies.workloadToken();
+async function workloadToken(dependencies) {
+    const token = (await dependencies.workloadToken())?.trim();
     if (!token) throw Object.assign(new Error("The server-side ProjectOS workload identity is unavailable"), { status: 503 });
     return token;
 }
@@ -316,6 +331,8 @@ function requiredToolScope(name) {
     switch (name) {
         case "projectos_tool_catalog":
         case "projectos_list_plans":
+        case "projectos_list_audit":
+        case "projectos_verify_audit":
             return "projectos:read";
         case "projectos_create_plan":
             return "projectos:plan";
@@ -359,7 +376,7 @@ function assertToolScope(name, actor) {
 async function createDurablePlan(tool, toolArgs, dependencies) {
     if (!toolRegistry[tool]) throw Object.assign(new Error(`Unknown tool: ${tool}`), { status: 400 });
     const payloadHash = executionPayloadHash(tool, toolArgs);
-    return dependencies.ledger.createPlan(workloadToken(dependencies), {
+    return dependencies.ledger.createPlan(await workloadToken(dependencies), {
         requestId: randomUUID(),
         tool,
         risk: classifyToolRisk(tool),
@@ -381,7 +398,7 @@ async function callTool(name, args, actor, dependencies) {
                 status: 409,
             });
         }
-        const token = workloadToken(dependencies);
+        const token = await workloadToken(dependencies);
         return toolResult(await dependencies.execute(
             name,
             args,
@@ -391,19 +408,29 @@ async function callTool(name, args, actor, dependencies) {
     switch (name) {
         case "projectos_tool_catalog":
             return toolResult({
-                tools: getAllTools().map((tool) => ({
-                    name: tool.name,
-                    description: tool.description,
-                    risk: classifyToolRisk(tool.name),
-                    provider: tool.manifest.provider,
-                    scope: tool.manifest.scope,
-                    mutation: tool.manifest.mutation,
-                    requiredProviderScopes: [...tool.manifest.requiredProviderScopes],
-                })),
+                tools: getAllTools().map((name) => {
+                    const tool = toolRegistry[name];
+                    return {
+                        name,
+                        description: tool.description,
+                        risk: classifyToolRisk(name),
+                        provider: tool.manifest.provider,
+                        scope: tool.manifest.scope,
+                        mutation: tool.manifest.mutation,
+                        requiredProviderScopes: [...tool.manifest.requiredProviderScopes],
+                    };
+                }),
             });
         case "projectos_list_plans": {
             const limit = Number.isInteger(args.limit) ? Math.min(Math.max(args.limit, 1), 500) : 100;
-            return toolResult({ plans: await dependencies.ledger.listPlans(workloadToken(dependencies), limit) });
+            return toolResult({ plans: await dependencies.ledger.listPlans(await workloadToken(dependencies), limit) });
+        }
+        case "projectos_list_audit": {
+            const limit = Number.isInteger(args.limit) ? Math.min(Math.max(args.limit, 1), 500) : 100;
+            return toolResult({ events: await dependencies.ledger.listAudit(await workloadToken(dependencies), limit) });
+        }
+        case "projectos_verify_audit": {
+            return toolResult({ verification: await dependencies.ledger.verifyAudit(await workloadToken(dependencies)) });
         }
         case "projectos_create_plan": {
             const tool = requiredString(args.tool, "tool");
@@ -416,7 +443,7 @@ async function callTool(name, args, actor, dependencies) {
             }
             const planId = requiredUuid(args.planId, "planId");
             const plan = assertPlanIdentity(await dependencies.ledger.approvePlan(
-                workloadToken(dependencies),
+                await workloadToken(dependencies),
                 planId,
                 projectOsApproverAttribution(actor),
             ), planId, "approved");
@@ -427,7 +454,7 @@ async function callTool(name, args, actor, dependencies) {
                 throw Object.assign(new Error("Plan execution requires a ProjectOS owner or admin session"), { status: 403 });
             }
             const planId = requiredUuid(args.planId, "planId");
-            const token = workloadToken(dependencies);
+            const token = await workloadToken(dependencies);
             const claimed = assertPlanIdentity(await dependencies.ledger.claimPlan(token, planId), planId, "executing");
             if (!claimed.tool || !claimed.args || !claimed.payloadHash) {
                 throw Object.assign(new Error("Claimed execution plan is incomplete"), { status: 409 });

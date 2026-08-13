@@ -62,6 +62,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "@vercel/oidc": "^3.8.4",
     "express": "^5.2.1",
     "cors": "^2.8.6",
     "helmet": "^8.1.0",
