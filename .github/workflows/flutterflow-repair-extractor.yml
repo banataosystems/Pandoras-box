@@ -1,0 +1,46 @@
+name: Repair FlutterFlow patch extractor
+
+on:
+  push:
+    branches:
+      - codex/flutterflow-full-integration-20260814
+    paths:
+      - .github/workflows/flutterflow-repair-extractor.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Repair extractor on exact branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: codex/flutterflow-full-integration-20260814
+        run: |
+          set -euo pipefail
+          git init repo
+          cd repo
+          git config user.name "Banatao Systems ProjectOS"
+          git config user.email "projectos@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}"
+          git checkout -B "${TARGET_BRANCH}" "refs/remotes/origin/${TARGET_BRANCH}"
+          python - <<'PY'
+          from pathlib import Path
+          path = Path(".github/workflows/flutterflow-full-integration-candidate.yml")
+          text = path.read_text()
+          old = '          script = textwrap.dedent(block)\n'
+          new = '          script = "\\n".join(line[4:] if line.startswith("    ") else line for line in block.splitlines()) + "\\n"\n'
+          if text.count(old) != 1:
+              raise SystemExit(f"expected exactly one extractor marker, found {text.count(old)}")
+          path.write_text(text.replace(old, new, 1))
+          PY
+          rm .github/workflows/flutterflow-repair-extractor.yml
+          git add .github/workflows/flutterflow-full-integration-candidate.yml .github/workflows/flutterflow-repair-extractor.yml
+          git diff --cached --check
+          git commit -m "fix: normalize reviewed FlutterFlow patch indentation"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
