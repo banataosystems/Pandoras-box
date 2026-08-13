@@ -34,19 +34,26 @@ function configuration(overrides = {}) {
   };
 }
 
-function providerProject(id = PROJECT_ID) {
+function providerProject(id = PROJECT_ID, projectOverrides = {}) {
   return {
     id,
     project: {
       name: id === PROJECT_ID ? "Pandora Mobile" : "Unrelated project",
       ownerEmail: "must-not-be-returned@example.com",
-      createdAt: "2026-08-10T01:00:00.000Z",
-      updatedAt: "2026-08-12T01:00:00.000Z",
+      Extras: {
+        createdAt: "2026-08-10T01:00:00.000Z",
+        updatedAt: "2026-08-12T01:00:00.000Z",
+      },
       mainBranchRef: { path: `projects/${id}` },
       numBranches: 2,
       totalNumUpdates: 17,
+      totalNumUpdatesV2: 29,
+      projectVersionNumber: 201,
+      isLibrary: false,
+      isMainBranch: true,
       otherMembers: { user: { email: "also-private@example.com" } },
       activeSessions: { session: { lastSuccessfulUpdate: "2026-08-12T00:00:00Z" } },
+      ...projectOverrides,
     },
   };
 }
@@ -80,7 +87,7 @@ test("project discovery pins the official origin, authenticates server-side, and
     return jsonResponse({
       success: true,
       reason: null,
-      value: { entries: [providerProject(), providerProject("unrelated-project")] },
+      value: JSON.stringify({ entries: [providerProject(), providerProject("unrelated-project")] }),
     });
   });
 
@@ -92,7 +99,10 @@ test("project discovery pins the official origin, authenticates server-side, and
     updatedAt: "2026-08-12T01:00:00.000Z",
     mainBranchPath: `projects/${PROJECT_ID}`,
     branchCount: 2,
-    updateCount: 17,
+    updateCount: 29,
+    projectVersionNumber: 201,
+    isLibrary: false,
+    isMainBranch: true,
   }]);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, "https://api.flutterflow.io/v2/l/listProjects");
@@ -154,6 +164,11 @@ test("readiness returns structural evidence but remains blocked for deployment",
   assert.equal(result.configurationSignals.pageCount, 2);
   assert.equal(result.projectConfigurationStatus, "observed");
   assert.equal(result.deploymentReadiness.status, "blocked");
+  assert.equal(result.projectType, "application");
+  assert.equal(
+    result.deploymentReadiness.gates.find((gate) => gate.key === "deployable_project_type").status,
+    "passed",
+  );
   assert.equal(
     result.deploymentReadiness.gates.find((gate) => gate.key === "generated_code_build").status,
     "not_proven",
@@ -166,6 +181,43 @@ test("readiness returns structural evidence but remains blocked for deployment",
   assert.equal(calls[1].init.method, "GET");
   assert.equal(calls[1].init.body, undefined);
   assert.doesNotMatch(JSON.stringify(result), /fileNames|custom-file\/id-main/);
+});
+
+test("readiness fails the deployable-project gate for a FlutterFlow Library", async () => {
+  const responses = [
+    jsonResponse({
+      success: true,
+      reason: null,
+      value: JSON.stringify({ entries: [providerProject(PROJECT_ID, { isLibrary: true })] }),
+    }),
+    jsonResponse({
+      success: true,
+      reason: null,
+      value: {
+        versionInfo: {
+          partitionerVersion: 13,
+          projectSchemaFingerprint: "library-schema-fingerprint",
+        },
+        fileNames: ["app-details", "page/id-home/page-widget-tree-outline"],
+      },
+    }),
+  ];
+  const server = new FlutterFlowMCPServer(configuration(), async () => responses.shift());
+
+  const result = await server.inspectReadiness("pandora-mobile", PROJECT_ID);
+
+  assert.equal(result.project.isLibrary, true);
+  assert.equal(result.projectType, "library");
+  assert.match(result.deploymentReadiness.summary, /Library projects cannot use web or mobile deployment/);
+  assert.deepEqual(
+    result.deploymentReadiness.gates.find((gate) => gate.key === "deployable_project_type"),
+    {
+      key: "deployable_project_type",
+      status: "failed",
+      observed: "library",
+      required: "application",
+    },
+  );
 });
 
 test("unknown accounts and wrong projects fail before any provider request", async () => {

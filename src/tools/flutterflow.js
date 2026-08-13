@@ -45,18 +45,37 @@ const ProjectEntrySchema = zod_1.z.object({
         name: zod_1.z.string().min(1).max(300),
         createdAt: zod_1.z.string().optional(),
         updatedAt: zod_1.z.string().optional(),
+        Extras: zod_1.z.object({
+            createdAt: zod_1.z.string().optional(),
+            updatedAt: zod_1.z.string().optional(),
+        }).optional(),
         mainBranchRef: zod_1.z.object({ path: zod_1.z.string().max(512) }).optional(),
         numBranches: zod_1.z.number().int().nonnegative().optional(),
         totalNumUpdates: zod_1.z.number().int().nonnegative().optional(),
+        totalNumUpdatesV2: zod_1.z.number().int().nonnegative().optional(),
+        projectVersionNumber: zod_1.z.number().int().nonnegative().optional(),
+        isLibrary: zod_1.z.boolean().optional(),
+        isMainBranch: zod_1.z.boolean().optional(),
     }),
 });
+
+function deserializeProviderValue(value) {
+    if (typeof value !== "string")
+        return value;
+    try {
+        return JSON.parse(value);
+    }
+    catch {
+        return value;
+    }
+}
 
 const ProjectListResponseSchema = zod_1.z.object({
     success: zod_1.z.literal(true),
     reason: zod_1.z.unknown().nullable().optional(),
-    value: zod_1.z.object({
+    value: zod_1.z.preprocess(deserializeProviderValue, zod_1.z.object({
         entries: zod_1.z.array(ProjectEntrySchema).max(10_000),
-    }),
+    })),
 });
 
 const PartitionedFilesResponseSchema = zod_1.z.object({
@@ -138,11 +157,14 @@ function normalizedProject(project) {
     return {
         id: project.id,
         name: project.project.name,
-        createdAt: project.project.createdAt,
-        updatedAt: project.project.updatedAt,
+        createdAt: project.project.createdAt ?? project.project.Extras?.createdAt,
+        updatedAt: project.project.updatedAt ?? project.project.Extras?.updatedAt,
         mainBranchPath: project.project.mainBranchRef?.path,
         branchCount: project.project.numBranches,
-        updateCount: project.project.totalNumUpdates,
+        updateCount: project.project.totalNumUpdatesV2 ?? project.project.totalNumUpdates,
+        projectVersionNumber: project.project.projectVersionNumber,
+        isLibrary: project.project.isLibrary,
+        isMainBranch: project.project.isMainBranch,
     };
 }
 
@@ -175,9 +197,20 @@ function configurationSignals(fileNames) {
 function readinessAssessment(project, partitioned, observedAt) {
     const signals = configurationSignals(partitioned.fileNames);
     const structuralEvidencePresent = signals.appDetailsPresent && signals.pageCount > 0;
+    const projectType = project.isLibrary === true
+        ? "library"
+        : project.isLibrary === false
+            ? "application"
+            : "unknown";
+    const projectTypeGateStatus = projectType === "library"
+        ? "failed"
+        : projectType === "application"
+            ? "passed"
+            : "not_proven";
     return {
         accountEvidence: "server-side FlutterFlow Project API bearer accepted",
         project,
+        projectType,
         observedAt,
         apiVersion: "v2-beta",
         schema: {
@@ -189,12 +222,20 @@ function readinessAssessment(project, partitioned, observedAt) {
         projectConfigurationStatus: structuralEvidencePresent ? "observed" : "blocked",
         deploymentReadiness: {
             status: "blocked",
-            summary: structuralEvidencePresent
-                ? "Project structure is readable, but deployment evidence is incomplete."
-                : "Required FlutterFlow project structure is missing or could not be evidenced.",
+            summary: projectType === "library"
+                ? "FlutterFlow reports this project as a Library; Library projects cannot use web or mobile deployment."
+                : structuralEvidencePresent
+                    ? "Project structure is readable, but deployment evidence is incomplete."
+                    : "Required FlutterFlow project structure is missing or could not be evidenced.",
             gates: [
                 { key: "provider_read_access", status: "passed" },
                 { key: "exact_project_binding", status: "passed" },
+                {
+                    key: "deployable_project_type",
+                    status: projectTypeGateStatus,
+                    observed: projectType,
+                    required: "application",
+                },
                 { key: "schema_snapshot", status: "passed" },
                 {
                     key: "minimum_project_structure",

@@ -23,7 +23,7 @@ No FlutterFlow mutation, YAML update, code export, deployment, or store-release 
 - Project inspection requires an exact project ID present in that account's allowlist.
 - Unknown accounts, alternate origins, missing scopes, and non-allowlisted projects fail before a provider request.
 - Responses are bounded by time and byte limits and pass through MCPMaster's result redaction.
-- Project discovery is reduced to ID, name, dates, main-branch path, branch count, and update count. FlutterFlow owner and collaborator fields are discarded.
+- Project discovery is reduced to ID, name, dates, main-branch path, branch count, update count, project version, main-branch state, and the deployment-critical Library flag. FlutterFlow owner and collaborator fields are discarded.
 - Readiness returns counts and configuration signals, not file names or YAML contents.
 
 FlutterFlow documents the Project API as beta. The adapter therefore rejects an unrecognized response contract instead of guessing through provider drift. Official reference: <https://docs.flutterflow.io/resources/projects/settings/project-apis/>.
@@ -53,7 +53,13 @@ Optional bounded settings:
 
 ## Readiness semantics
 
-`flutterflow.inspect-readiness` verifies that the API token can see the exact project and that FlutterFlow returns partitioned-file metadata with a schema fingerprint. It records whether `app-details`, authentication, app state, theme, pages, components, and custom files are structurally present.
+`flutterflow.inspect-readiness` verifies that the API token can see the exact project and that FlutterFlow returns partitioned-file metadata with a schema fingerprint. It records whether `app-details`, authentication, app state, theme, pages, components, and custom files are structurally present. It also fails the `deployable_project_type` gate when FlutterFlow reports `isLibrary: true`, and fails closed when that signal is absent.
+
+FlutterFlow documents that publishing a project as a Library is irreversible and disables both web and mobile deployment. Restoring an application project requires cloning the Library, which clears deployment and Firestore settings: <https://docs.flutterflow.io/resources/projects/libraries/>.
+
+### Current bound-project finding
+
+The protected Vault-backed check on 2026-08-13 returned HTTP 200 for `pandoras-box-gj9hnb`, partitioner version 13, schema fingerprint `1ae5bba3c4f3415753be1563417e3a510488ff4e`, and 795 partitioned files. FlutterFlow reports the exact project as `isLibrary: true`. It is the only Pandora-named project visible to the bound account, so this project is not deployable as an app. A non-Library clone must be created and its cleared deployment and backend settings restored before the remaining release gates can be evaluated.
 
 The returned deployment status is always `blocked` until separate evidence exists for all remaining release gates:
 
