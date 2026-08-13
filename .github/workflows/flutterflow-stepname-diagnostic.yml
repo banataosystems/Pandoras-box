@@ -1,0 +1,82 @@
+name: FlutterFlow stepname diagnostic
+
+on:
+  push:
+    branches:
+      - codex/flutterflow-full-integration-candidate-20260814
+    paths:
+      - .github/workflows/flutterflow-stepname-diagnostic.yml
+
+permissions:
+  contents: read
+
+jaobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Run repaired patch locally
+        id: apply
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HELPER_BRANCH: codex/flutterflow-readiness-provider
+        run: |
+          set -euo pipefail
+          git init repo
+          cd repo
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags origin \
+            "refs/heads/${HELPER_BRANCH}:refs/remotes/origin/${HELPER_BRANCH}" \
+            main
+          git checkout -B work refs/remotes/origin/main
+          git show "refs/remotes/origin/${HELPER_BRANCH}:.github/workflows/flutterflow-full-integration.yml" > /tmp/helper.yml
+          awk '
+            /^      - name: Extend FlutterFlow Project API provider$/ { step=1; next }
+            step && /^        run: \|$/ { body=1; next }
+            body && /^      - name:/ { exit }
+            body {
+              if (substr($0,1,10) == "          ") print substr($0,11);
+              else print $0;
+            }
+          ' /tmp/helper.yml > /tmp/apply.py
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("/tmp/apply.py")
+          text = p.read_text()
+          bad = 'test_path.write_text(r\'\'"use strict";'
+          good = 'test_path.write_text(r \'\'\'"puse strict";'
+          if text.count(bad) != 1:
+              raise SystemExit(f"opener_count={text.count(bad)}")
+          text = text.replace(bad, good, 1)
+          lines = text.splitlines()
+          matches = []
+          for i in range(len(lines)-2):
+              if lines[i].strip() != "'''":
+                  continue
+              if lines[i+1].strip() != '")':
+                  continue
+              j = i + 2
+              while j < len(lines) and not lines[j].strip():
+                  j += 1
+              if j < len(lines) and lines[j].lstrip().startswith("wf = Path("):
+                  matches.append(i)
+          if len(matches) != 1:
+              raise SystemExit(f"tail_matches={matches}")
+          i = matches[0]
+          prefix = lines[i][:len(lines[i])-len(lines[i].lstrip())]
+          lines[i:i+2] = [prefix + "''')"]
+          p.write_text("\n".join(lines) + ("\n" if text.endswith("\n") else ""))
+          PY
+          python -m py_compile /tmp/apply.py
+          set +e
+          python /tmp/apply.py >/tmp/apply.stdout 2>/tmp/apply.stderr
+          code=$?
+          set -e
+          last="$(tail -n 1 /tmp/apply.stderr | sed 's/[^A-Za-z0-9_.:=()/\-]/_/g' | head -c 120)"
+          if [ -z "$last" ]; then last="none"; fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "kind=$last" >> "$GITHUB_OUTPUT"
+      - name: "Patch result ${{ steps.apply.outputs.code }} ${{ steps.apply.outputs.kind }}"
+        shell: bash
+        run: exit 1
