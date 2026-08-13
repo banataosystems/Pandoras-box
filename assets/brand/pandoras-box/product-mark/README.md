@@ -10,16 +10,19 @@ objects first preserved at commit
 wholesale. Each restored blob is tied to the approved master by the transform,
 dimensions, Git blob, and SHA-256 recorded in `manifest.json`.
 
-Run the deterministic verification from the repository root:
+Run the content-addressed integrity verification from the repository root. It
+does not require an image toolchain:
 
 ```sh
 node scripts/verify-pandora-brand-assets.mjs
 ```
 
-The verifier recreates every derivative with the recorded ImageMagick version,
-normalizes the historical PNG metadata, and requires exact byte equality. The
-optional `--write` mode restores only the known outputs after all expected
-hashes pass.
+To recreate every derivative, normalize the historical PNG metadata, and
+require exact byte equality, use
+`node scripts/verify-pandora-brand-assets.mjs --reproduce` with the exact
+ImageMagick version recorded in `manifest.json`. The optional `--write` mode
+performs the same reproduction checks and restores only the known outputs after
+all expected hashes pass.
 
 The black field is part of the approved treatment. Do not redraw, recolor,
 invert, trace, animate, remove the black field, or substitute a generic apple.

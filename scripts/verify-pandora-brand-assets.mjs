@@ -26,6 +26,7 @@ const appAssetPath = join(
   'apps/pandora-mobile/assets/brand/pandora-product-mark-ui-1024.png',
 );
 const shouldWrite = process.argv.includes('--write');
+const shouldReproduce = shouldWrite || process.argv.includes('--reproduce');
 
 const source = Object.freeze({
   sha256: 'd6f055b88b962b4dbae4ac67bc30f5e31b6c3a90997dfd5fddf9a0be23aa5970',
@@ -298,64 +299,74 @@ function verifyFile(path, expected, expectNormalizedTime) {
   );
 }
 
-const version = run('convert', ['-version']).split('\n')[0];
-if (!version.includes('ImageMagick 6.9.12-98 Q16 x86_64')) {
-  throw new Error(
-    `Exact derivative reproduction requires ImageMagick 6.9.12-98 Q16 x86_64; received: ${version}`,
-  );
-}
-
 verifyManifest();
 
 const master = readFileSync(masterPath);
 assertEqual(digest('sha256', master), source.sha256, 'provenance master SHA-256');
 assertEqual(gitBlobDigest(master), source.gitBlobSha1, 'provenance master Git blob');
 
-const workRoot = mkdtempSync(join(repoRoot, '.pandora-brand-assets-'));
-try {
-  buildDerivatives(workRoot);
-
+const ui1024 = outputs.find((item) => item.name === 'ui-mark-1024.png');
+if (!shouldWrite) {
   for (const output of outputs) {
-    const generated = join(workRoot, output.name);
-    const checkedIn = join(derivedRoot, output.name);
-    const normalizedTime = !output.name.endsWith('-1024.png');
-    verifyFile(generated, output, normalizedTime);
-    if (!shouldWrite) {
-      verifyFile(checkedIn, output, normalizedTime);
-      assertEqual(
-        readFileSync(generated).equals(readFileSync(checkedIn)),
-        true,
-        `${output.name} exact byte reproduction`,
-      );
-    }
+    verifyFile(
+      join(derivedRoot, output.name),
+      output,
+      !output.name.endsWith('-1024.png'),
+    );
+  }
+  verifyFile(appAssetPath, ui1024, false);
+}
+
+if (shouldReproduce) {
+  const version = run('convert', ['-version']).split('\n')[0];
+  if (!version.includes('ImageMagick 6.9.12-98 Q16 x86_64')) {
+    throw new Error(
+      `Exact derivative reproduction requires ImageMagick 6.9.12-98 Q16 x86_64; received: ${version}`,
+    );
   }
 
-  const ui1024 = outputs.find((item) => item.name === 'ui-mark-1024.png');
-  if (!shouldWrite) verifyFile(appAssetPath, ui1024, false);
-
-  if (shouldWrite) {
-    mkdirSync(derivedRoot, { recursive: true });
-    for (const output of outputs) {
-      copyFileSync(join(workRoot, output.name), join(derivedRoot, output.name));
-    }
-    mkdirSync(dirname(appAssetPath), { recursive: true });
-    copyFileSync(join(workRoot, 'ui-mark-1024.png'), appAssetPath);
+  const workRoot = mkdtempSync(join(repoRoot, '.pandora-brand-assets-'));
+  try {
+    buildDerivatives(workRoot);
 
     for (const output of outputs) {
-      verifyFile(
-        join(derivedRoot, output.name),
-        output,
-        !output.name.endsWith('-1024.png'),
-      );
+      const generated = join(workRoot, output.name);
+      const checkedIn = join(derivedRoot, output.name);
+      const normalizedTime = !output.name.endsWith('-1024.png');
+      verifyFile(generated, output, normalizedTime);
+      if (!shouldWrite) {
+        assertEqual(
+          readFileSync(generated).equals(readFileSync(checkedIn)),
+          true,
+          `${output.name} exact byte reproduction`,
+        );
+      }
     }
-    verifyFile(appAssetPath, ui1024, false);
+
+    if (shouldWrite) {
+      mkdirSync(derivedRoot, { recursive: true });
+      for (const output of outputs) {
+        copyFileSync(join(workRoot, output.name), join(derivedRoot, output.name));
+      }
+      mkdirSync(dirname(appAssetPath), { recursive: true });
+      copyFileSync(join(workRoot, 'ui-mark-1024.png'), appAssetPath);
+
+      for (const output of outputs) {
+        verifyFile(
+          join(derivedRoot, output.name),
+          output,
+          !output.name.endsWith('-1024.png'),
+        );
+      }
+      verifyFile(appAssetPath, ui1024, false);
+    }
+  } finally {
+    rmSync(workRoot, { recursive: true, force: true });
   }
-} finally {
-  rmSync(workRoot, { recursive: true, force: true });
 }
 
 console.log(
-  `Pandora brand assets verified: source + ${outputs.length} exact derivatives + Flutter UI copy${
-    shouldWrite ? ' (written)' : ''
-  }.`,
+  `Pandora brand assets verified: source + ${outputs.length} content-addressed derivatives + Flutter UI copy${
+    shouldReproduce ? ' + exact derivative reproduction' : ''
+  }${shouldWrite ? ' (written)' : ''}.`,
 );
