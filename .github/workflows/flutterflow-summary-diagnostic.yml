@@ -1,0 +1,70 @@
+name: FlutterFlow compile summary diagnostic
+
+on:
+  push:
+    branches:
+      - codex/flutterflow-full-integration-candidate-20260814
+    paths:
+      - .github/workflows/flutterflow-summary-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Compile and summarize
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HELPER_BRANCH: codex/flutterflow-readiness-provider
+        run: |
+          set -euo pipefail
+          git init repo
+          cd repo
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags origin "refs/heads/${HELPER_BRANCH}:refs/heads/helper"
+          git show refs/heads/helper:.github/workflows/flutterflow-full-integration.yml > /tmp/helper.yml
+          awk '
+            /^      - name: Extend FlutterFlow Project API provider$/ { step=1; next }
+            step && /^        run: \|$/ { body=1; next }
+            body && /^      - name:/ { exit }
+            body {
+              if (substr($0,1,10) == "          ") print substr($0,11);
+              else print $0;
+            }
+          ' /tmp/helper.yml > /tmp/apply.py
+          python - <<'PY' > /tmp/report.txt
+          from pathlib import Path
+          import subprocess, sys
+          p = Path("/tmp/apply.py")
+          t = p.read_text()
+          lines = t.splitlines()
+          matches = []
+          for i in range(len(lines) - 2):
+              if lines[i].strip() == "'''" and lines[i+1].strip() == '")':
+                  j = i + 2
+                  while j < len(lines) and not lines[j].strip():
+                      j += 1
+                  if j < len(lines) and lines[j].lstrip().startswith("wf = Path("):
+                      matches.append(i)
+          print("apply_lines=", len(lines))
+          print("matches=", matches)
+          if len(matches) == 1:
+              i = matches[0]
+              prefix = lines[i][:len(lines[i]) - len(lines[i].lstrip())]
+              lines[i:i+2] = [prefix + "''')"]
+              p.write_text("\n".join(lines) + ("\n" if t.endswith("\n") else ""))
+          r = subprocess.run([sys.executable, "-m", "py_compile", str(p)], text=True, capture_output=True)
+          print("compile_status=", r.returncode)
+          print("compile_stderr=")
+          print(r.stderr[-2000:])
+          PY
+          {
+            echo "## FlutterFlow patch compile diagnostic"
+            echo '```text'
+            cat /tmp/report.txt
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
