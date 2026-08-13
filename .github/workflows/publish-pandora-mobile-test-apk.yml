@@ -1,0 +1,48 @@
+name: Publish Pandora mobile test APK
+
+on:
+  push:
+    branches:
+      - 'artifact/pandora-mobile-0.1.1-2-release'
+    paths:
+      - '.github/workflows/publish-pandora-mobile-test-apk.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN_ID: '31718495356'
+      SOURCE_SHA: '256124d8ea1b2253f16491c20367a83e4b711a2b'
+      RELEASE_TAG: 'pandora-mobile-0.1.1-test.2'
+      RELEASE_ASSET: 'Pandora-Mobile-0.1.1-debug.apk'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact verified APK artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pandora-apk
+          gh run download "$SOURCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name pandora-mobile-android-debug \
+            --dir /tmp/pandora-apk
+          test -f /tmp/pandora-apk/app-debug.apk
+          cp /tmp/pandora-apk/app-debug.apk "/tmp/$RELEASE_ASSET"
+          sha256sum "/tmp/$RELEASE_ASSET" | tee /tmp/Pandora-Mobile-0.1.1-debug.apk.sha256
+      - name: Publish public prerelease asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE_SHA" \
+            --prerelease \
+            --title "Pandora Mobile 0.1.1 — Android test APK" \
+            --notes "Debug/test Android build from exact source $SOURCE_SHA. Passed ProjectOS security regression, flutter analyze, flutter test, Web release build, and Android APK build. This is not Play Store/release-signed and remains subject to authenticated on-device verification." \
+            "/tmp/$RELEASE_ASSET#Pandora Mobile Android test APK" \
+            "/tmp/Pandora-Mobile-0.1.1-debug.apk.sha256#SHA-256 checksum"
