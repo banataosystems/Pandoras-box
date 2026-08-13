@@ -33,42 +33,93 @@ jobs:
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
 
       - name: Recover reviewed FlutterFlow patch logic
+        id: recover
+        continue-on-error: true
         shell: bash
         env:
           HELPER_BRANCH: codex/flutterflow-readiness-provider
         run: |
-          set -euo pipefail
+          set -uo pipefail
           cd repo
-          git fetch --no-tags origin "refs/heads/${HELPER_BRANCH}:refs/remotes/origin/${HELPER_BRANCH}"
-          git show "refs/remotes/origin/${HELPER_BRANCH}:.github/workflows/flutterflow-full-integration.yml" > /tmp/flutterflow-helper.yml
-          python - <<'PY'
+          : > /tmp/flutterflow-patch-diagnostic.txt
+          if ! git fetch --no-tags origin "refs/heads/${HELPER_BRANCH}:refs/remotes/origin/${HELPER_BRANCH}" >>/tmp/flutterflow-patch-diagnostic.txt 2>&1; then
+            echo "stage=fetch-helper" >> /tmp/flutterflow-patch-diagnostic.txt
+            exit 1
+          fi
+          if ! git show "refs/remotes/origin/${HELPER_BRANCH}:.github/workflows/flutterflow-full-integration.yml" > /tmp/flutterflow-helper.yml 2>>/tmp/flutterflow-patch-diagnostic.txt; then
+            echo "stage=read-helper" >> /tmp/flutterflow-patch-diagnostic.txt
+            exit 1
+          fi
+          if ! python - <<'PY' >>/tmp/flutterflow-patch-diagnostic.txt 2>&1
           from pathlib import Path
+          import re
           import textwrap
 
           text = Path("/tmp/flutterflow-helper.yml").read_text()
-          marker = "      - name: Extend FlutterFlow Project API provider\n        shell: python\n        run: |\n"
-          if marker not in text:
-              raise SystemExit("reviewed FlutterFlow patch marker missing")
-          start = text.index(marker) + len(marker)
-          end_marker = "\n      - name:"
-          end = text.find(end_marker, start)
-          if end < 0:
-              raise SystemExit("reviewed FlutterFlow patch block terminator missing")
-          block = text[start:end]
+          label = "Extend FlutterFlow Project API provider"
+          label_pos = text.find(label)
+          if label_pos < 0:
+              names = re.findall(r"^\s*-\s+name:\s*(.+)$", text, flags=re.MULTILINE)
+              raise SystemExit("patch-step-label-missing; steps=" + " | ".join(names))
+          run_pos = text.find("run: |", label_pos)
+          if run_pos < 0:
+              raise SystemExit("patch-step-run-block-missing")
+          block_start = text.find("\n", run_pos) + 1
+          match = re.search(r"^      - name:\s+", text[block_start:], flags=re.MULTILINE)
+          block_end = block_start + match.start() if match else len(text)
+          block = text[block_start:block_end]
           script = textwrap.dedent(block)
-          if 'ff_path = Path("src/tools/flutterflow.js")' not in script:
-              raise SystemExit("reviewed patch does not target FlutterFlow provider")
-          if "updateProjectByYaml" not in script or "validateProjectYaml" not in script:
-              raise SystemExit("reviewed patch does not contain required FlutterFlow write/validate endpoints")
+          checks = [
+              'ff_path = Path("src/tools/flutterflow.js")',
+              "updateProjectByYaml",
+              "validateProjectYaml",
+              "flutterflow.list-files",
+              "flutterflow.read-project-yaml",
+              "flutterflow.update-project-yaml",
+          ]
+          missing = [item for item in checks if item not in script]
+          if missing:
+              raise SystemExit("reviewed-patch-content-missing=" + ",".join(missing))
           Path("/tmp/apply-flutterflow-integration.py").write_text(script)
+          print("patch-script-bytes=" + str(len(script.encode())))
           PY
-          python /tmp/apply-flutterflow-integration.py
+          then
+            echo "stage=extract-reviewed-patch" >> /tmp/flutterflow-patch-diagnostic.txt
+            exit 1
+          fi
+          if ! python /tmp/apply-flutterflow-integration.py >>/tmp/flutterflow-patch-diagnostic.txt 2>&1; then
+            echo "stage=apply-reviewed-patch" >> /tmp/flutterflow-patch-diagnostic.txt
+            exit 1
+          fi
+          echo "ok" > /tmp/flutterflow-patch-ok
+
+      - name: Preserve patch diagnostic if recovery fails
+        if: steps.recover.outcome == 'failure'
+        shell: bash
+        env:
+          TARGET_BRANCH: codex/flutterflow-full-integration-20260814
+        run: |
+          set -euo pipefail
+          cd repo
+          mkdir -p recovery/evidence/flutterflow
+          {
+            echo "FlutterFlow patch recovery failed closed."
+            echo "source_head=${GITHUB_SHA}"
+            echo "helper_branch=codex/flutterflow-readiness-provider"
+            cat /tmp/flutterflow-patch-diagnostic.txt
+          } > recovery/evidence/flutterflow/full-integration-patch-diagnostic.txt
+          git add recovery/evidence/flutterflow/full-integration-patch-diagnostic.txt
+          git commit -m "evidence: preserve FlutterFlow patch recovery failure"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
+          exit 1
 
       - name: Fail closed on unintended paths
+        if: steps.recover.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
           cd repo
+          test -f /tmp/flutterflow-patch-ok
           git diff --name-only | sort | tee /tmp/changed-paths.txt
           test -s /tmp/changed-paths.txt
           while IFS= read -r path; do
@@ -83,6 +134,7 @@ jobs:
           done < /tmp/changed-paths.txt
 
       - name: Verify exact candidate
+        if: steps.recover.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
@@ -94,6 +146,7 @@ jobs:
           git diff --check
 
       - name: Publish verified candidate only
+        if: steps.recover.outcome == 'success'
         shell: bash
         env:
           TARGET_BRANCH: codex/flutterflow-full-integration-20260814
