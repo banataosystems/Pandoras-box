@@ -1,0 +1,11 @@
+branch_head=e724a003b4c4cd53ace45e6424e0d0241969271b
+helper_head=0f22e12322dec872fc842029f1292a6488844d01
+apply_bytes=17540
+first_line=from pathlib import Path
+python_status=1
+--- stdout ---
+--- stderr ---
+  File "/tmp/apply.py", line 472
+    '''
+    ^
+SyntaxError: unterminated triple-quoted string literal (detected at line 479)
