@@ -361,6 +361,95 @@ async function catalogAssertions(db, migrationFiles) {
     'decide_approval still admits operator',
   );
 
+  const sourcePolicy = await db.query(`
+    select source_type, source_value, wildcard, operational_status
+    from private.repository_source_policies
+    where source_type = 'github_owner'
+      and source_value = 'mbanatao'
+  `);
+  assert.deepEqual(sourcePolicy.rows, [{
+    source_type: 'github_owner',
+    source_value: 'mbanatao',
+    wildcard: 'mbanatao/*',
+    operational_status: 'historical_only',
+  }], 'owner-wide repository source policy drifted');
+
+  const historicalBindings = await db.query(`
+    select repo_full_name, github_access, source_status
+    from private.project_resource_bindings
+    where lower(split_part(repo_full_name, '/', 1)) = 'mbanatao'
+    order by lower(repo_full_name)
+  `);
+  assert.ok(historicalBindings.rows.length > 0, 'historical repository bindings are missing');
+  assert.ok(
+    historicalBindings.rows.every((binding) =>
+      binding.github_access === 'read_only' && binding.source_status === 'historical_only'),
+    'an mbanatao repository binding remains operational',
+  );
+
+  const canonicalBinding = await db.query(`
+    select github_access, supabase_project_ref, vercel_project_id, source_status
+    from private.project_resource_bindings
+    where repo_full_name = 'banataosystems/fxpass'
+  `);
+  assert.deepEqual(canonicalBinding.rows, [{
+    github_access: 'read_write',
+    supabase_project_ref: 'jhygppdcfrmejbzyozud',
+    vercel_project_id: 'prj_t9cl0GiY9APSTw2NUNJLtRg6auwZ',
+    source_status: 'active',
+  }], 'canonical FXPass binding drifted');
+
+  const sourceTrigger = await db.query(`
+    select procedure.prosecdef as security_definer,
+           procedure.proconfig as configuration,
+           has_function_privilege('anon', procedure.oid, 'EXECUTE') as anon_execute,
+           has_function_privilege('authenticated', procedure.oid, 'EXECUTE') as authenticated_execute,
+           has_function_privilege('service_role', procedure.oid, 'EXECUTE') as service_execute
+    from pg_trigger trigger
+    join pg_proc procedure on procedure.oid = trigger.tgfoid
+    join pg_class relation on relation.oid = trigger.tgrelid
+    join pg_namespace namespace on namespace.oid = relation.relnamespace
+    where namespace.nspname = 'public'
+      and relation.relname = 'projectos_projects'
+      and trigger.tgname = 'enforce_repository_source_authority'
+      and not trigger.tgisinternal
+  `);
+  assert.equal(sourceTrigger.rows.length, 1, 'repository source trigger is missing');
+  assert.equal(sourceTrigger.rows[0].security_definer, true, 'repository source trigger is not security-definer');
+  assert.equal(sourceTrigger.rows[0].anon_execute, false, 'anon can execute the repository source trigger');
+  assert.equal(sourceTrigger.rows[0].authenticated_execute, false, 'authenticated can execute the repository source trigger');
+  assert.equal(sourceTrigger.rows[0].service_execute, true, 'service_role cannot execute the repository source trigger');
+  assert.ok(
+    sourceTrigger.rows[0].configuration?.some((entry) => /^search_path=(?:""|)$/i.test(entry)),
+    'repository source trigger search path is not pinned empty',
+  );
+
+  const fxpassIntake = await db.query(`
+    select pg_get_functiondef(
+      'public.projectos_accept_fxpass_product_intake(uuid,jsonb)'::regprocedure
+    ) as definition
+  `);
+  assert.match(fxpassIntake.rows[0].definition, /banataosystems\/fxpass/i, 'FXPass intake lacks canonical repository');
+  assert.doesNotMatch(fxpassIntake.rows[0].definition, /mbanatao\/fong/i, 'FXPass intake retains historical repository');
+
+  let mixedCaseSourceDenied = false;
+  try {
+    await db.exec(`
+      insert into public.projectos_projects (
+        organization_id, project_key, name, repository, workspace_path
+      ) values (
+        '2270b266-59da-4c39-bfd9-9f8d08352af0',
+        'blocked-source-replay',
+        'Blocked source replay',
+        'MBANATAO/blocked-source-replay',
+        'projectos/projects/blocked-source-replay'
+      )
+    `);
+  } catch (error) {
+    mixedCaseSourceDenied = error?.code === '42501';
+  }
+  assert.equal(mixedCaseSourceDenied, true, 'mixed-case mbanatao repository was not rejected');
+
   const secrets = await db.query(`
     select secret_name, length(secret_value) as value_length
     from private.integration_secrets
@@ -404,6 +493,12 @@ async function catalogAssertions(db, migrationFiles) {
       meta_drafts_policy_count: 2,
       final_decide_approval: 'AAL1 permanent owner/admin; anon/operator/session dependency denied',
       replay_credentials: 'four database-generated 256-bit values; no source literals',
+      source_authority: {
+        owner_wildcard: 'mbanatao/*',
+        historical_binding_count: historicalBindings.rows.length,
+        canonical_fxpass_binding: 'active',
+        mixed_case_repository_insert: 'denied',
+      },
       authorization_smoke: authorization,
       database_rollback_smoke: rollback,
     },
@@ -414,7 +509,7 @@ async function main() {
   const filenames = (await readdir(migrationRoot))
     .filter((name) => /^\d{14}_.+\.sql$/.test(name))
     .sort();
-  assert.equal(filenames.length, 51, 'expected 50 historical migrations plus one pending AAL1 migration');
+  assert.equal(filenames.length, 52, 'expected 50 historical migrations plus two applied changes');
   const migrationFiles = await Promise.all(filenames.map(async (filename) => ({
     filename,
     source: await readFile(join(migrationRoot, filename), 'utf8'),

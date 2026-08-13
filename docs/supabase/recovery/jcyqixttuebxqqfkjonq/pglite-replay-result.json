@@ -6,8 +6,8 @@
     "postgres_server_version_num": "180003"
   },
   "provider_equivalence": false,
-  "migration_count": 51,
-  "chain_sha256": "e93cec23e645cde9337dbb27c86ffdd7f897780a3985d24c37d147374954f7c7",
+  "migration_count": 52,
+  "chain_sha256": "77e2dbe177cac4eddd8b6de03bc98cd98c4c4d2bfd5a0dfd7bde6cff174a56fb",
   "provider_extension_substitutions": [
     {
       "filename": "20260728150403_enable_http_for_supabase_account_discovery.sql",
@@ -36,6 +36,12 @@
     "meta_drafts_policy_count": 2,
     "final_decide_approval": "AAL1 permanent owner/admin; anon/operator/session dependency denied",
     "replay_credentials": "four database-generated 256-bit values; no source literals",
+    "source_authority": {
+      "owner_wildcard": "mbanatao/*",
+      "historical_binding_count": 14,
+      "canonical_fxpass_binding": "active",
+      "mixed_case_repository_insert": "denied"
+    },
     "authorization_smoke": {
       "aal1_owner_without_session": "approved",
       "operator": "denied",

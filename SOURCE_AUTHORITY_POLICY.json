@@ -1,6 +1,6 @@
 {
-  "schema_version": "1.0.0",
-  "effective_date": "2026-08-08",
+  "schema_version": "1.1.0",
+  "effective_date": "2026-08-13",
   "project_key": "mcpmaster-pandoras-box",
   "mode": "fail_closed",
   "canonical": {
@@ -10,13 +10,10 @@
   },
   "deprecated_operational_sources": [
     {
-      "type": "github_repository",
-      "value": "mbanatao/mcpmaster",
-      "status": "historical_only"
-    },
-    {
-      "type": "github_repository",
-      "value": "mbanatao/Memory",
+      "type": "github_owner",
+      "value": "mbanatao",
+      "wildcard": "mbanatao/*",
+      "match": "case_insensitive_owner",
       "status": "historical_only"
     }
   ],
@@ -25,15 +22,7 @@
       "type": "vercel_git_metadata",
       "match": {
         "githubOrg": "mbanatao",
-        "githubRepo": "mcpmaster"
-      },
-      "authority": "evidence_only"
-    },
-    {
-      "type": "vercel_git_metadata",
-      "match": {
-        "githubOrg": "mbanatao",
-        "githubRepo": "Memory"
+        "githubRepo": "*"
       },
       "authority": "evidence_only"
     },
@@ -70,8 +59,8 @@
     "Pandora_hard_canon_current_state",
     "banataosystems/Pandoras-box_exact_committed_source_and_manifests",
     "exact_verified_Vercel_or_Supabase_runtime_evidence",
-    "deprecated_mbanatao_sources_as_historical_evidence_only"
+    "any_mbanatao_owner_source_as_historical_evidence_only"
   ],
   "preservation_rule": "Do not delete or rewrite historical evidence. Quarantine it from operational authority instead.",
-  "owner_directive": "Previous Pandora/MCPMaster repositories and stale old-source metadata must no longer cause source selection or status confusion."
+  "owner_directive": "Every repository owned by mbanatao is operationally blacklisted. Preserve it only as historical evidence and never select it for new work, routing, build, release, or current-state authority."
 }

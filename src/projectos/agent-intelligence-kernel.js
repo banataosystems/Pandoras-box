@@ -5,6 +5,7 @@ exports.canonicalAgentVendor = canonicalAgentVendor;
 const agent_qualification_1 = require("./agent-qualification");
 const router_1 = require("./router");
 const repair_policy_1 = require("./repair-policy");
+const source_authority_js_1 = require("../runtime/source-authority.js");
 const VENDOR_ALIASES = [
     { canonical: 'openai', aliases: ['openai', 'chatgpt', 'codex'] },
     { canonical: 'google', aliases: ['google', 'gemini', 'jules'] },
@@ -28,6 +29,7 @@ function requireRoutingRequest(request) {
         throw new Error('routing requires a non-empty work item ID');
     if (!request.repository.trim())
         throw new Error('routing requires a non-empty repository');
+    (0, source_authority_js_1.assertOperationalRepository)(request.repository, 'route work to');
     if (!request.capability.trim())
         throw new Error('routing requires a non-empty capability');
     if (!Number.isFinite(request.now) || request.now < 0)

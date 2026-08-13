@@ -5,6 +5,7 @@ exports.buildExecutionIntakeRequest = buildExecutionIntakeRequest;
 exports.shouldEnforceMandatoryIntake = shouldEnforceMandatoryIntake;
 const zod_1 = require("zod");
 const control_client_js_1 = require("../projectos/control-client.js");
+const source_authority_js_1 = require("./source-authority.js");
 const RepositorySchema = zod_1.z.string().regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/);
 const ProjectKeySchema = zod_1.z.string().regex(/^[a-z0-9][a-z0-9._-]{0,79}$/);
 const IntakeResultSchema = zod_1.z.object({
@@ -76,6 +77,8 @@ function requestType(tool) {
 }
 function buildExecutionIntakeRequest(input) {
     const repository = repositoryFromArgs(input.args);
+    if (repository)
+        (0, source_authority_js_1.assertOperationalRepository)(repository, 'create new work for');
     const explicitProjectKey = projectKeyFromArgs(input.args);
     const fallbackProjectKey = repository ? undefined : 'mcpmaster';
     const resolvedProjectKey = explicitProjectKey ?? fallbackProjectKey;
