@@ -9,13 +9,19 @@ fi
 scan_temp_root="${RUNNER_TEMP:-${TMPDIR:-.}}"
 scan_output="$(mktemp "${scan_temp_root%/}/pandora-private-key-scan.XXXXXX")"
 trap 'rm -f "$scan_output"' EXIT
+private_key_prefix='-----BEGIN '
+private_key_suffix='PRIVATE KEY-----'
+private_key_patterns=()
+for key_label in '' 'RSA ' 'EC ' 'OPENSSH '; do
+  private_key_patterns+=(-e "${private_key_prefix}${key_label}${private_key_suffix}")
+done
 
 set +e
 grep -RIl \
   --exclude='*.md' \
   --exclude='*.patch' \
   --exclude-dir='.git' \
-  -e '-----BEGIN PRIVATE KEY-----' \
+  "${private_key_patterns[@]}" \
   -- "$@" > "$scan_output"
 scan_status=$?
 set -e

@@ -43,6 +43,7 @@ test('security regression runs whenever any workflow changes', () => {
 test('exceptional recovery publishers cannot run automatically', () => {
   for (const filename of [
     'recover-canonical-source.yml',
+    'recover-operational-core.yml',
     'recovery-actions-write-probe.yml',
   ]) {
     const source = fs.readFileSync(path.join(workflowDirectory, filename), 'utf8');
@@ -52,40 +53,33 @@ test('exceptional recovery publishers cannot run automatically', () => {
   }
 });
 
-test('operational recovery separates PR validation from trusted publication', () => {
+test('broken operational transport remains quarantined and read-only', () => {
   const source = fs.readFileSync(
     path.join(workflowDirectory, 'recover-operational-core.yml'),
     'utf8',
   );
 
-  assert.match(source, /validate-core:[\s\S]*?permissions:\n\s+contents: read/);
+  assert.match(source, /^permissions:\n\s+contents: read$/m);
+  assert.doesNotMatch(source, /contents: write/);
+  assert.doesNotMatch(source, /git (?:commit|push)/);
+  assert.doesNotMatch(source, /base64 -d|tar -x/);
   assert.match(
     source,
-    /publish-core:[\s\S]*?github\.event_name == 'workflow_dispatch'[\s\S]*?github\.ref == 'refs\/heads\/main'[\s\S]*?permissions:\n\s+contents: write/,
+    /Legacy operational transport is incomplete and quarantined/,
   );
-  assert.match(
-    source,
-    /outputs:\n\s+validated_sha: \$\{\{ steps\.validated_source\.outputs\.sha \}\}/,
-  );
-  assert.match(
-    source,
-    /publish-core:[\s\S]*?ref: \$\{\{ needs\.validate-core\.outputs\.validated_sha \}\}/,
-  );
-  assert.doesNotMatch(
-    source,
-    /publish-core:[\s\S]*?ref: recovery\/materialize-source/,
-  );
-  assert.doesNotMatch(source, /git push origin HEAD:recovery\/materialize-source/);
-  assert.match(
-    source,
-    /branch="recovery\/materialize-source-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}"/,
-  );
-  assert.match(source, /- 'patches\/\*\*'/);
-  assert.match(source, /- 'scripts\/check-private-key-literals\.sh'/);
   assert.equal(
     source.match(/bash scripts\/check-private-key-literals\.sh/g)?.length,
-    2,
+    1,
   );
+  for (const requiredPath of [
+    'vercel-entrypoint.js',
+    'vercel.json',
+    'src',
+    'packages',
+    'supabase',
+  ]) {
+    assert.match(source, new RegExp(`(?:^|\\s)${requiredPath.replace('.', '\\.')}(?:\\s|$)`));
+  }
 });
 
 test('private-key marker scan fails closed', () => {
@@ -101,11 +95,15 @@ test('private-key marker scan fails closed', () => {
     fs.writeFileSync(safeFile, 'ordinary source\n');
     assert.equal(spawnSync('bash', [scanner, fixture]).status, 0);
 
-    fs.writeFileSync(
-      path.join(fixture, 'unsafe.txt'),
-      '-----BEGIN PRIVATE KEY-----\nfixture\n',
-    );
-    assert.equal(spawnSync('bash', [scanner, fixture]).status, 1);
+    for (const [index, label] of ['', 'RSA ', 'EC ', 'OPENSSH '].entries()) {
+      const unsafeFile = path.join(fixture, `unsafe-${index}.txt`);
+      fs.writeFileSync(
+        unsafeFile,
+        `-----BEGIN ${label}PRIVATE KEY-----\nfixture\n`,
+      );
+      assert.equal(spawnSync('bash', [scanner, fixture]).status, 1);
+      fs.rmSync(unsafeFile);
+    }
 
     assert.notEqual(
       spawnSync('bash', [scanner, path.join(fixture, 'missing')]).status,
