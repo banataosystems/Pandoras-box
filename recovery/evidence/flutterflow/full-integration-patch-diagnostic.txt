@@ -1,0 +1,10 @@
+FlutterFlow patch recovery failed closed.
+source_head=1fb68a1f93e7652988c9090dc5b4b179f170864c
+helper_branch=codex/flutterflow-readiness-provider
+From https://github.com/banataosystems/Pandoras-box
+ * [new branch]      codex/flutterflow-readiness-provider -> origin/codex/flutterflow-readiness-provider
+patch-script-bytes=18408
+  File "/tmp/apply-flutterflow-integration.py", line 1
+    from pathlib import Path
+IndentationError: unexpected indent
+stage=apply-reviewed-patch
