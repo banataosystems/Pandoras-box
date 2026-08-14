@@ -1,0 +1,438 @@
+name: Bootstrap governed Memory evidence intake
+
+on:
+  push:
+    branches:
+      - feature/projectos-memory-evidence-intake
+    paths:
+      - '.github/workflows/memory-evidence-intake-bootstrap.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'chore: bootstrap memory evidence intake'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact feature head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Patch bounded Memory evidence intake
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const intakeModule = `"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.EvidenceCandidateArgsSchema = void 0;
+exports.submitEvidenceCandidate = submitEvidenceCandidate;
+
+const { z } = require("zod");
+
+const MAX_RESPONSE_BYTES = 100_000;
+const DEFAULT_TIMEOUT_MS = 8_000;
+const NamespaceSchema = z.enum(["real_life", "au"]);
+const ProofStageSchema = z.enum([
+  "documented",
+  "implemented",
+  "tested",
+  "deployed",
+  "production_verified",
+]);
+
+const EvidenceRefSchema = z.object({
+  type: z.string().trim().min(1).max(64),
+  ref: z.string().trim().min(1).max(512),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  artifact_class: z.string().trim().min(1).max(64).optional(),
+  observed_at: z.string().datetime({ offset: true }).optional(),
+}).strict();
+
+const ProvenanceSchema = z.object({
+  source_type: z.string().trim().min(1).max(64),
+  source_locator: z.string().trim().min(1).max(512),
+  source_sha: z.string().regex(/^[a-f0-9]{40}$/).optional(),
+  parent_sha: z.string().regex(/^[a-f0-9]{40}$/).optional(),
+  observed_at: z.string().datetime({ offset: true }),
+}).strict();
+
+exports.EvidenceCandidateArgsSchema = z.object({
+  namespace: NamespaceSchema,
+  projectId: z.string().uuid().optional(),
+  projectKey: z.string().trim().regex(/^[a-z0-9][a-z0-9._-]{1,95}$/).optional(),
+  title: z.string().trim().min(1).max(200),
+  summary: z.string().trim().min(1).max(4000),
+  proofStage: ProofStageSchema,
+  claim: z.string().trim().min(1).max(1000),
+  evidenceRefs: z.array(EvidenceRefSchema).min(1).max(20),
+  provenance: ProvenanceSchema,
+  idempotencyKey: z.string().trim().regex(/^[A-Za-z0-9._:-]{16,160}$/),
+}).strict().refine((value) => Boolean(value.projectId || value.projectKey), {
+  message: "projectId or projectKey is required",
+});
+
+function normalizeOrigin(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("Pandora Memory origin is invalid");
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    (url.pathname !== "/" && url.pathname !== "")
+  ) {
+    throw new Error("Pandora Memory origin must be a clean HTTPS origin");
+  }
+  return url.origin;
+}
+
+function sensitiveReason(value) {
+  const text = JSON.stringify(value);
+  const checks = [
+    [/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/i, "direct_identifier_email"],
+    [/\\b(?:ghp|github_pat|glpat|sk|sbp|xox[baprs])_[A-Za-z0-9_-]{12,}\\b/i, "credential_signature"],
+    [/\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\b/, "jwt_signature"],
+    [/\\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|service[_-]?role|private[_-]?key)\\s*[:=]\\s*["']?[A-Za-z0-9_./+=-]{12,}/i, "secret_assignment"],
+  ];
+  for (const [pattern, reason] of checks) {
+    if (pattern.test(text)) return reason;
+  }
+  return null;
+}
+
+async function readBounded(response, maxBytes) {
+  const declared = Number(response.headers?.get?.("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new Error("Pandora Memory response exceeded size limit");
+  }
+  const text = await response.text();
+  if (Buffer.byteLength(text, "utf8") > maxBytes) {
+    throw new Error("Pandora Memory response exceeded size limit");
+  }
+  return text;
+}
+
+async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis.fetch) {
+  const input = exports.EvidenceCandidateArgsSchema.parse(args);
+  if (!configuration?.allowedNamespaces?.includes(input.namespace)) {
+    throw new Error(`Pandora Memory namespace is not allowed: ${input.namespace}`);
+  }
+  if (!configuration?.grantedScopes?.includes("memory:write")) {
+    throw new Error("Pandora Memory write scope is not granted");
+  }
+  const reason = sensitiveReason(input);
+  if (reason) {
+    throw new Error(`Pandora Memory candidate rejected: ${reason}`);
+  }
+  if (typeof fetchFn !== "function") {
+    throw new Error("Pandora Memory fetch transport is unavailable");
+  }
+
+  const origin = normalizeOrigin(configuration.baseUrl);
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    Math.min(Number(configuration.timeoutMs || DEFAULT_TIMEOUT_MS), 30_000),
+  );
+
+  const payload = {
+    namespace: input.namespace,
+    project_id: input.projectId ?? null,
+    project_key: input.projectKey ?? null,
+    title: input.title,
+    summary: input.summary,
+    proof_stage: input.proofStage,
+    claim: input.claim,
+    evidence_refs: input.evidenceRefs,
+    provenance: input.provenance,
+    idempotency_key: input.idempotencyKey,
+  };
+
+  try {
+    const response = await fetchFn(`${origin}/api/projectos/memory/evidence-candidates`, {
+      method: "POST",
+      redirect: "error",
+      cache: "no-store",
+      headers: {
+        "content-type": "application/json",
+        "accept": "application/json",
+        "x-pandora-vercel-oidc": configuration.oidcToken,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    const text = await readBounded(
+      response,
+      Math.min(Number(configuration.maxResponseBytes || MAX_RESPONSE_BYTES), MAX_RESPONSE_BYTES),
+    );
+    let body = {};
+    try {
+      body = text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error("Pandora Memory candidate response was not valid JSON");
+    }
+    if (!response.ok || body?.ok === false) {
+      throw new Error(`Pandora Memory candidate submission failed (${response.status})`);
+    }
+    if (body?.status !== "pending_review") {
+      throw new Error("Pandora Memory candidate did not remain pending review");
+    }
+
+    return {
+      ok: true,
+      candidateId: body.candidate_id ?? null,
+      status: "pending_review",
+      deduplicated: body.deduplicated === true,
+      idempotencyKey: body.idempotency_key ?? input.idempotencyKey,
+      namespace: body.namespace ?? input.namespace,
+      projectId: body.project_id ?? input.projectId ?? null,
+      projectKey: body.project_key ?? input.projectKey ?? null,
+      proofStage: body.proof_stage ?? input.proofStage,
+      createdAt: body.created_at ?? null,
+      canonicalPromoted: false,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+`;
+
+          const intakeTest = `"use strict";
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+
+const {
+  EvidenceCandidateArgsSchema,
+  submitEvidenceCandidate,
+} = require("../src/tools/memory-evidence-intake.js");
+const { memoryTools } = require("../src/tools/memory.js");
+const { getToolManifest } = require("../src/runtime/tool-manifest.js");
+
+const SHA40 = "0b6d32b9135e2050c4f819a8d7ac3c78e6bc1117";
+const SHA256 = "4a10f26ebe4e760c984b89ecc741ba77ba0213dcad6205f3d1851a887f624545";
+
+function validArgs() {
+  return {
+    namespace: "real_life",
+    projectKey: "mcpmaster-pandoras-box",
+    title: "Pandora Mobile owner-device read-only journey",
+    summary: "Owner-operated Android journey verified installation, authentication, live reads, and primary read-only navigation.",
+    proofStage: "tested",
+    claim: "Physical Android authenticated read-only foundation is tested; merge, deployment, and production remain unverified.",
+    evidenceRefs: [
+      { type: "video_sha256", ref: SHA256, sha256: SHA256, artifact_class: "private-raw-evidence" },
+      { type: "github_source", ref: "banataosystems/Pandoras-box#37@" + SHA40 },
+    ],
+    provenance: {
+      source_type: "owner_device_recording",
+      source_locator: "conversation-attachment:2908.mp4",
+      source_sha: SHA40,
+      observed_at: "2026-08-14T10:00:00+08:00",
+    },
+    idempotencyKey: "pandora-mobile:" + SHA40 + ":owner-device-readonly",
+  };
+}
+
+const config = {
+  baseUrl: "https://pandorasbox-memory.vercel.app",
+  oidcToken: "header.payload.signature",
+  allowedNamespaces: ["real_life"],
+  grantedScopes: ["memory:read", "memory:write"],
+  timeoutMs: 1000,
+  maxResponseBytes: 100000,
+};
+
+test("candidate schema requires a project identity and exact proof stage", () => {
+  const parsed = EvidenceCandidateArgsSchema.parse(validArgs());
+  assert.equal(parsed.proofStage, "tested");
+  assert.throws(() => EvidenceCandidateArgsSchema.parse({ ...validArgs(), projectKey: undefined }));
+  assert.throws(() => EvidenceCandidateArgsSchema.parse({ ...validArgs(), proofStage: "done" }));
+});
+
+test("memory tool and manifest expose governed write semantics", () => {
+  assert.ok(memoryTools["memory.submitEvidenceCandidate"]);
+  const manifest = getToolManifest("memory.submitEvidenceCandidate");
+  assert.equal(manifest.provider, "memory");
+  assert.equal(manifest.risk, "write");
+  assert.equal(manifest.mutation, true);
+  assert.deepEqual(manifest.requiredProviderScopes, ["memory:write"]);
+});
+
+test("submission is bounded, OIDC-authenticated, and remains pending review", async () => {
+  let observed;
+  const result = await submitEvidenceCandidate(validArgs(), config, async (url, init) => {
+    observed = { url, init, body: JSON.parse(init.body) };
+    return new Response(JSON.stringify({
+      ok: true,
+      candidate_id: "11111111-1111-4111-8111-111111111111",
+      status: "pending_review",
+      idempotency_key: validArgs().idempotencyKey,
+      namespace: "real_life",
+      project_key: "mcpmaster-pandoras-box",
+      proof_stage: "tested",
+      deduplicated: false,
+      created_at: "2026-08-14T11:00:00Z",
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  assert.equal(observed.url, "https://pandorasbox-memory.vercel.app/api/projectos/memory/evidence-candidates");
+  assert.equal(observed.init.method, "POST");
+  assert.equal(observed.init.headers["x-pandora-vercel-oidc"], config.oidcToken);
+  assert.equal(observed.body.proof_stage, "tested");
+  assert.equal(result.status, "pending_review");
+  assert.equal(result.canonicalPromoted, false);
+});
+
+test("direct identifiers and credential signatures are rejected before network I/O", async () => {
+  let called = false;
+  const fetchFn = async () => { called = true; throw new Error("must not call"); };
+  await assert.rejects(
+    () => submitEvidenceCandidate({ ...validArgs(), summary: "owner email owner@example.com" }, config, fetchFn),
+    /direct_identifier_email/,
+  );
+  await assert.rejects(
+    () => submitEvidenceCandidate({ ...validArgs(), summary: "token sk_example123456789012345" }, config, fetchFn),
+    /credential_signature/,
+  );
+  assert.equal(called, false);
+});
+
+test("write scope is fail-closed and non-pending responses are rejected", async () => {
+  await assert.rejects(
+    () => submitEvidenceCandidate(validArgs(), { ...config, grantedScopes: ["memory:read"] }, async () => {
+      throw new Error("must not call");
+    }),
+    /write scope is not granted/,
+  );
+
+  await assert.rejects(
+    () => submitEvidenceCandidate(validArgs(), config, async () =>
+      new Response(JSON.stringify({ ok: true, status: "hard_canon" }), { status: 200 })),
+    /did not remain pending review/,
+  );
+});
+`;
+
+          fs.writeFileSync("src/tools/memory-evidence-intake.js", intakeModule);
+          fs.writeFileSync("test/memory-evidence-intake.test.js", intakeTest);
+
+          const memoryPath = "src/tools/memory.js";
+          let memory = fs.readFileSync(memoryPath, "utf8");
+          const requireNeedle = 'const memory_governance_1 = require("./memory-governance");';
+          if (!memory.includes(requireNeedle)) throw new Error("memory-governance require anchor missing");
+          memory = memory.replace(
+            requireNeedle,
+            requireNeedle + '\\nconst memory_evidence_intake_1 = require("./memory-evidence-intake");',
+          );
+
+          const definitionAnchor = "    'memory.canonicalContext': {";
+          if (!memory.includes(definitionAnchor)) throw new Error("memory tool definition anchor missing");
+          const definition = `    'memory.submitEvidenceCandidate': {
+        description: 'Submit a sanitized, project-scoped evidence candidate to Pandora Memory for human review. This never promotes canonical Memory automatically',
+        parameters: {
+            type: 'object',
+            properties: {
+                namespace: { type: 'string', enum: ['real_life', 'au'] },
+                projectId: { type: 'string', description: 'Exact ProjectOS project UUID when known' },
+                projectKey: { type: 'string', description: 'Exact ProjectOS project key when known' },
+                title: { type: 'string' },
+                summary: { type: 'string' },
+                proofStage: { type: 'string', enum: ['documented', 'implemented', 'tested', 'deployed', 'production_verified'] },
+                claim: { type: 'string' },
+                evidenceRefs: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            type: { type: 'string' },
+                            ref: { type: 'string' },
+                            sha256: { type: 'string' },
+                            artifact_class: { type: 'string' },
+                            observed_at: { type: 'string' },
+                        },
+                        required: ['type', 'ref'],
+                    },
+                },
+                provenance: {
+                    type: 'object',
+                    properties: {
+                        source_type: { type: 'string' },
+                        source_locator: { type: 'string' },
+                        source_sha: { type: 'string' },
+                        parent_sha: { type: 'string' },
+                        observed_at: { type: 'string' },
+                    },
+                    required: ['source_type', 'source_locator', 'observed_at'],
+                },
+                idempotencyKey: { type: 'string' },
+            },
+            required: ['namespace', 'title', 'summary', 'proofStage', 'claim', 'evidenceRefs', 'provenance', 'idempotencyKey'],
+            additionalProperties: false,
+        },
+    },
+`;
+          memory = memory.replace(definitionAnchor, definition + definitionAnchor);
+
+          const switchAnchor = "        case 'memory.canonicalContext':";
+          if (!memory.includes(switchAnchor)) throw new Error("memory tool switch anchor missing");
+          memory = memory.replace(
+            switchAnchor,
+            "        case 'memory.submitEvidenceCandidate':\\n" +
+            "            return (0, memory_evidence_intake_1.submitEvidenceCandidate)(args, configuration, fetchFn);\\n" +
+            switchAnchor,
+          );
+          fs.writeFileSync(memoryPath, memory);
+
+          const manifestPath = "src/runtime/tool-manifest.js";
+          let manifest = fs.readFileSync(manifestPath, "utf8");
+          const closeAnchor = "\\n];\\nexports.toolManifests";
+          const idx = manifest.indexOf(closeAnchor);
+          if (idx < 0) throw new Error("tool manifest entries close anchor missing");
+          const manifestLine =
+            "    manifest('memory.submitEvidenceCandidate', 'memory', 'write', true, 'project', ['memory:write']),";
+          manifest = manifest.slice(0, idx) + "\\n" + manifestLine + manifest.slice(idx);
+          fs.writeFileSync(manifestPath, manifest);
+          NODE
+
+      - name: Verify exact bounded change
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -c src/tools/memory-evidence-intake.js
+          node -c src/tools/memory.js
+          node -c src/runtime/tool-manifest.js
+          node --test test/memory-evidence-intake.test.js
+
+      - name: Run repository verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run check
+          npm test
+
+      - name: Commit source change and retire bootstrap workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/memory-evidence-intake-bootstrap.yml
+          git add src/tools/memory.js src/tools/memory-evidence-intake.js src/runtime/tool-manifest.js test/memory-evidence-intake.test.js
+          git diff --cached --check
+          git commit -m "feat: add governed Memory evidence candidate intake"
+          git push origin HEAD:feature/projectos-memory-evidence-intake
