@@ -285,13 +285,18 @@ function memoryScopes() {
     const scopes = configured.length > 0
         ? [...new Set(configured)]
         : ['memory:health', 'memory:read'];
-    const invalid = scopes.filter((scope) => scope !== 'memory:health' && scope !== 'memory:read');
+    const invalid = scopes.filter((scope) => scope !== 'memory:health'
+        && scope !== 'memory:read'
+        && scope !== 'memory:write');
     if (invalid.length > 0) {
         throw new MissingConfigurationError('memory', [
-            'valid PANDORA_MEMORY_GRANTED_SCOPES (memory:health,memory:read)',
+            'valid PANDORA_MEMORY_GRANTED_SCOPES (memory:health,memory:read,memory:write)',
         ]);
     }
     return scopes;
+}
+function memoryMutationsEnabled() {
+    return process.env.PANDORA_MEMORY_ALLOW_MUTATIONS === 'true';
 }
 function buildMemoryConfiguration(context) {
     const oidcToken = context.vercelOidcToken?.trim()
@@ -311,6 +316,7 @@ function buildMemoryConfiguration(context) {
         oidcToken,
         allowedNamespaces: memoryNamespaces(),
         grantedScopes: memoryScopes(),
+        allowMutations: memoryMutationsEnabled(),
         timeoutMs: boundedIntegerEnvironment('memory', 'PANDORA_MEMORY_TIMEOUT_MS', 8000, 250, 30000),
         maxResponseBytes: boundedIntegerEnvironment('memory', 'PANDORA_MEMORY_MAX_RESPONSE_BYTES', 500000, 1024, 2000000),
     };
@@ -353,6 +359,7 @@ function inspectToolConfiguration(toolName) {
             memoryOrigin();
             memoryNamespaces();
             memoryScopes();
+            memoryMutationsEnabled();
             boundedIntegerEnvironment('memory', 'PANDORA_MEMORY_TIMEOUT_MS', 8000, 250, 30000);
             boundedIntegerEnvironment('memory', 'PANDORA_MEMORY_MAX_RESPONSE_BYTES', 500000, 1024, 2000000);
             if (process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.VERCEL_OIDC_TOKEN) {
