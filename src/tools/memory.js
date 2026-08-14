@@ -5,6 +5,7 @@ exports.executeMemoryTool = executeMemoryTool;
 const zod_1 = require("zod");
 const memory_response_1 = require("./memory-response");
 const memory_governance_1 = require("./memory-governance");
+const memory_evidence_intake_1 = require("./memory-evidence-intake");
 const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_MAX_RESPONSE_BYTES = 500000;
 const NamespaceSchema = zod_1.z.enum(['real_life', 'au']);
@@ -246,6 +247,49 @@ exports.memoryTools = {
             required: ['namespace', 'query'],
         },
     },
+    'memory.submitEvidenceCandidate': {
+        description: 'Submit a sanitized, project-scoped evidence candidate to Pandora Memory for human review. This never promotes canonical Memory automatically',
+        parameters: {
+            type: 'object',
+            properties: {
+                namespace: { type: 'string', enum: ['real_life', 'au'] },
+                projectId: { type: 'string', description: 'Exact ProjectOS project UUID when known' },
+                projectKey: { type: 'string', description: 'Exact ProjectOS project key when known' },
+                title: { type: 'string' },
+                summary: { type: 'string' },
+                proofStage: { type: 'string', enum: ['documented', 'implemented', 'tested', 'deployed', 'production_verified'] },
+                claim: { type: 'string' },
+                evidenceRefs: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            type: { type: 'string' },
+                            ref: { type: 'string' },
+                            sha256: { type: 'string' },
+                            artifact_class: { type: 'string' },
+                            observed_at: { type: 'string' },
+                        },
+                        required: ['type', 'ref'],
+                    },
+                },
+                provenance: {
+                    type: 'object',
+                    properties: {
+                        source_type: { type: 'string' },
+                        source_locator: { type: 'string' },
+                        source_sha: { type: 'string' },
+                        parent_sha: { type: 'string' },
+                        observed_at: { type: 'string' },
+                    },
+                    required: ['source_type', 'source_locator', 'observed_at'],
+                },
+                idempotencyKey: { type: 'string' },
+            },
+            required: ['namespace', 'title', 'summary', 'proofStage', 'claim', 'evidenceRefs', 'provenance', 'idempotencyKey'],
+            additionalProperties: false,
+        },
+    },
     'memory.canonicalContext': {
         description: 'Recover governed canonical project context from Pandora Memory. Returns approved records only, surfaces unresolved conflicts, and fails closed to GitHub and Supabase when approved memory is unavailable or stale',
         parameters: {
@@ -291,6 +335,8 @@ async function executeMemoryTool(tool, args, configuration, fetchFn) {
             return memory.health();
         case 'memory.search':
             return memory.search(SearchArgsSchema.parse(args));
+        case 'memory.submitEvidenceCandidate':
+            return (0, memory_evidence_intake_1.submitEvidenceCandidate)(args, configuration, fetchFn);
         case 'memory.canonicalContext':
             return memory.canonicalContext(CanonicalContextArgsSchema.parse(args));
         default:
