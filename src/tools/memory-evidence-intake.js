@@ -87,11 +87,52 @@ async function readBounded(response, maxBytes) {
   if (Number.isFinite(declared) && declared > maxBytes) {
     throw new Error("Pandora Memory response exceeded size limit");
   }
+
+  if (response.body && typeof response.body.getReader === "function") {
+    const reader = response.body.getReader();
+    const chunks = [];
+    let total = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel().catch(() => undefined);
+          throw new Error("Pandora Memory response exceeded size limit");
+        }
+        chunks.push(Buffer.from(value));
+      }
+    } finally {
+      reader.releaseLock?.();
+    }
+    return Buffer.concat(chunks).toString("utf8");
+  }
+
   const text = await response.text();
   if (Buffer.byteLength(text, "utf8") > maxBytes) {
     throw new Error("Pandora Memory response exceeded size limit");
   }
   return text;
+}
+
+function assertBoundResponse(body, input) {
+  if (body?.idempotency_key !== input.idempotencyKey) {
+    throw new Error("Pandora Memory candidate response idempotency mismatch");
+  }
+  if (body?.namespace !== input.namespace) {
+    throw new Error("Pandora Memory candidate response namespace mismatch");
+  }
+  if (body?.proof_stage !== input.proofStage) {
+    throw new Error("Pandora Memory candidate response proof-stage mismatch");
+  }
+  if (input.projectId && body?.project_id !== input.projectId) {
+    throw new Error("Pandora Memory candidate response project-id mismatch");
+  }
+  if (input.projectKey && body?.project_key !== input.projectKey) {
+    throw new Error("Pandora Memory candidate response project-key mismatch");
+  }
 }
 
 async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis.fetch) {
@@ -160,17 +201,18 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
     if (body?.status !== "pending_review") {
       throw new Error("Pandora Memory candidate did not remain pending review");
     }
+    assertBoundResponse(body, input);
 
     return {
       ok: true,
       candidateId: body.candidate_id ?? null,
       status: "pending_review",
       deduplicated: body.deduplicated === true,
-      idempotencyKey: body.idempotency_key ?? input.idempotencyKey,
-      namespace: body.namespace ?? input.namespace,
-      projectId: body.project_id ?? input.projectId ?? null,
-      projectKey: body.project_key ?? input.projectKey ?? null,
-      proofStage: body.proof_stage ?? input.proofStage,
+      idempotencyKey: input.idempotencyKey,
+      namespace: input.namespace,
+      projectId: input.projectId ?? null,
+      projectKey: input.projectKey ?? null,
+      proofStage: input.proofStage,
       createdAt: body.created_at ?? null,
       canonicalPromoted: false,
     };
