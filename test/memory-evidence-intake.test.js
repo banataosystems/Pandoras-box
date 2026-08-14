@@ -49,6 +49,7 @@ test("candidate schema requires a project identity and exact proof stage", () =>
   assert.equal(parsed.proofStage, "tested");
   assert.throws(() => EvidenceCandidateArgsSchema.parse({ ...validArgs(), projectKey: undefined }));
   assert.throws(() => EvidenceCandidateArgsSchema.parse({ ...validArgs(), proofStage: "done" }));
+  assert.throws(() => EvidenceCandidateArgsSchema.parse({ ...validArgs(), summary: "x".repeat(1801) }));
 });
 
 test("memory tool and manifest expose governed write semantics", () => {

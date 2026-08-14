@@ -38,7 +38,7 @@ exports.EvidenceCandidateArgsSchema = z.object({
   projectId: z.string().uuid().optional(),
   projectKey: z.string().trim().regex(/^[a-z0-9][a-z0-9._-]{1,95}$/).optional(),
   title: z.string().trim().min(1).max(200),
-  summary: z.string().trim().min(1).max(4000),
+  summary: z.string().trim().min(1).max(1800),
   proofStage: ProofStageSchema,
   claim: z.string().trim().min(1).max(1000),
   evidenceRefs: z.array(EvidenceRefSchema).min(1).max(20),

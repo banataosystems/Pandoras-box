@@ -256,7 +256,7 @@ exports.memoryTools = {
                 projectId: { type: 'string', description: 'Exact ProjectOS project UUID when known' },
                 projectKey: { type: 'string', description: 'Exact ProjectOS project key when known' },
                 title: { type: 'string' },
-                summary: { type: 'string' },
+                summary: { type: 'string', maxLength: 1800 },
                 proofStage: { type: 'string', enum: ['documented', 'implemented', 'tested', 'deployed', 'production_verified'] },
                 claim: { type: 'string' },
                 evidenceRefs: {
