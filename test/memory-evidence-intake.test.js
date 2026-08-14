@@ -9,6 +9,7 @@ const {
 } = require("../src/tools/memory-evidence-intake.js");
 const { memoryTools } = require("../src/tools/memory.js");
 const { getToolManifest } = require("../src/runtime/tool-manifest.js");
+const { executeTool } = require("../src/runtime/tool-catalog.js");
 
 const SHA40 = "0b6d32b9135e2050c4f819a8d7ac3c78e6bc1117";
 const SHA256 = "4a10f26ebe4e760c984b89ecc741ba77ba0213dcad6205f3d1851a887f624545";
@@ -40,9 +41,26 @@ const config = {
   oidcToken: "header.payload.signature",
   allowedNamespaces: ["real_life"],
   grantedScopes: ["memory:read", "memory:write"],
+  allowMutations: true,
   timeoutMs: 1000,
   maxResponseBytes: 100000,
 };
+
+function successBody(overrides = {}) {
+  return {
+    ok: true,
+    candidate_id: "11111111-1111-4111-8111-111111111111",
+    status: "pending_review",
+    idempotency_key: validArgs().idempotencyKey,
+    namespace: "real_life",
+    project_id: null,
+    project_key: "mcpmaster-pandoras-box",
+    proof_stage: "tested",
+    deduplicated: false,
+    created_at: "2026-08-14T11:00:00Z",
+    ...overrides,
+  };
+}
 
 test("candidate schema requires a project identity and exact proof stage", () => {
   const parsed = EvidenceCandidateArgsSchema.parse(validArgs());
@@ -65,17 +83,10 @@ test("submission is bounded, OIDC-authenticated, and remains pending review", as
   let observed;
   const result = await submitEvidenceCandidate(validArgs(), config, async (url, init) => {
     observed = { url, init, body: JSON.parse(init.body) };
-    return new Response(JSON.stringify({
-      ok: true,
-      candidate_id: "11111111-1111-4111-8111-111111111111",
-      status: "pending_review",
-      idempotency_key: validArgs().idempotencyKey,
-      namespace: "real_life",
-      project_key: "mcpmaster-pandoras-box",
-      proof_stage: "tested",
-      deduplicated: false,
-      created_at: "2026-08-14T11:00:00Z",
-    }), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify(successBody()), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
   });
 
   assert.equal(observed.url, "https://pandorasbox-memory.vercel.app/api/projectos/memory/evidence-candidates");
@@ -84,6 +95,25 @@ test("submission is bounded, OIDC-authenticated, and remains pending review", as
   assert.equal(observed.body.proof_stage, "tested");
   assert.equal(result.status, "pending_review");
   assert.equal(result.canonicalPromoted, false);
+  assert.equal(result.namespace, validArgs().namespace);
+  assert.equal(result.projectKey, validArgs().projectKey);
+  assert.equal(result.proofStage, validArgs().proofStage);
+});
+
+test("response identity and proof stage are bound to the submitted candidate", async () => {
+  for (const [name, override, pattern] of [
+    ["namespace", { namespace: "au" }, /namespace mismatch/],
+    ["proof stage", { proof_stage: "production_verified" }, /proof-stage mismatch/],
+    ["idempotency", { idempotency_key: "different-key-123456789" }, /idempotency mismatch/],
+    ["project key", { project_key: "memory" }, /project-key mismatch/],
+  ]) {
+    await assert.rejects(
+      () => submitEvidenceCandidate(validArgs(), config, async () =>
+        new Response(JSON.stringify(successBody(override)), { status: 200 })),
+      pattern,
+      name,
+    );
+  }
 });
 
 test("direct identifiers and credential signatures are rejected before network I/O", async () => {
@@ -112,5 +142,51 @@ test("write scope is fail-closed and non-pending responses are rejected", async 
     () => submitEvidenceCandidate(validArgs(), config, async () =>
       new Response(JSON.stringify({ ok: true, status: "hard_canon" }), { status: 200 })),
     /did not remain pending review/,
+  );
+});
+
+test("governed executeTool path is inert by default and works only with explicit mutation plus write scope", async () => {
+  const toolConfig = { memory: { ...config } };
+
+  await assert.rejects(
+    () => executeTool("memory.submitEvidenceCandidate", validArgs(), {
+      memory: { ...config, allowMutations: false },
+    }),
+    /Memory mutations are disabled/,
+  );
+
+  await assert.rejects(
+    () => executeTool("memory.submitEvidenceCandidate", validArgs(), {
+      memory: { ...config, grantedScopes: ["memory:read"] },
+    }),
+    /missing required scope.*memory:write/,
+  );
+
+  const originalFetch = globalThis.fetch;
+  let called = false;
+  globalThis.fetch = async () => {
+    called = true;
+    return new Response(JSON.stringify(successBody()), { status: 202 });
+  };
+  try {
+    const result = await executeTool(
+      "memory.submitEvidenceCandidate",
+      validArgs(),
+      toolConfig,
+    );
+    assert.equal(result.status, "pending_review");
+    assert.equal(result.canonicalPromoted, false);
+    assert.equal(called, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("governed namespace enforcement also covers the write path", async () => {
+  await assert.rejects(
+    () => executeTool("memory.submitEvidenceCandidate", validArgs(), {
+      memory: { ...config, allowedNamespaces: ["au"] },
+    }),
+    /namespace is not allowed: real_life/,
   );
 });
