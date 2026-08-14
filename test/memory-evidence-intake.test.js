@@ -38,7 +38,7 @@ function validArgs() {
 
 const config = {
   baseUrl: "https://pandorasbox-memory.vercel.app",
-  oidcToken: "header.payload.signature",
+  oidcToken: "test-oidc-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
   allowedNamespaces: ["real_life"],
   grantedScopes: ["memory:read", "memory:write"],
   allowMutations: true,
