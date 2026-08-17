@@ -1,0 +1,52 @@
+name: Pandora mobile package-context formatter
+
+on:
+  push:
+    branches:
+      - feature/pandora-mobile-owner-experience-p1
+
+permissions:
+  contents: write
+
+jobs:
+  format-and-commit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out branch source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: 3.47.0
+          channel: stable
+          cache: true
+
+      - name: Resolve the locked package language context
+        working-directory: apps/pandora-mobile
+        run: |
+          set -euo pipefail
+          test -f pubspec.lock
+          cp pubspec.lock pubspec.lock.expected
+          flutter pub get --enforce-lockfile
+          cmp pubspec.lock.expected pubspec.lock
+
+      - name: Apply exact package-context formatter output
+        working-directory: apps/pandora-mobile
+        run: dart format lib test
+
+      - name: Commit formatter output atomically
+        run: |
+          set -euo pipefail
+          git config user.name "Mark Johnson Banatao"
+          git config user.email "lawbatalla@gmail.com"
+          git add -- apps/pandora-mobile/lib apps/pandora-mobile/test
+          if git diff --cached --quiet; then
+            echo "No package-context formatter changes were needed."
+            exit 0
+          fi
+          git commit -m "style(mobile): apply package-context Dart formatter"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
