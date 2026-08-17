@@ -509,7 +509,16 @@ async function main() {
   const filenames = (await readdir(migrationRoot))
     .filter((name) => /^\d{14}_.+\.sql$/.test(name))
     .sort();
-  assert.equal(filenames.length, 52, 'expected 50 historical migrations plus two applied changes');
+  const minimumHistoricalMigrationCount = 52;
+  assert.ok(
+    filenames.length >= minimumHistoricalMigrationCount,
+    `historical migration chain unexpectedly shrank below ${minimumHistoricalMigrationCount}`,
+  );
+  assert.equal(
+    new Set(filenames.map((filename) => filename.slice(0, 14))).size,
+    filenames.length,
+    'migration timestamps must remain unique',
+  );
   const migrationFiles = await Promise.all(filenames.map(async (filename) => ({
     filename,
     source: await readFile(join(migrationRoot, filename), 'utf8'),
