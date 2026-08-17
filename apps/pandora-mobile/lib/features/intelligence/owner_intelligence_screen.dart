@@ -92,16 +92,15 @@ class _OwnerIntelligenceScreenState extends State<OwnerIntelligenceScreen> {
 
     final message = prepareOnly
         ? 'Prepare the highest-value safe next action. Do not execute it. '
-            'Explain risk, dependencies, required proof, rollback, and '
-            'owner approval gates.'
+              'Explain risk, dependencies, required proof, rollback, and '
+              'owner approval gates.'
         : 'Continue all safe, reversible, no-cost connected work. Stop '
-            'before spending, destructive production or data changes, '
-            'legal or public commitments, regulated activation, or '
-            'production release. Preserve evidence and project state.';
+              'before spending, destructive production or data changes, '
+              'legal or public commitments, regulated activation, or '
+              'production release. Preserve evidence and project state.';
 
     try {
-      await PandoraDependencies.of(context)
-          .repository
+      await PandoraDependencies.of(context).repository
           .ask(message: message, projectId: project.id);
       if (!mounted) {
         return;
@@ -148,7 +147,7 @@ class _OwnerIntelligenceScreenState extends State<OwnerIntelligenceScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DropdownButtonFormField<OwnerIntelligenceSection>(
-            value: _section,
+            initialValue: _section,
             isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'View',
@@ -561,10 +560,10 @@ class _OwnerIntelligenceScreenState extends State<OwnerIntelligenceScreen> {
             Text(
               eyebrow,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                  ),
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+              ),
             ),
             const SizedBox(height: 4),
             Text(title, style: Theme.of(context).textTheme.titleLarge),
