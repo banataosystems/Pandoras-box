@@ -7,10 +7,14 @@ import '../../core/models/pandora_models.dart';
 import '../../core/state/screen_controller.dart';
 import '../../core/widgets/content_state.dart';
 import '../../core/widgets/freshness_label.dart';
+import '../../core/widgets/owner_experience.dart';
 import '../../core/widgets/pandora_page.dart';
 import '../../core/widgets/pandora_surface.dart';
 import '../../core/widgets/proof_ladder.dart';
 import '../../core/widgets/status_badge.dart';
+import '../approvals/approvals_screen.dart';
+import '../projects/project_detail_screen.dart';
+import '../projects/projects_screen.dart';
 import '../settings/settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -37,19 +41,19 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  void _open(Widget screen) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
+  }
+
   @override
   Widget build(BuildContext context) => PandoraPage(
-        title: 'Home',
-        subtitle:
-            'What needs you, what Pandora is doing, and what happens next.',
+        title: 'Pandora',
+        subtitle: 'Your verified operating briefing.',
         showProductMark: true,
         actions: [
           IconButton(
             tooltip: 'Open Settings',
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute<void>(
-                builder: (_) => const SettingsScreen())),
+            onPressed: () => _open(const SettingsScreen()),
             icon: const Icon(Icons.settings_outlined),
           ),
           IconButton(
@@ -93,7 +97,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: PandoraSpacing.md),
                 ],
                 _HomeContent(
-                    summary: summary, refreshing: controller.isLoading),
+                  summary: summary,
+                  refreshing: controller.isLoading,
+                  onOpenApprovals: () => _open(const ApprovalsScreen()),
+                  onOpenProjects: () => _open(const ProjectsScreen()),
+                  onOpenProject: (project) => _open(
+                    ProjectDetailScreen(project: project),
+                  ),
+                ),
               ],
             );
           },
@@ -102,221 +113,202 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _HomeContent extends StatelessWidget {
-  const _HomeContent({required this.summary, required this.refreshing});
+  const _HomeContent({
+    required this.summary,
+    required this.refreshing,
+    required this.onOpenApprovals,
+    required this.onOpenProjects,
+    required this.onOpenProject,
+  });
 
   final HomeSummary summary;
   final bool refreshing;
+  final VoidCallback onOpenApprovals;
+  final VoidCallback onOpenProjects;
+  final ValueChanged<ProjectSummary> onOpenProject;
 
   @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PandoraSurface(
-            title: 'System posture',
-            trailing: refreshing
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : null,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                StatusBadge(
-                  label: summary.healthLabel,
-                  tone: statusToneFor(summary.healthState),
+  Widget build(BuildContext context) {
+    final needsDecision = summary.priority != null ||
+        (summary.countersVerified && summary.approvalCount > 0);
+    final projects = List<ProjectSummary>.of(summary.topProjects)
+      ..sort(_compareProjectAttention);
+    final heroTone = needsDecision
+        ? PandoraStatusTone.attention
+        : statusToneFor(summary.healthState);
+    final heroTitle = summary.priority?.action ??
+        (summary.countersVerified
+            ? 'Nothing requires your decision'
+            : 'Owner decision state is not verified');
+    final heroMessage = summary.priority?.reason ??
+        (summary.countersVerified
+            ? 'Pandora is continuing safe work and watching for blockers.'
+            : 'Refresh before relying on approval and portfolio counters.');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OwnerBriefingHero(
+          eyebrow: needsDecision ? 'Needs you' : 'Owner briefing',
+          title: heroTitle,
+          message: heroMessage,
+          icon: needsDecision
+              ? Icons.priority_high_rounded
+              : Icons.auto_awesome_rounded,
+          tone: heroTone,
+          statusLabel: summary.healthLabel,
+          actionLabel: needsDecision ? 'Review approvals' : 'Open projects',
+          onAction: needsDecision ? onOpenApprovals : onOpenProjects,
+          footer: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (refreshing) ...[
+                const SizedBox.square(
+                  dimension: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-                const SizedBox(height: PandoraSpacing.sm),
-                FreshnessLabel(freshness: summary.freshness),
+                const SizedBox(width: PandoraSpacing.xs),
               ],
-            ),
-          ),
-          const SizedBox(height: PandoraSpacing.md),
-          PandoraSurface(
-            title: 'Needs you',
-            subtitle: summary.priority != null
-                ? 'The highest-value decision waiting for you.'
-                : !summary.countersVerified
-                    ? 'Owner decision state is not verified.'
-                    : summary.approvalCount == 0
-                        ? 'Nothing is waiting for an owner decision.'
-                        : '${summary.approvalCount} owner decision${summary.approvalCount == 1 ? '' : 's'} need review.',
-            leading: Icon(
-              Icons.priority_high_rounded,
-              color: context.pandoraPalette.attention,
-            ),
-            child: summary.priority == null
-                ? Text(
-                    !summary.countersVerified
-                        ? 'Refresh before relying on this briefing.'
-                        : summary.approvalCount == 0
-                            ? 'Pandora will keep watching your projects.'
-                            : 'Open Approvals to inspect the verified queue.',
-                  )
-                : _PriorityCard(approval: summary.priority!),
-          ),
-          const SizedBox(height: PandoraSpacing.md),
-          _CounterRow(summary: summary),
-          const SizedBox(height: PandoraSpacing.xl),
-          Semantics(
-            header: true,
-            child: Text('Portfolio',
-                style: Theme.of(context).textTheme.titleLarge),
-          ),
-          const SizedBox(height: PandoraSpacing.sm),
-          if (summary.topProjects.isEmpty)
-            const EmptyContent(
-              title: 'No projects in the briefing',
-              message: 'Open Projects to refresh the verified portfolio list.',
-            )
-          else
-            for (var index = 0;
-                index < summary.topProjects.length;
-                index++) ...[
-              _ProjectBrief(project: summary.topProjects[index]),
-              if (index != summary.topProjects.length - 1)
-                const SizedBox(height: PandoraSpacing.sm),
+              FreshnessLabel(freshness: summary.freshness),
             ],
-          const SizedBox(height: PandoraSpacing.xl),
-          PandoraSurface(
-            title: 'Meaningful recent changes',
-            child: summary.recentActivity.isEmpty
-                ? const Text('No recent verified activity was returned.')
-                : Column(
-                    children: [
-                      for (var index = 0;
-                          index < summary.recentActivity.length;
-                          index++) ...[
-                        _ActivityBrief(event: summary.recentActivity[index]),
-                        if (index != summary.recentActivity.length - 1)
-                          const Divider(),
-                      ],
-                    ],
-                  ),
           ),
-        ],
-      );
-}
-
-class _PriorityCard extends StatelessWidget {
-  const _PriorityCard({required this.approval});
-
-  final ApprovalSummary approval;
-
-  @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(approval.action, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: PandoraSpacing.xs),
-          Text(approval.reason),
-          const SizedBox(height: PandoraSpacing.sm),
-          StatusBadge(
-            label: approval.risk.label,
-            tone: statusToneFor(approval.risk.label),
-          ),
-        ],
-      );
-}
-
-class _CounterRow extends StatelessWidget {
-  const _CounterRow({required this.summary});
-
-  final HomeSummary summary;
-
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-        builder: (context, constraints) {
-          final cards = [
-            _CounterCard(
+        ),
+        const SizedBox(height: PandoraSpacing.md),
+        OwnerMetricGrid(
+          metrics: [
+            OwnerMetric(
               label: 'Approvals',
               value: summary.countersVerified
                   ? '${summary.approvalCount}'
-                  : 'Not verified',
+                  : '—',
+              icon: Icons.approval_outlined,
+              tone: summary.approvalCount > 0
+                  ? PandoraStatusTone.attention
+                  : PandoraStatusTone.neutral,
             ),
-            _CounterCard(
+            OwnerMetric(
               label: 'Active projects',
               value: summary.countersVerified
                   ? '${summary.activeProjectCount}'
-                  : 'Not verified',
+                  : '—',
+              icon: Icons.workspaces_outline,
+              tone: PandoraStatusTone.informative,
             ),
-            _CounterCard(
+            OwnerMetric(
               label: 'Needs attention',
               value: summary.countersVerified
                   ? '${summary.needsAttentionCount}'
-                  : 'Not verified',
+                  : '—',
+              icon: Icons.warning_amber_rounded,
+              tone: summary.needsAttentionCount > 0
+                  ? PandoraStatusTone.attention
+                  : PandoraStatusTone.neutral,
             ),
-          ];
-          if (constraints.maxWidth < 460) {
-            return Column(
-              children: [
-                for (var index = 0; index < cards.length; index++) ...[
-                  cards[index],
-                  if (index != cards.length - 1)
-                    const SizedBox(height: PandoraSpacing.xs),
-                ],
-              ],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var index = 0; index < cards.length; index++) ...[
-                Expanded(child: cards[index]),
-                if (index != cards.length - 1)
-                  const SizedBox(width: PandoraSpacing.xs),
-              ],
-            ],
-          );
-        },
-      );
-}
-
-class _CounterCard extends StatelessWidget {
-  const _CounterCard({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => PandoraSurface(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(child: Text(label)),
-            Text(value, style: Theme.of(context).textTheme.headlineSmall),
           ],
         ),
-      );
+        const SizedBox(height: PandoraSpacing.xl),
+        OwnerSectionHeading(
+          title: 'Portfolio focus',
+          subtitle: projects.isEmpty
+              ? 'No verified project summaries were returned.'
+              : 'Blockers and stale proof are shown first.',
+          trailing: TextButton(
+            onPressed: onOpenProjects,
+            child: const Text('View all'),
+          ),
+        ),
+        const SizedBox(height: PandoraSpacing.sm),
+        if (projects.isEmpty)
+          const EmptyContent(
+            title: 'No projects in the briefing',
+            message: 'Open Projects to refresh the verified portfolio list.',
+          )
+        else
+          for (var index = 0; index < projects.length; index++) ...[
+            _ProjectBrief(
+              project: projects[index],
+              onTap: () => onOpenProject(projects[index]),
+            ),
+            if (index != projects.length - 1)
+              const SizedBox(height: PandoraSpacing.sm),
+          ],
+        const SizedBox(height: PandoraSpacing.xl),
+        const OwnerSectionHeading(
+          title: 'Meaningful recent changes',
+          subtitle: 'Owner-readable outcomes, not internal machinery.',
+        ),
+        const SizedBox(height: PandoraSpacing.sm),
+        PandoraSurface(
+          child: summary.recentActivity.isEmpty
+              ? const Text('No recent verified activity was returned.')
+              : Column(
+                  children: [
+                    for (var index = 0;
+                        index < summary.recentActivity.length;
+                        index++) ...[
+                      _ActivityBrief(event: summary.recentActivity[index]),
+                      if (index != summary.recentActivity.length - 1)
+                        const Divider(),
+                    ],
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
 }
 
 class _ProjectBrief extends StatelessWidget {
-  const _ProjectBrief({required this.project});
+  const _ProjectBrief({required this.project, required this.onTap});
 
   final ProjectSummary project;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => PandoraSurface(
-        title: project.name,
-        subtitle: project.purpose,
-        trailing: StatusBadge(
-          label: project.status,
-          tone: statusToneFor(project.status),
-          compact: true,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(project.phase, style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: PandoraSpacing.sm),
-            ProofLadder(stages: project.evidenceStages, compact: true),
-            const SizedBox(height: PandoraSpacing.sm),
-            Text(project.progressLabel),
-            if (project.nextAction != null) ...[
-              const SizedBox(height: PandoraSpacing.xs),
-              Text('Next: ${project.nextAction!}'),
-            ],
-          ],
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: 'Open ${project.name}',
+        child: InkWell(
+          borderRadius: PandoraRadius.cardBorder,
+          onTap: onTap,
+          child: PandoraSurface(
+            title: project.name,
+            subtitle: project.purpose,
+            trailing: StatusBadge(
+              label: project.status,
+              tone: statusToneFor(project.status),
+              compact: true,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  project.phase,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: PandoraSpacing.sm),
+                ProofLadder(stages: project.evidenceStages, compact: true),
+                if (project.blocker != null) ...[
+                  const SizedBox(height: PandoraSpacing.sm),
+                  OwnerSignal(
+                    label: 'Blocked by',
+                    value: project.blocker!,
+                    icon: Icons.block_rounded,
+                    tone: PandoraStatusTone.critical,
+                  ),
+                ],
+                if (project.nextAction != null) ...[
+                  const SizedBox(height: PandoraSpacing.xs),
+                  OwnerSignal(
+                    label: 'Pandora will do next',
+                    value: project.nextAction!,
+                    icon: Icons.arrow_forward_rounded,
+                    tone: PandoraStatusTone.informative,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       );
 }
@@ -329,10 +321,39 @@ class _ActivityBrief extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: const Icon(Icons.history_rounded),
+        leading: Icon(providerIconFor(event.provider ?? event.type)),
         title: Text(event.summary),
-        subtitle: Text('${event.actor} · ${event.type}'),
+        subtitle: Text(
+          [
+            event.project,
+            event.provider,
+            ownerRelativeTime(event.happenedAt),
+          ].whereType<String>().where((item) => item.isNotEmpty).join(' · '),
+        ),
+        trailing: event.result == null
+            ? null
+            : StatusBadge(
+                label: event.result!,
+                tone: statusToneFor(event.result!),
+                compact: true,
+              ),
       );
+}
+
+int _compareProjectAttention(ProjectSummary left, ProjectSummary right) {
+  int score(ProjectSummary project) {
+    if (project.blocker != null ||
+        project.status.toLowerCase().contains('blocked')) {
+      return 0;
+    }
+    if (project.freshness.state != FreshnessState.fresh) return 1;
+    if (project.status.toLowerCase().contains('active')) return 2;
+    return 3;
+  }
+
+  final scoreDifference = score(left).compareTo(score(right));
+  if (scoreDifference != 0) return scoreDifference;
+  return left.name.toLowerCase().compareTo(right.name.toLowerCase());
 }
 
 String _safeError(Object? error) {
