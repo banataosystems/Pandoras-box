@@ -1,0 +1,106 @@
+name: Pandora mobile ARM64 direct delivery
+
+on:
+  push:
+    branches:
+      - delivery/pandora-mobile-builder
+    paths:
+      - '.github/workflows/pandora-mobile-arm64-delivery.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: e64125c12237503678573b9efdf14747f89a3b79
+      DELIVERY_BRANCH: delivery/pandora-mobile-latest
+    steps:
+      - name: Check out builder branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Check out exact mobile source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          path: exact-source
+          fetch-depth: 0
+
+      - name: Verify exact source
+        run: test "$(git -C exact-source rev-parse HEAD)" = "$SOURCE_SHA"
+
+      - name: Verify approved brand assets
+        run: node exact-source/scripts/verify-pandora-brand-assets.mjs
+
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+
+      - name: Materialize disposable Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .pandora-mobile-delivery
+          mkdir .pandora-mobile-delivery
+          cd .pandora-mobile-delivery
+          flutter create --platforms=android --org com.banataosystems --project-name pandora_mobile .
+          rm -rf lib test assets pubspec.yaml pubspec.lock analysis_options.yaml
+          cp -R ../exact-source/apps/pandora-mobile/lib ./lib
+          cp -R ../exact-source/apps/pandora-mobile/test ./test
+          cp -R ../exact-source/apps/pandora-mobile/assets ./assets
+          cp ../exact-source/apps/pandora-mobile/pubspec.yaml ./pubspec.yaml
+          cp ../exact-source/apps/pandora-mobile/pubspec.lock ./pubspec.lock
+          cp ../exact-source/apps/pandora-mobile/analysis_options.yaml ./analysis_options.yaml
+
+      - name: Resolve locked dependencies
+        working-directory: .pandora-mobile-delivery
+        run: |
+          cp pubspec.lock pubspec.lock.expected
+          flutter pub get --enforce-lockfile
+          cmp pubspec.lock.expected pubspec.lock
+
+      - name: Analyze exact delivery source
+        working-directory: .pandora-mobile-delivery
+        run: flutter analyze
+
+      - name: Run full Flutter suite
+        working-directory: .pandora-mobile-delivery
+        run: flutter test --reporter expanded
+
+      - name: Build ARM64 installable debug APK
+        working-directory: .pandora-mobile-delivery
+        run: flutter build apk --debug --split-per-abi --dart-define=PANDORA_SOURCE_REVISION=${{ env.SOURCE_SHA }}
+
+      - name: Verify ARM64 package and prepare delivery
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=".pandora-mobile-delivery/build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk"
+          test -f "$apk"
+          bytes="$(stat -c %s "$apk")"
+          test "$bytes" -lt 100000000
+          rm -rf delivery-out
+          mkdir -p delivery-out
+          cp "$apk" "delivery-out/Pandora-Mobile-e64125c-arm64-debug.apk"
+          sha256sum "delivery-out/Pandora-Mobile-e64125c-arm64-debug.apk" > "delivery-out/Pandora-Mobile-e64125c-arm64-debug.apk.sha256"
+          printf 'source_sha=%s\nartifact_class=test-only\nproduction_release=false\nsigning_class=android-debug\nabi=arm64-v8a\nbytes=%s\n' "$SOURCE_SHA" "$bytes" > delivery-out/BUILD_INFO.txt
+
+      - name: Publish reversible delivery branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$DELIVERY_BRANCH" "$SOURCE_SHA"
+          rm -rf deliveries/pandora-mobile
+          mkdir -p deliveries/pandora-mobile
+          cp delivery-out/* deliveries/pandora-mobile/
+          git add deliveries/pandora-mobile
+          git commit -m "build(mobile): publish exact-head ARM64 test APK"
+          git push --force-with-lease origin "HEAD:$DELIVERY_BRANCH"
