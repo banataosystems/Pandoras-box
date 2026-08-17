@@ -21,7 +21,7 @@ const recoveryReplayResult = JSON.parse(
 );
 const currentReplayResult = JSON.parse(
   readFileSync(
-    join(evidenceRoot, 'pglite-replay-result-20260817130000.json'),
+    join(evidenceRoot, 'pglite-replay-result-20260817145929.json'),
     'utf8',
   ),
 );
@@ -71,6 +71,9 @@ test('active Supabase history preserves the captured 52-file recovery chain and 
   assert.ok(capturedFiles.every((filename) => files.includes(filename)));
   assert.deepEqual(appendedFiles, [
     '20260817130000_projectos_memory_full_capacity_context_gate.sql',
+    '20260817145550_add_vercel_control_adapter.sql',
+    '20260817145659_add_vercel_git_binding_clear.sql',
+    '20260817145929_add_vercel_async_git_link_queue.sql',
   ]);
   assert.equal(files.length, currentReplayResult.migration_count);
   assert.equal(
