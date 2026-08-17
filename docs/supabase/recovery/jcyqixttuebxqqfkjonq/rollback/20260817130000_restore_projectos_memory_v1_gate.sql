@@ -60,7 +60,7 @@ begin
      or v_retrieved_at < new.created_at - interval '10 minutes'
      or v_retrieved_at > clock_timestamp() + interval '1 minute'
      or v_context.recorded_at < new.created_at - interval '2 seconds'
-     or v_context.recored_at > clock_timestamp() + interval '1 minute' then
+     or v_context.recorded_at > clock_timestamp() + interval '1 minute' then
     raise exception 'projectos_memory_context_stale'
       using errcode = '55000';
   end if;

@@ -132,7 +132,7 @@ test('full-capacity migration preserves the existing execution safety boundary',
   assert.match(sql, /context_hash, ''\)\) !~ '\^\[0-9a-f\]\{64\}\$'/);
   assert.match(sql, /new\.risk = 'read'/);
   assert.match(sql, /context_status not in \('available', 'empty'\)/);
-  assert.match(sql, /context_status is distinct from 'availe'/);
+  assert.match(sql, /context_status is distinct from 'available'/);
   assert.match(sql, /new\.created_at - interval '10 minutes'/);
   assert.match(sql, /clock_timestamp\(\) \+ interval '1 minute'/);
   assert.match(sql, /recorded_at < new\.created_at - interval '2 seconds'/);
