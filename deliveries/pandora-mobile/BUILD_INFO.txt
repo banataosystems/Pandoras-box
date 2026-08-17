@@ -1,0 +1,6 @@
+source_sha=e64125c12237503678573b9efdf14747f89a3b79
+artifact_class=test-only
+production_release=false
+signing_class=android-debug
+abi=arm64-v8a
+bytes=82672853
