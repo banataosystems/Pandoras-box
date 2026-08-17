@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../app/pandora_dependencies.dart';
+import '../../core/data/owner_projection.dart';
 import '../../core/design/pandora_tokens.dart';
 import '../../core/models/pandora_models.dart';
 import '../../core/state/screen_controller.dart';
 import '../../core/widgets/content_state.dart';
 import '../../core/widgets/freshness_label.dart';
+import '../../core/widgets/owner_experience.dart';
 import '../../core/widgets/pandora_page.dart';
 import '../../core/widgets/pandora_surface.dart';
 import '../../core/widgets/status_badge.dart';
@@ -40,8 +42,7 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
   Widget build(BuildContext context) => Scaffold(
         body: PandoraPage(
           title: 'Connections',
-          subtitle:
-              'Services Pandora can read or ask to change through governed access.',
+          subtitle: 'Provider health, capability, and verified freshness.',
           actions: [
             IconButton(
               tooltip: 'Refresh Connections',
@@ -64,7 +65,8 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
                   onRetry: controller.load,
                 );
               }
-              final items = controller.data ?? const <ConnectionSummary>[];
+              final raw = controller.data ?? const <ConnectionSummary>[];
+              final items = deduplicateConnections(raw);
               if (items.isEmpty) {
                 return const EmptyContent(
                   title: 'No connections returned',
@@ -72,7 +74,17 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
                       'Pandora has not returned a verified connection list.',
                 );
               }
+              final changeReady =
+                  items.where((connection) => connection.canChange).length;
+              final needsAttention = items
+                  .where((connection) => connectionAttentionRank(connection) >= 3)
+                  .length;
+              final healthy = items
+                  .where((connection) => connectionAttentionRank(connection) == 1)
+                  .length;
+
               return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (controller.degradedReason != null ||
                       controller.error != null) ...[
@@ -83,30 +95,56 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
                     ),
                     const SizedBox(height: PandoraSpacing.md),
                   ],
+                  OwnerBriefingHero(
+                    eyebrow: 'Provider posture',
+                    title: needsAttention == 0
+                        ? 'Connected services are ready'
+                        : '$needsAttention connection${needsAttention == 1 ? '' : 's'} need attention',
+                    message:
+                        'Capabilities are shown without exposing credentials or secret values.',
+                    icon: needsAttention == 0
+                        ? Icons.cable_rounded
+                        : Icons.warning_amber_rounded,
+                    tone: needsAttention == 0
+                        ? PandoraStatusTone.verified
+                        : PandoraStatusTone.attention,
+                    statusLabel: raw.length == items.length
+                        ? '${items.length} providers'
+                        : '${items.length} unique providers · ${raw.length - items.length} duplicate record${raw.length - items.length == 1 ? '' : 's'} collapsed',
+                  ),
+                  const SizedBox(height: PandoraSpacing.md),
+                  OwnerMetricGrid(
+                    metrics: [
+                      OwnerMetric(
+                        label: 'Healthy',
+                        value: '$healthy',
+                        icon: Icons.check_circle_outline_rounded,
+                        tone: PandoraStatusTone.verified,
+                      ),
+                      OwnerMetric(
+                        label: 'Change-ready',
+                        value: '$changeReady',
+                        icon: Icons.edit_note_rounded,
+                        tone: PandoraStatusTone.informative,
+                      ),
+                      OwnerMetric(
+                        label: 'Needs attention',
+                        value: '$needsAttention',
+                        icon: Icons.warning_amber_rounded,
+                        tone: needsAttention > 0
+                            ? PandoraStatusTone.attention
+                            : PandoraStatusTone.neutral,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: PandoraSpacing.xl),
+                  const OwnerSectionHeading(
+                    title: 'Connected services',
+                    subtitle: 'Attention-first, with capability and freshness.',
+                  ),
+                  const SizedBox(height: PandoraSpacing.sm),
                   for (var index = 0; index < items.length; index++) ...[
-                    PandoraSurface(
-                      title: items[index].name,
-                      subtitle: items[index].purpose,
-                      trailing: StatusBadge(
-                        label: items[index].status,
-                        tone: statusToneFor(items[index].status),
-                        compact: true,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            items[index].canChange
-                                ? 'Read and governed change access'
-                                : items[index].canRead
-                                    ? 'Read access'
-                                    : 'No verified access',
-                          ),
-                          const SizedBox(height: PandoraSpacing.xs),
-                          FreshnessLabel(freshness: items[index].freshness),
-                        ],
-                      ),
-                    ),
+                    _ConnectionCard(connection: items[index]),
                     if (index != items.length - 1)
                       const SizedBox(height: PandoraSpacing.sm),
                   ],
@@ -114,6 +152,47 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
               );
             },
           ),
+        ),
+      );
+}
+
+class _ConnectionCard extends StatelessWidget {
+  const _ConnectionCard({required this.connection});
+
+  final ConnectionSummary connection;
+
+  @override
+  Widget build(BuildContext context) => PandoraSurface(
+        title: connection.name,
+        subtitle: connection.purpose,
+        leading: Icon(providerIconFor(connection.name)),
+        trailing: StatusBadge(
+          label: connection.status,
+          tone: statusToneFor(connection.status),
+          compact: true,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            OwnerSignal(
+              label: 'Verified capability',
+              value: connection.canChange
+                  ? 'Read access and governed changes'
+                  : connection.canRead
+                      ? 'Read access only'
+                      : 'No verified access',
+              icon: connection.canChange
+                  ? Icons.edit_note_rounded
+                  : connection.canRead
+                      ? Icons.visibility_outlined
+                      : Icons.link_off_rounded,
+              tone: connection.canChange || connection.canRead
+                  ? PandoraStatusTone.informative
+                  : PandoraStatusTone.attention,
+            ),
+            const SizedBox(height: PandoraSpacing.sm),
+            FreshnessLabel(freshness: connection.freshness),
+          ],
         ),
       );
 }
