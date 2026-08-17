@@ -24,6 +24,6 @@ The mobile client does not:
 
 ## Acceptance boundary
 
-The candidate source and test tree is normalized with the repository-pinned Flutter 3.47.0 Dart formatter before acceptance verification.
+The candidate `lib` and `test` tree is normalized by the repository-pinned Flutter 3.47.0 Dart formatter **inside the Pandora Mobile app package context**, matching the disposable acceptance environment. Running the formatter from the repository root is not treated as equivalent formatting proof.
 
 Source implementation is only **implemented** until the exact branch head passes the pinned mobile integration workflow (formatting, static analysis, complete Flutter tests/goldens, Web release build, and Android debug artifact) and ProjectOS security regression. A real authenticated Android-device journey, device accessibility/lifecycle verification, independent review when required, deployment, and production verification remain separate proof gates.
