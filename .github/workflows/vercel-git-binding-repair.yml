@@ -1,0 +1,198 @@
+name: Vercel Git binding repair
+
+on:
+  push:
+    branches:
+      - ops/vercel-git-bindings-main-env-20260817
+    paths:
+      - .github/workflows/vercel-git-binding-repair.yml
+
+permissions:
+  contents: read
+
+jobs:
+  repair-bindings:
+    name: Repair canonical Vercel Git bindings
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: Main
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN || secrets.VERCEL_ACCESS_TOKEN || secrets.VERCEL_API_TOKEN || secrets.VERCEL_AUTH_TOKEN || vars.VERCEL_TOKEN || vars.VERCEL_ACCESS_TOKEN || vars.VERCEL_API_TOKEN || vars.VERCEL_AUTH_TOKEN }}
+      VERCEL_TEAM_ID: team_IcdJUnzLi5wUN1GD8ALHyjF7
+      VERCEL_TEAM_SLUG: mbanatao-dc676069
+      VERCEL_CLI_VERSION: 58.1.0
+
+    steps:
+      - name: Verify Vercel credential is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${VERCEL_TOKEN:-}" ]]; then
+            echo "::error::No Vercel credential is available to the Main environment under the supported secret/variable names."
+            exit 1
+          fi
+          echo "Vercel credential is available to this job."
+
+      - name: Checkout canonical MCPMaster repository
+        uses: actions/checkout@v4
+        with:
+          path: mcpmaster
+          fetch-depth: 1
+
+      - name: Checkout canonical Memory repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/banataosystems/pandoras-box-memory.git memory
+
+      - name: Install pinned Vercel CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global "vercel@${VERCEL_CLI_VERSION}"
+          vercel --version
+
+      - name: Repair bindings and verify provider readback
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          api="https://api.vercel.com"
+
+          project_json() {
+            local project_id="$1"
+            curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "${api}/v9/projects/${project_id}?teamId=${VERCEL_TEAM_ID}"
+          }
+
+          set_local_project() {
+            local dir="$1"
+            local project_id="$2"
+            mkdir -p "${dir}/.vercel"
+            jq -cn --arg orgId "$VERCEL_TEAM_ID" --arg projectId "$project_id" \
+              '{orgId:$orgId,projectId:$projectId}' > "${dir}/.vercel/project.json"
+          }
+
+          link_field() {
+            local json="$1"
+            local field="$2"
+            jq -r ".link.${field} // empty" <<<"$json"
+          }
+
+          verify_desired_link() {
+            local project_id="$1"
+            local desired_org="$2"
+            local desired_repo="$3"
+            local current
+            current="$(project_json "$project_id")"
+            [[ "$(link_field "$current" type)" == "github" ]] && \
+              [[ "$(link_field "$current" org)" == "$desired_org" ]] && \
+              [[ "$(link_field "$current" repo)" == "$desired_repo" ]]
+          }
+
+          restore_before_link() {
+            local dir="$1"
+            local project_id="$2"
+            local before_type="$3"
+            local before_org="$4"
+            local before_repo="$5"
+
+            if [[ "$before_type" == "github" && -n "$before_org" && -n "$before_repo" ]]; then
+              echo "Attempting rollback to prior github:${before_org}/${before_repo}."
+              git -C "$dir" remote set-url origin "https://github.com/${before_org}/${before_repo}.git"
+              if (cd "$dir" && vercel git connect --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_SLUG"); then
+                local rolled
+                rolled="$(project_json "$project_id")"
+                if [[ "$(link_field "$rolled" type)" == "github" && \
+                      "$(link_field "$rolled" org)" == "$before_org" && \
+                      "$(link_field "$rolled" repo)" == "$before_repo" ]]; then
+                  echo "Rollback verified: github:${before_org}/${before_repo}."
+                  return 0
+                fi
+              fi
+              echo "::error::Rollback to the prior GitHub link could not be verified."
+              return 1
+            fi
+
+            echo "No prior Git link was recorded; checking for an unexpected partial link."
+            local partial
+            partial="$(project_json "$project_id")"
+            if [[ -z "$(link_field "$partial" type)" ]]; then
+              echo "No partial Git link exists."
+              return 0
+            fi
+
+            echo "::warning::A partial Git link exists although the project was previously unlinked; attempting to disconnect it."
+            if (cd "$dir" && vercel git disconnect github --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_SLUG"); then
+              local cleared
+              cleared="$(project_json "$project_id")"
+              if [[ -z "$(link_field "$cleared" type)" ]]; then
+                echo "Rollback verified: project returned to an unlinked state."
+                return 0
+              fi
+            fi
+            echo "::error::Rollback to the prior unlinked state could not be verified."
+            return 1
+          }
+
+          bind_project() {
+            local dir="$1"
+            local project_id="$2"
+            local project_name="$3"
+            local desired_org="$4"
+            local desired_repo="$5"
+            local desired_path="${desired_org}/${desired_repo}"
+
+            set_local_project "$dir" "$project_id"
+            git -C "$dir" remote set-url origin "https://github.com/${desired_path}.git"
+
+            local before before_type before_org before_repo
+            before="$(project_json "$project_id")"
+            before_type="$(link_field "$before" type)"
+            before_org="$(link_field "$before" org)"
+            before_repo="$(link_field "$before" repo)"
+
+            if [[ "$before_type" == "github" && "$before_org" == "$desired_org" && "$before_repo" == "$desired_repo" ]]; then
+              echo "${project_name}: already VERIFIED github:${desired_path}."
+              return 0
+            fi
+
+            if [[ -n "$before_type" ]]; then
+              echo "${project_name}: current safe link metadata is ${before_type}:${before_org}/${before_repo}."
+            else
+              echo "${project_name}: currently has no Git provider link."
+            fi
+
+            echo "${project_name}: connecting github:${desired_path} with pinned Vercel CLI."
+            if ! (cd "$dir" && vercel git connect --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_SLUG"); then
+              echo "::error::${project_name}: Vercel Git connect failed."
+              restore_before_link "$dir" "$project_id" "$before_type" "$before_org" "$before_repo" || true
+              return 1
+            fi
+
+            if ! verify_desired_link "$project_id" "$desired_org" "$desired_repo"; then
+              echo "::error::${project_name}: provider readback did not match github:${desired_path}. Rolling back."
+              restore_before_link "$dir" "$project_id" "$before_type" "$before_org" "$before_repo"
+              return 1
+            fi
+
+            echo "${project_name}: VERIFIED github:${desired_path}."
+          }
+
+          bind_project \
+            memory \
+            prj_brg3BJDcHfSftHH84NhnFtDJAnDO \
+            memory \
+            banataosystems \
+            pandoras-box-memory
+
+          bind_project \
+            mcpmaster \
+            prj_Y5rZVcq8xJVzHVt4uvfmg9wPvXMk \
+            mcpmaster \
+            banataosystems \
+            Pandoras-box
+
+          echo "Both canonical Vercel Git bindings passed provider readback."
