@@ -8,8 +8,7 @@ on:
       - '.github/workflows/pandora-mobile-accessibility-diagnostic.yml'
 
 permissions:
-  contents: read
-  checks: write
+  contents: write
 
 jobs:
   diagnose:
@@ -17,11 +16,16 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: '3.47.0'
           cache: true
-      - name: Materializ package
+
+      - name: Materialize acceptance package
+        shell: bash
         run: |
           set -euo pipefail
           rm -rf .pandora-mobile-build
@@ -35,42 +39,35 @@ jobs:
           cp ../apps/pandora-mobile/pubspec.yaml ./pubspec.yaml
           cp ../apps/pandora-mobile/analysis_options.yaml ./analysis_options.yaml
           cp ../apps/pandora-mobile/pubspec.lock ./pubspec.lock
+
       - name: Resolve locked dependencies
         working-directory: .pandora-mobile-build
+        shell: bash
         run: |
+          set -euo pipefail
           cp pubspec.lock pubspec.lock.expected
           flutter pub get --enforce-lockfile
           cmp pubspec.lock.expected pubspec.lock
+
       - name: Capture accessibility output
-        id: a11
         working-directory: .pandora-mobile-build
         shell: bash
         run: |
           set +e
-          flutter test test/accessibility/foundation_accessibility_test.dart --reporter expanded > ../a11.xtxt 2>&1
+          flutter test test/accessibility/foundation_accessibility_test.dart --reporter expanded > ../accessibility-diagnostic.txt 2>&1
           code=$?
           set -e
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-      - name: Publish diagnostic check
-        env:
-          GH: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-        SHA: ${{ github.sha }}
-          API: ${{ github.api_url }}
+          printf '\nEXIT_CODE=%s\n' "$code" >> ../accessibility-diagnostic.txt
+          test "$code" -ne 0
+
+      - name: Commit diagnostic evidence
+        shell: bash
         run: |
-          python - <<'PY'
-          import json, os, pathlib, urllib.request
-          text = pathlib.Path('a11.xtxt').read_text(errors='replace')
-          text = text[-15000:]
-          payload = {
-            'name': 'accessibility-output',
-            'head_sha': os.environ['SHA'],
-            'status': 'completed',
-            'conclusion': 'neutral',
-            'output': {'title': 'Pinned Flutter accessibility diagnostics', 'summary': '```text\n' + text + '\n```'},
-          }
-          data = json.dumps(payload).encode()
-          req = urllib.request.Request(os.environ['API'] + '/repos/' + os.environ['REPO'] + '/check-runs', data=data, method='POST', headers={'Authorization': 'Bearer ' + os.environ['GH'], 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json'})
-          with urllib.request.urlopen(req, timeout=10) as resp:
-              print(resp.read().decode()[:500])
-          PY
+          set -euo pipefail
+          mkdir -p apps/pandora-mobile/docs/evidence
+          cp accessibility-diagnostic.txt apps/pandora-mobile/docs/evidence/transparent-background-a11y-diagnostic.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/pandora-mobile/docs/evidence/transparent-background-a11y-diagnostic.txt
+          git commit -m "test(mobile): capture transparent accessibility failure"
+          git push origin HEAD:feature/pandora-mobile-premium-foundation
