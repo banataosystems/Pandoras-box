@@ -8,14 +8,14 @@ abstract final class PandoraTheme {
   static ThemeData get porcelain => _build(
         brightness: Brightness.light,
         palette: PandoraPalette.porcelain,
-        background: const Color(0xFFF8F8FA),
+        background: Colors.transparent,
         surface: const Color(0xFFFFFFFF),
       );
 
   static ThemeData get graphite => _build(
         brightness: Brightness.dark,
         palette: PandoraPalette.graphite,
-        background: const Color(0xFF0D0E12),
+        background: Colors.transparent,
         surface: const Color(0xFF17181D),
       );
 
@@ -88,14 +88,14 @@ abstract final class PandoraTheme {
       navigationBarTheme: NavigationBarThemeData(
         height: 72,
         elevation: 0,
-        backgroundColor: surface,
+        backgroundColor: Colors.transparent,
         indicatorColor: scheme.primaryContainer,
         labelTextStyle: WidgetStatePropertyAll(
           textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: surface,
+        backgroundColor: Colors.transparent,
         indicatorColor: scheme.primaryContainer,
         selectedLabelTextStyle: textTheme.labelLarge,
         unselectedLabelTextStyle: textTheme.labelLarge,

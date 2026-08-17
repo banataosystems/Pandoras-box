@@ -37,6 +37,7 @@ class _PandoraAppState extends State<PandoraApp> {
         diagnostics: widget.diagnostics,
         child: MaterialApp(
           title: "Pandora's Box",
+          color: Colors.transparent,
           debugShowCheckedModeBanner: false,
           themeMode: ThemeMode.system,
           theme: PandoraTheme.porcelain,
