@@ -10,6 +10,7 @@ import '../../core/network/pandora_api_error.dart';
 import '../../core/state/screen_controller.dart';
 import '../../core/widgets/confirmation_sheet.dart';
 import '../../core/widgets/content_state.dart';
+import '../../core/widgets/owner_experience.dart';
 import '../../core/widgets/pandora_page.dart';
 import '../../core/widgets/pandora_surface.dart';
 import '../../core/widgets/status_badge.dart';
@@ -151,8 +152,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
   @override
   Widget build(BuildContext context) => PandoraPage(
         title: 'Approvals',
-        subtitle:
-            'Understand the target, risk, and recovery before you decide. Approval never means execution.',
+        subtitle: 'Decide with target, risk, proof, and recovery in view.',
         actions: [
           IconButton(
             tooltip: 'Refresh Approvals',
@@ -177,22 +177,81 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
             }
             final approvals = controller.data ?? const <ApprovalSummary>[];
             if (approvals.isEmpty) {
-              return const EmptyContent(
-                title: 'Nothing needs approval',
-                message: 'Pandora has no current owner decisions waiting.',
+              return const OwnerBriefingHero(
+                eyebrow: 'Approval queue',
+                title: 'Nothing needs your decision',
+                message:
+                    'Pandora has no current owner approvals waiting. Protected work still remains governed.',
                 icon: Icons.verified_user_outlined,
+                tone: PandoraStatusTone.verified,
+                statusLabel: 'Queue clear',
               );
             }
+            final highRisk = approvals
+                .where(
+                  (approval) =>
+                      approval.risk == ActionRisk.high ||
+                      approval.risk == ActionRisk.critical,
+                )
+                .length;
+            final reversible =
+                approvals.where((approval) => approval.reversible).length;
+            final expiringSoon = approvals.where(_expiresSoon).length;
+
             return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                OwnerBriefingHero(
+                  eyebrow: 'Needs you',
+                  title:
+                      '${approvals.length} decision${approvals.length == 1 ? '' : 's'} waiting',
+                  message:
+                      'Approval records your decision. Execution remains a separate governed step.',
+                  icon: Icons.approval_outlined,
+                  tone: PandoraStatusTone.attention,
+                  statusLabel: 'Approval never means execution',
+                ),
+                const SizedBox(height: PandoraSpacing.md),
+                OwnerMetricGrid(
+                  metrics: [
+                    OwnerMetric(
+                      label: 'High risk',
+                      value: '$highRisk',
+                      icon: Icons.warning_amber_rounded,
+                      tone: highRisk > 0
+                          ? PandoraStatusTone.critical
+                          : PandoraStatusTone.neutral,
+                    ),
+                    OwnerMetric(
+                      label: 'Reversible',
+                      value: '$reversible',
+                      icon: Icons.undo_rounded,
+                      tone: PandoraStatusTone.verified,
+                    ),
+                    OwnerMetric(
+                      label: 'Expiring soon',
+                      value: '$expiringSoon',
+                      icon: Icons.timer_outlined,
+                      tone: expiringSoon > 0
+                          ? PandoraStatusTone.attention
+                          : PandoraStatusTone.neutral,
+                    ),
+                  ],
+                ),
                 if (controller.error != null) ...[
+                  const SizedBox(height: PandoraSpacing.md),
                   ErrorContent(
                     title: 'Live approval state could not be revalidated',
                     message: controller.error!.message,
                     onRetry: controller.refresh,
                   ),
-                  const SizedBox(height: PandoraSpacing.md),
                 ],
+                const SizedBox(height: PandoraSpacing.xl),
+                const OwnerSectionHeading(
+                  title: 'Decision queue',
+                  subtitle: 'Review the consequence and recovery before acting.',
+                ),
+                const SizedBox(height: PandoraSpacing.sm),
                 for (var index = 0; index < approvals.length; index++) ...[
                   _ApprovalCard(
                     approval: approvals[index],
@@ -250,16 +309,53 @@ class _ApprovalCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('What changes', style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: PandoraSpacing.xxs),
-          Text(approval.change),
+          Wrap(
+            spacing: PandoraSpacing.xs,
+            runSpacing: PandoraSpacing.xs,
+            children: [
+              if (approval.projectId != null)
+                StatusBadge(
+                  label: approval.projectId!,
+                  tone: PandoraStatusTone.informative,
+                  compact: true,
+                ),
+              StatusBadge(
+                label: approval.reversible
+                    ? 'Recovery recorded'
+                    : 'Recovery not verified',
+                tone: approval.reversible
+                    ? PandoraStatusTone.verified
+                    : PandoraStatusTone.critical,
+                compact: true,
+              ),
+              StatusBadge(
+                label: approval.expiresAt == null
+                    ? 'Expiry not verified'
+                    : 'Expires ${ownerRelativeTime(approval.expiresAt)}',
+                tone: approval.expiresAt == null || _expiresSoon(approval)
+                    ? PandoraStatusTone.attention
+                    : PandoraStatusTone.neutral,
+                compact: true,
+              ),
+            ],
+          ),
           const SizedBox(height: PandoraSpacing.md),
-          Text('Recovery', style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: PandoraSpacing.xxs),
-          Text(
-            approval.reversible
+          OwnerSignal(
+            label: 'What changes',
+            value: approval.change,
+            icon: Icons.change_circle_outlined,
+            tone: PandoraStatusTone.informative,
+          ),
+          const SizedBox(height: PandoraSpacing.xs),
+          OwnerSignal(
+            label: 'Recovery',
+            value: approval.reversible
                 ? approval.rollback ?? 'A recovery path is recorded.'
                 : 'No verified recovery path is recorded.',
+            icon: Icons.undo_rounded,
+            tone: approval.reversible
+                ? PandoraStatusTone.verified
+                : PandoraStatusTone.critical,
           ),
           if (blockReason.isNotEmpty) ...[
             const SizedBox(height: PandoraSpacing.md),
@@ -308,6 +404,13 @@ class _ApprovalCard extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _expiresSoon(ApprovalSummary approval) {
+  final expiresAt = approval.expiresAt;
+  if (expiresAt == null) return true;
+  final remaining = expiresAt.difference(DateTime.now());
+  return !remaining.isNegative && remaining <= const Duration(hours: 24);
 }
 
 String _safeError(Object? error) {
