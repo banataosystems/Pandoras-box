@@ -29,8 +29,7 @@ class OwnerIntelligenceScreen extends StatefulWidget {
   }
 }
 
-class _OwnerIntelligenceScreenState
-    extends State<OwnerIntelligenceScreen> {
+class _OwnerIntelligenceScreenState extends State<OwnerIntelligenceScreen> {
   Future<_OwnerData>? _future;
   late OwnerIntelligenceSection _section;
   final _searchController = TextEditingController();
@@ -69,9 +68,7 @@ class _OwnerIntelligenceScreenState
       approvals: approvals.data,
       activity: activity.data,
       connections: connections.data,
-      degraded: projects.isCached ||
-          activity.isCached ||
-          connections.isCached,
+      degraded: projects.isCached || activity.isCached || connections.isCached,
     );
   }
 
@@ -95,18 +92,16 @@ class _OwnerIntelligenceScreenState
 
     final message = prepareOnly
         ? 'Prepare the highest-value safe next action. Do not execute it. '
-            'Explain risk, dependencies, required proof, rollback, and '
-            'owner approval gates.'
+              'Explain risk, dependencies, required proof, rollback, and '
+              'owner approval gates.'
         : 'Continue all safe, reversible, no-cost connected work. Stop '
-            'before spending, destructive production or data changes, '
-            'legal or public commitments, regulated activation, or '
-            'production release. Preserve evidence and project state.';
+              'before spending, destructive production or data changes, '
+              'legal or public commitments, regulated activation, or '
+              'production release. Preserve evidence and project state.';
 
     try {
-      await PandoraDependencies.of(context).repository.ask(
-            message: message,
-            projectId: project.id,
-          );
+      await PandoraDependencies.of(context).repository
+          .ask(message: message, projectId: project.id);
       if (!mounted) {
         return;
       }
@@ -124,9 +119,8 @@ class _OwnerIntelligenceScreenState
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
     } finally {
       if (mounted) {
         setState(() {
@@ -217,14 +211,8 @@ class _OwnerIntelligenceScreenState
           spacing: 8,
           runSpacing: 8,
           children: [
-            _metric(
-              '${data.home.activeProjectCount}',
-              'Active projects',
-            ),
-            _metric(
-              '${data.home.needsAttentionCount}',
-              'Needs attention',
-            ),
+            _metric('${data.home.activeProjectCount}', 'Active projects'),
+            _metric('${data.home.needsAttentionCount}', 'Needs attention'),
             _metric('${data.home.approvalCount}', 'Approvals'),
           ],
         ),
@@ -410,24 +398,16 @@ class _OwnerIntelligenceScreenState
                   OutlinedButton.icon(
                     onPressed: busy
                         ? null
-                        : () => _delegate(
-                              project,
-                              prepareOnly: true,
-                            ),
+                        : () => _delegate(project, prepareOnly: true),
                     icon: busy && _preparing
                         ? _spinner()
-                        : const Icon(
-                            Icons.playlist_add_check_rounded,
-                          ),
+                        : const Icon(Icons.playlist_add_check_rounded),
                     label: const Text('Prepare next action'),
                   ),
                   FilledButton.icon(
                     onPressed: busy
                         ? null
-                        : () => _delegate(
-                              project,
-                              prepareOnly: false,
-                            ),
+                        : () => _delegate(project, prepareOnly: false),
                     icon: busy && !_preparing
                         ? _spinner()
                         : const Icon(Icons.auto_mode_rounded),
@@ -513,9 +493,7 @@ class _OwnerIntelligenceScreenState
           ),
           title: Text(project.name),
           subtitle: Text(
-            project.blocker ??
-                project.nextAction ??
-                project.purpose,
+            project.blocker ?? project.nextAction ?? project.purpose,
           ),
           trailing: Text(project.phase),
         );
@@ -544,11 +522,7 @@ class _OwnerIntelligenceScreenState
     return Column(children: items);
   }
 
-  Widget _notice(
-    IconData icon,
-    String title,
-    String subtitle,
-  ) {
+  Widget _notice(IconData icon, String title, String subtitle) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(icon),
@@ -560,10 +534,7 @@ class _OwnerIntelligenceScreenState
   Widget _metric(String value, String label) {
     return Container(
       constraints: const BoxConstraints(minWidth: 96),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 10,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
@@ -571,24 +542,14 @@ class _OwnerIntelligenceScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium,
-          ),
+          Text(value, style: Theme.of(context).textTheme.titleLarge),
+          Text(label, style: Theme.of(context).textTheme.labelMedium),
         ],
       ),
     );
   }
 
-  Widget _panel(
-    String eyebrow,
-    String title,
-    Widget child,
-  ) {
+  Widget _panel(String eyebrow, String title, Widget child) {
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -599,16 +560,13 @@ class _OwnerIntelligenceScreenState
             Text(
               eyebrow,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                  ),
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+              ),
             ),
             const SizedBox(height: 4),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
             child,
           ],
@@ -741,10 +699,7 @@ List<String> _recommendations(_OwnerData data) {
   return result;
 }
 
-List<_SearchHit> _searchHits(
-  _OwnerData data,
-  String rawQuery,
-) {
+List<_SearchHit> _searchHits(_OwnerData data, String rawQuery) {
   final query = rawQuery.trim().toLowerCase();
   if (query.isEmpty) {
     return const [];
@@ -771,9 +726,7 @@ List<_SearchHit> _searchHits(
         _SearchHit(
           kind: 'Project',
           title: project.name,
-          subtitle: project.nextAction ??
-              project.blocker ??
-              project.purpose,
+          subtitle: project.nextAction ?? project.blocker ?? project.purpose,
           icon: Icons.folder_open_rounded,
         ),
       );
