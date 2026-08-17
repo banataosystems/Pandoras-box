@@ -27,46 +27,44 @@ PandoraApiClient clientWith(
   int maxResponseBytes = 1024 * 1024,
   DiagnosticsStore? diagnostics,
   String? token = 'fixture-session-token',
-}) =>
-    PandoraApiClient(
-      baseUri: Uri.parse('https://example.invalid/functions/v1/owner'),
-      organizationId: 'organization-fixture-1',
-      sessionTokenProvider: _TokenProvider(token),
-      httpClient: httpClient,
-      timeout: timeout,
-      maxResponseBytes: maxResponseBytes,
-      diagnostics: diagnostics ?? DiagnosticsStore(),
-    );
+}) => PandoraApiClient(
+  baseUri: Uri.parse('https://example.invalid/functions/v1/owner'),
+  organizationId: 'organization-fixture-1',
+  sessionTokenProvider: _TokenProvider(token),
+  httpClient: httpClient,
+  timeout: timeout,
+  maxResponseBytes: maxResponseBytes,
+  diagnostics: diagnostics ?? DiagnosticsStore(),
+);
 
 Map<String, Object?> canonicalIntakeStatus() => <String, Object?>{
-      'whatChanged': 'A governed intake record was created.',
-      'whereWeAre': 'Planning',
-      'whatIsDone': 'The request was accepted.',
-      'whatIsHappeningNow': 'Pandora is checking preconditions.',
-      'whatIsStoppingUs': null,
-      'whatIWillDoNext': 'Show the plan before any protected change.',
-    };
+  'whatChanged': 'A governed intake record was created.',
+  'whereWeAre': 'Planning',
+  'whatIsDone': 'The request was accepted.',
+  'whatIsHappeningNow': 'Pandora is checking preconditions.',
+  'whatIsStoppingUs': null,
+  'whatIWillDoNext': 'Show the plan before any protected change.',
+};
 
 Map<String, Object?> approvalDecisionResponse({
   Object? ok = true,
   String decision = 'approved',
   String approvalId = 'approval-fixture-1',
   String approvalDecision = 'approved',
-}) =>
-    <String, Object?>{
-      'ok': ok,
-      'decision': decision,
-      'approval': <String, Object?>{
-        'id': approvalId,
-        'whatWillHappen': 'Publish the candidate',
-        'whyINeedYou': 'Owner decision required',
-        'whatWillChange': 'Release alias',
-        'howWeCanUndoIt': 'Restore prior alias',
-        'riskLevel': 'HIGH',
-        'reversible': true,
-        'decision': approvalDecision,
-      },
-    };
+}) => <String, Object?>{
+  'ok': ok,
+  'decision': decision,
+  'approval': <String, Object?>{
+    'id': approvalId,
+    'whatWillHappen': 'Publish the candidate',
+    'whyINeedYou': 'Owner decision required',
+    'whatWillChange': 'Release alias',
+    'howWeCanUndoIt': 'Restore prior alias',
+    'riskLevel': 'HIGH',
+    'reversible': true,
+    'decision': approvalDecision,
+  },
+};
 
 String? header(http.Request request, String name) {
   final normalized = name.toLowerCase();
@@ -305,9 +303,7 @@ void main() {
             'status': canonicalIntakeStatus(),
           }),
           202,
-          headers: const <String, String>{
-            'x-request-id': 'receipt-wrong-type',
-          },
+          headers: const <String, String>{'x-request-id': 'receipt-wrong-type'},
         ),
       ),
     );
@@ -511,7 +507,7 @@ void main() {
             'code': 'PRIVATE_DETAIL',
             'plainMessage':
                 'Contact owner@example.com with Bearer private-token at '
-                    'https://example.invalid/retry?access_token=private.',
+                'https://example.invalid/retry?access_token=private.',
           }),
           400,
         ),
@@ -812,192 +808,198 @@ void main() {
     repository.dispose();
   });
 
-  test('a prior identity cannot repopulate cache or diagnostics after clear',
-      () async {
-    final delayed = Completer<http.Response>();
-    var calls = 0;
-    final diagnostics = DiagnosticsStore();
-    final api = clientWith(
-      MockClient((request) async {
-        calls += 1;
-        if (calls == 1) return delayed.future;
-        return http.Response(
-          jsonEncode(<String, Object?>{
-            'code': 'UNAVAILABLE',
-            'plainMessage': 'Projects are unavailable.',
-          }),
-          503,
-        );
-      }),
-      diagnostics: diagnostics,
-    );
-    final repository = RemotePandoraRepository(client: api);
+  test(
+    'a prior identity cannot repopulate cache or diagnostics after clear',
+    () async {
+      final delayed = Completer<http.Response>();
+      var calls = 0;
+      final diagnostics = DiagnosticsStore();
+      final api = clientWith(
+        MockClient((request) async {
+          calls += 1;
+          if (calls == 1) return delayed.future;
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'code': 'UNAVAILABLE',
+              'plainMessage': 'Projects are unavailable.',
+            }),
+            503,
+          );
+        }),
+        diagnostics: diagnostics,
+      );
+      final repository = RemotePandoraRepository(client: api);
 
-    final oldRequest = repository.projects();
-    await Future<void>.delayed(Duration.zero);
-    repository.beginAuthenticatedIdentityEpoch();
-    diagnostics.clear();
-    delayed.complete(
-      http.Response(
-        jsonEncode(<Object?>[
-          <String, Object?>{
-            'id': 'old-owner-project',
-            'name': 'Private old-owner project',
-          },
-        ]),
-        200,
-      ),
-    );
-
-    await expectLater(
-      oldRequest,
-      throwsA(isA<StaleAuthenticatedIdentityException>()),
-    );
-    expect(diagnostics.events, isEmpty);
-    await expectLater(
-      repository.projects(allowCached: true),
-      throwsA(
-        isA<PandoraApiError>().having(
-          (error) => error.kind,
-          'kind',
-          PandoraApiErrorKind.unavailable,
+      final oldRequest = repository.projects();
+      await Future<void>.delayed(Duration.zero);
+      repository.beginAuthenticatedIdentityEpoch();
+      diagnostics.clear();
+      delayed.complete(
+        http.Response(
+          jsonEncode(<Object?>[
+            <String, Object?>{
+              'id': 'old-owner-project',
+              'name': 'Private old-owner project',
+            },
+          ]),
+          200,
         ),
-      ),
-    );
-    repository.dispose();
-  });
+      );
 
-  test('authorization invalidation suppresses other in-flight identity data',
-      () async {
-    final delayed = Completer<http.Response>();
-    final diagnostics = DiagnosticsStore();
-    final api = clientWith(
-      MockClient((request) async {
-        if (request.url.path.endsWith('/projects')) return delayed.future;
-        return http.Response(
+      await expectLater(
+        oldRequest,
+        throwsA(isA<StaleAuthenticatedIdentityException>()),
+      );
+      expect(diagnostics.events, isEmpty);
+      await expectLater(
+        repository.projects(allowCached: true),
+        throwsA(
+          isA<PandoraApiError>().having(
+            (error) => error.kind,
+            'kind',
+            PandoraApiErrorKind.unavailable,
+          ),
+        ),
+      );
+      repository.dispose();
+    },
+  );
+
+  test(
+    'authorization invalidation suppresses other in-flight identity data',
+    () async {
+      final delayed = Completer<http.Response>();
+      final diagnostics = DiagnosticsStore();
+      final api = clientWith(
+        MockClient((request) async {
+          if (request.url.path.endsWith('/projects')) return delayed.future;
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'code': 'OWNER_FORBIDDEN',
+              'plainMessage': 'Owner access changed.',
+            }),
+            403,
+          );
+        }),
+        diagnostics: diagnostics,
+      );
+      final repository = RemotePandoraRepository(client: api);
+      final subscription = repository.authorizationInvalidations.listen(
+        (_) => diagnostics.clear(),
+      );
+
+      final oldRequest = repository.projects();
+      await Future<void>.delayed(Duration.zero);
+      await expectLater(
+        repository.home(),
+        throwsA(
+          isA<PandoraApiError>().having(
+            (error) => error.kind,
+            'kind',
+            PandoraApiErrorKind.forbidden,
+          ),
+        ),
+      );
+      delayed.complete(
+        http.Response(
+          jsonEncode(<Object?>[
+            <String, Object?>{
+              'id': 'old-owner-project',
+              'name': 'Private old-owner project',
+            },
+          ]),
+          200,
+        ),
+      );
+      await expectLater(
+        oldRequest,
+        throwsA(isA<StaleAuthenticatedIdentityException>()),
+      );
+      expect(diagnostics.events, isEmpty);
+
+      await subscription.cancel();
+      repository.dispose();
+    },
+  );
+
+  test(
+    'ordinary cache clearing cannot suppress a concurrent global 403',
+    () async {
+      final delayed = Completer<http.Response>();
+      final api = clientWith(MockClient((request) async => delayed.future));
+      final repository = RemotePandoraRepository(client: api);
+      final invalidations = <AuthorizationInvalidation>[];
+      final subscription = repository.authorizationInvalidations.listen(
+        invalidations.add,
+      );
+
+      final request = repository.home();
+      await Future<void>.delayed(Duration.zero);
+      repository.clearReadOnlyCache();
+      delayed.complete(
+        http.Response(
           jsonEncode(<String, Object?>{
             'code': 'OWNER_FORBIDDEN',
             'plainMessage': 'Owner access changed.',
           }),
           403,
-        );
-      }),
-      diagnostics: diagnostics,
-    );
-    final repository = RemotePandoraRepository(client: api);
-    final subscription = repository.authorizationInvalidations.listen(
-      (_) => diagnostics.clear(),
-    );
-
-    final oldRequest = repository.projects();
-    await Future<void>.delayed(Duration.zero);
-    await expectLater(
-      repository.home(),
-      throwsA(
-        isA<PandoraApiError>().having(
-          (error) => error.kind,
-          'kind',
-          PandoraApiErrorKind.forbidden,
         ),
-      ),
-    );
-    delayed.complete(
-      http.Response(
-        jsonEncode(<Object?>[
-          <String, Object?>{
-            'id': 'old-owner-project',
-            'name': 'Private old-owner project',
-          },
-        ]),
-        200,
-      ),
-    );
-    await expectLater(
-      oldRequest,
-      throwsA(isA<StaleAuthenticatedIdentityException>()),
-    );
-    expect(diagnostics.events, isEmpty);
+      );
 
-    await subscription.cancel();
-    repository.dispose();
-  });
-
-  test('ordinary cache clearing cannot suppress a concurrent global 403',
-      () async {
-    final delayed = Completer<http.Response>();
-    final api = clientWith(
-      MockClient((request) async => delayed.future),
-    );
-    final repository = RemotePandoraRepository(client: api);
-    final invalidations = <AuthorizationInvalidation>[];
-    final subscription = repository.authorizationInvalidations.listen(
-      invalidations.add,
-    );
-
-    final request = repository.home();
-    await Future<void>.delayed(Duration.zero);
-    repository.clearReadOnlyCache();
-    delayed.complete(
-      http.Response(
-        jsonEncode(<String, Object?>{
-          'code': 'OWNER_FORBIDDEN',
-          'plainMessage': 'Owner access changed.',
-        }),
-        403,
-      ),
-    );
-
-    await expectLater(
-      request,
-      throwsA(
-        isA<PandoraApiError>().having(
-          (error) => error.kind,
-          'kind',
-          PandoraApiErrorKind.forbidden,
+      await expectLater(
+        request,
+        throwsA(
+          isA<PandoraApiError>().having(
+            (error) => error.kind,
+            'kind',
+            PandoraApiErrorKind.forbidden,
+          ),
         ),
-      ),
-    );
-    expect(invalidations, hasLength(1));
+      );
+      expect(invalidations, hasLength(1));
 
-    await subscription.cancel();
-    repository.dispose();
-  });
+      await subscription.cancel();
+      repository.dispose();
+    },
+  );
 
-  test('operation-local forbidden errors do not invalidate owner access',
-      () async {
-    final api = clientWith(
-      MockClient(
-        (request) async => http.Response(
-          jsonEncode(<String, Object?>{
-            'code': 'APPROVAL_FORBIDDEN',
-            'plainMessage': 'You cannot decide this approval.',
-          }),
-          403,
+  test(
+    'operation-local forbidden errors do not invalidate owner access',
+    () async {
+      final api = clientWith(
+        MockClient(
+          (request) async => http.Response(
+            jsonEncode(<String, Object?>{
+              'code': 'APPROVAL_FORBIDDEN',
+              'plainMessage': 'You cannot decide this approval.',
+            }),
+            403,
+          ),
         ),
-      ),
-    );
-    final repository = RemotePandoraRepository(client: api);
-    final invalidations = <AuthorizationInvalidation>[];
-    final subscription = repository.authorizationInvalidations.listen(
-      invalidations.add,
-    );
+      );
+      final repository = RemotePandoraRepository(client: api);
+      final invalidations = <AuthorizationInvalidation>[];
+      final subscription = repository.authorizationInvalidations.listen(
+        invalidations.add,
+      );
 
-    await expectLater(
-      repository.decideApproval(
-        approvalId: 'approval-fixture-1',
-        decision: ApprovalDecision.approve,
-      ),
-      throwsA(
-        isA<PandoraApiError>().having(
-          (error) => error.code,
-          'code',
-          'APPROVAL_FORBIDDEN',
+      await expectLater(
+        repository.decideApproval(
+          approvalId: 'approval-fixture-1',
+          decision: ApprovalDecision.approve,
         ),
-      ),
-    );
-    expect(invalidations, isEmpty);
+        throwsA(
+          isA<PandoraApiError>().having(
+            (error) => error.code,
+            'code',
+            'APPROVAL_FORBIDDEN',
+          ),
+        ),
+      );
+      expect(invalidations, isEmpty);
 
-    await subscription.cancel();
-    repository.dispose();
-  });
+      await subscription.cancel();
+      repository.dispose();
+    },
+  );
 }

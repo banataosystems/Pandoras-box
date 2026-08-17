@@ -39,10 +39,7 @@ final class LoadableSuccess<T> extends Loadable<T> {
 }
 
 final class LoadableFailure<T> extends Loadable<T> {
-  const LoadableFailure({
-    required this.failure,
-    this.previous,
-  });
+  const LoadableFailure({required this.failure, this.previous});
 
   final PandoraRepositoryException failure;
   final RepositorySnapshot<T>? previous;

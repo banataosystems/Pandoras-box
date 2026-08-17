@@ -60,10 +60,8 @@ class PandoraPage extends StatelessWidget {
                       Text(
                         subtitle!,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                       const SizedBox(height: PandoraSpacing.xl),
                     ],
@@ -78,10 +76,7 @@ class PandoraPage extends StatelessWidget {
     );
     final scrollable = onRefresh == null
         ? content
-        : RefreshIndicator(
-            onRefresh: onRefresh!,
-            child: content,
-          );
+        : RefreshIndicator(onRefresh: onRefresh!, child: content);
     return SafeArea(top: false, child: scrollable);
   }
 }

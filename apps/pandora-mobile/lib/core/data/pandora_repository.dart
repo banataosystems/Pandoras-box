@@ -30,14 +30,14 @@ class RepositorySnapshot<T> {
       isCached || (staleAfter != null && !staleAfter!.isAfter(now));
 
   RepositorySnapshot<T> asDegradedCache(String reason) => RepositorySnapshot<T>(
-        data: data,
-        source: RepositorySource.memoryCache,
-        fetchedAt: fetchedAt,
-        verifiedAt: verifiedAt,
-        staleAfter: staleAfter,
-        requestId: requestId,
-        degradedReason: reason,
-      );
+    data: data,
+    source: RepositorySource.memoryCache,
+    fetchedAt: fetchedAt,
+    verifiedAt: verifiedAt,
+    staleAfter: staleAfter,
+    requestId: requestId,
+    degradedReason: reason,
+  );
 }
 
 enum ApprovalDecision {
@@ -92,21 +92,23 @@ class SafetyOverview {
   static List<SafetySection> _integrationSections(Object? value) {
     final integrations = asJsonList(value);
     if (integrations.isEmpty) return const <SafetySection>[];
-    final items = integrations.map((entry) {
-      final json = asJsonMap(entry);
-      final provider = jsonText(json['provider'], fallback: 'Service');
-      return SafetyItem.fromJson(<String, Object?>{
-        'id': 'integration-${provider.toLowerCase()}',
-        'title': provider,
-        'plainStatus': humanizeToken(
-          json['status'],
-          fallback: 'Not checked',
-        ),
-        'explanation': json['freshness'] == 'fresh'
-            ? 'This connection has fresh health evidence.'
-            : 'Fresh health evidence is not available.',
-      });
-    }).toList(growable: false);
+    final items = integrations
+        .map((entry) {
+          final json = asJsonMap(entry);
+          final provider = jsonText(json['provider'], fallback: 'Service');
+          return SafetyItem.fromJson(<String, Object?>{
+            'id': 'integration-${provider.toLowerCase()}',
+            'title': provider,
+            'plainStatus': humanizeToken(
+              json['status'],
+              fallback: 'Not checked',
+            ),
+            'explanation': json['freshness'] == 'fresh'
+                ? 'This connection has fresh health evidence.'
+                : 'Fresh health evidence is not available.',
+          });
+        })
+        .toList(growable: false);
     return <SafetySection>[
       SafetySection(
         id: 'integrations',

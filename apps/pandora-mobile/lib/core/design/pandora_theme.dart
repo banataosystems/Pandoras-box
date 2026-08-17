@@ -6,18 +6,18 @@ abstract final class PandoraTheme {
   static const Color _primary = Color(0xFF4D55C7);
 
   static ThemeData get porcelain => _build(
-        brightness: Brightness.light,
-        palette: PandoraPalette.porcelain,
-        background: const Color(0xFFF8F8FA),
-        surface: const Color(0xFFFFFFFF),
-      );
+    brightness: Brightness.light,
+    palette: PandoraPalette.porcelain,
+    background: const Color(0xFFF8F8FA),
+    surface: const Color(0xFFFFFFFF),
+  );
 
   static ThemeData get graphite => _build(
-        brightness: Brightness.dark,
-        palette: PandoraPalette.graphite,
-        background: const Color(0xFF0D0E12),
-        surface: const Color(0xFF17181D),
-      );
+    brightness: Brightness.dark,
+    palette: PandoraPalette.graphite,
+    background: const Color(0xFF0D0E12),
+    surface: const Color(0xFF17181D),
+  );
 
   static ThemeData _build({
     required Brightness brightness,

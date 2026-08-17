@@ -44,9 +44,8 @@ class _CommandScreenState extends State<CommandScreen> {
     });
     _submissionKey ??= _idempotencyKeys.create('command');
     try {
-      final receipt = await PandoraDependencies.of(
-        context,
-      ).repository.ask(message: objective, idempotencyKey: _submissionKey);
+      final receipt = await PandoraDependencies.of(context).repository
+          .ask(message: objective, idempotencyKey: _submissionKey);
       if (mounted) {
         setState(() {
           _receipt = receipt;
@@ -60,7 +59,7 @@ class _CommandScreenState extends State<CommandScreen> {
           _outcomeUnknown = error.outcomeMayBeUnknown;
           _error = error.outcomeMayBeUnknown
               ? '${error.message} Check Activity first. If it is not recorded, '
-                  'retry here; Pandora will reuse the same request identity.'
+                    'retry here; Pandora will reuse the same request identity.'
               : error.message;
           if (!error.outcomeMayBeUnknown) _submissionKey = null;
         });
@@ -90,76 +89,71 @@ class _CommandScreenState extends State<CommandScreen> {
 
   @override
   Widget build(BuildContext context) => PandoraPage(
-        title: 'Command',
-        subtitle:
-            'Describe the outcome. Pandora will prepare a governed plan before protected work runs.',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PandoraSurface(
-              title: 'What do you want Pandora to do?',
-              subtitle:
-                  'Use ordinary language. You will see the plan and any required proof or approval separately.',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _objective,
-                    readOnly: _outcomeUnknown,
-                    minLines: 4,
-                    maxLines: 8,
-                    maxLength: 4000,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      hintText:
-                          'For example: Continue the highest-value safe work on Pandora Mobile.',
-                      alignLabelWithHint: true,
-                    ),
-                  ),
-                  const SizedBox(height: PandoraSpacing.sm),
-                  FilledButton.icon(
-                    onPressed: _submitting || _outcomeUnknown ? null : _submit,
-                    icon: _submitting
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.arrow_forward_rounded),
-                    label: Text(
-                      _submitting
-                          ? 'Recording request…'
-                          : 'Prepare the request',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: PandoraSpacing.md),
-              PandoraSurface(
-                title: 'Request needs attention',
-                leading: Icon(
-                  Icons.warning_amber_rounded,
-                  color: context.pandoraPalette.attention,
+    title: 'Command',
+    subtitle: 'Describe the outcome. Pandora will prepare a governed plan before protected work runs.',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PandoraSurface(
+          title: 'What do you want Pandora to do?',
+          subtitle: 'Use ordinary language. You will see the plan and any required proof or approval separately.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _objective,
+                readOnly: _outcomeUnknown,
+                minLines: 4,
+                maxLines: 8,
+                maxLength: 4000,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  hintText: 'For example: Continue the highest-value safe work on Pandora Mobile.',
+                  alignLabelWithHint: true,
                 ),
-                child: Text(_error!),
               ),
-              if (_outcomeUnknown) ...[
-                const SizedBox(height: PandoraSpacing.sm),
-                OutlinedButton.icon(
-                  onPressed: _submitting ? null : _retrySameRequest,
-                  icon: const Icon(Icons.replay_rounded),
-                  label: const Text('Retry same request safely'),
+              const SizedBox(height: PandoraSpacing.sm),
+              FilledButton.icon(
+                onPressed: _submitting || _outcomeUnknown ? null : _submit,
+                icon: _submitting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.arrow_forward_rounded),
+                label: Text(
+                  _submitting ? 'Recording request…' : 'Prepare the request',
                 ),
-              ],
+              ),
             ],
-            if (_receipt != null) ...[
-              const SizedBox(height: PandoraSpacing.md),
-              _CommandReceiptCard(receipt: _receipt!),
-            ],
-          ],
+          ),
         ),
-      );
+        if (_error != null) ...[
+          const SizedBox(height: PandoraSpacing.md),
+          PandoraSurface(
+            title: 'Request needs attention',
+            leading: Icon(
+              Icons.warning_amber_rounded,
+              color: context.pandoraPalette.attention,
+            ),
+            child: Text(_error!),
+          ),
+          if (_outcomeUnknown) ...[
+            const SizedBox(height: PandoraSpacing.sm),
+            OutlinedButton.icon(
+              onPressed: _submitting ? null : _retrySameRequest,
+              icon: const Icon(Icons.replay_rounded),
+              label: const Text('Retry same request safely'),
+            ),
+          ],
+        ],
+        if (_receipt != null) ...[
+          const SizedBox(height: PandoraSpacing.md),
+          _CommandReceiptCard(receipt: _receipt!),
+        ],
+      ],
+    ),
+  );
 }
 
 class _CommandReceiptCard extends StatelessWidget {
@@ -211,14 +205,14 @@ class _StatusLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: PandoraSpacing.xxs),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: PandoraSpacing.xxs),
-            Text(value),
-          ],
-        ),
-      );
+    padding: const EdgeInsets.symmetric(vertical: PandoraSpacing.xxs),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelMedium),
+        const SizedBox(height: PandoraSpacing.xxs),
+        Text(value),
+      ],
+    ),
+  );
 }

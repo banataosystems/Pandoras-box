@@ -4,7 +4,9 @@ import 'package:pandora_mobile/pandora_config.dart';
 void main() {
   test('canonical operator configuration is explicit', () {
     expect(
-        PandoraConfig.supabaseUrl, 'https://jcyqixttuebxqqfkjonq.supabase.co');
+      PandoraConfig.supabaseUrl,
+      'https://jcyqixttuebxqqfkjonq.supabase.co',
+    );
     expect(
       PandoraConfig.ownerApiBaseUrl,
       'https://jcyqixttuebxqqfkjonq.supabase.co/functions/v1/pandora-owner-api',

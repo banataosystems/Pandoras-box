@@ -16,29 +16,28 @@ class PandoraMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Semantics(
-        image: true,
-        label: semanticLabel,
-        child: SizedBox.square(
-          dimension: size,
-          child: Image.asset(
-            assetPath,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-            cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-            cacheHeight:
-                (size * MediaQuery.devicePixelRatioOf(context)).round(),
-            excludeFromSemantics: true,
-            errorBuilder: (context, error, stackTrace) => DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.black,
-                border: Border.all(color: Theme.of(context).colorScheme.error),
-              ),
-              child: Icon(
-                Icons.broken_image_outlined,
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
+    image: true,
+    label: semanticLabel,
+    child: SizedBox.square(
+      dimension: size,
+      child: Image.asset(
+        assetPath,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+        cacheHeight: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+        excludeFromSemantics: true,
+        errorBuilder: (context, error, stackTrace) => DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.black,
+            border: Border.all(color: Theme.of(context).colorScheme.error),
+          ),
+          child: Icon(
+            Icons.broken_image_outlined,
+            color: Theme.of(context).colorScheme.error,
           ),
         ),
-      );
+      ),
+    ),
+  );
 }
