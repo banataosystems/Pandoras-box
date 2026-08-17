@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../app/pandora_dependencies.dart';
 import '../../core/data/pandora_repository.dart';
+import '../../core/design/pandora_tokens.dart';
 import '../../core/models/pandora_models.dart';
+import '../../core/widgets/content_state.dart';
 import '../../core/widgets/pandora_page.dart';
 import '../../core/widgets/proof_ladder.dart';
 
@@ -31,6 +33,14 @@ class OwnerIntelligenceScreen extends StatefulWidget {
 
 class _OwnerIntelligenceScreenState extends State<OwnerIntelligenceScreen> {
   Future<_OwnerData>? _future;
+
+  /// Last successfully verified snapshot, retained so a refresh never replaces
+  /// useful owner information with a skeleton. It is only ever rendered behind
+  /// an explicit staleness notice, so saved data is never silently presented
+  /// as a live decision.
+  _OwnerData? _lastVerified;
+  DateTime? _verifiedAt;
+
   late OwnerIntelligenceSection _section;
   final _searchController = TextEditingController();
   String _query = '';
@@ -46,7 +56,7 @@ class _OwnerIntelligenceScreenState extends State<OwnerIntelligenceScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _future ??= _load();
+    _future ??= _start();
   }
 
   @override
@@ -62,7 +72,7 @@ class _OwnerIntelligenceScreenState extends State<OwnerIntelligenceScreen> {
     final approvals = await repository.approvals();
     final activity = await repository.activity(allowCached: true);
     final connections = await repository.connections(allowCached: true);
-    return _OwnerData(
+    final data = _OwnerData(
       home: home.data,
       projects: projects.data,
       approvals: approvals.data,
@@ -70,12 +80,45 @@ class _OwnerIntelligenceScreenState extends State<OwnerIntelligenceScreen> {
       connections: connections.data,
       degraded: projects.isCached || activity.isCached || connections.isCached,
     );
+    _lastVerified = data;
+    _verifiedAt = DateTime.now().toUtc();
+    return data;
+  }
+
+  /// Starts a load whose rejection is observed immediately.
+  ///
+  /// `FutureBuilder` only subscribes on the next build, so a future that
+  /// rejects in the meantime would be reported as an unhandled asynchronous
+  /// error even though the screen renders the failure correctly.
+  Future<_OwnerData> _start() {
+    final future = _load();
+    future.then<void>((_) {}, onError: (Object _) {});
+    return future;
   }
 
   void _refresh() {
     setState(() {
-      _future = _load();
+      _future = _start();
     });
+  }
+
+  /// Relative age of the retained snapshot, for the staleness notice.
+  String _verifiedAgo() {
+    final verifiedAt = _verifiedAt;
+    if (verifiedAt == null) {
+      return 'Verified earlier';
+    }
+    final elapsed = DateTime.now().toUtc().difference(verifiedAt);
+    if (elapsed.inMinutes < 1) {
+      return 'Verified moments ago';
+    }
+    if (elapsed.inMinutes < 60) {
+      return 'Verified ${elapsed.inMinutes} minutes ago';
+    }
+    if (elapsed.inHours < 24) {
+      return 'Verified ${elapsed.inHours} hours ago';
+    }
+    return 'Verified ${elapsed.inDays} days ago';
   }
 
   Future<void> _delegate(
@@ -170,13 +213,32 @@ class _OwnerIntelligenceScreenState extends State<OwnerIntelligenceScreen> {
           FutureBuilder<_OwnerData>(
             future: _future,
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                if (snapshot.hasError) {
-                  return _error();
-                }
-                return _loading();
+              if (snapshot.hasData) {
+                return _view(snapshot.data!);
               }
-              return _view(snapshot.data!);
+              // A refresh must not discard verified content. Show what was last
+              // verified, clearly labelled, and keep refreshing underneath.
+              final retained = _lastVerified;
+              if (retained != null) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DegradedContentNotice(
+                      message: snapshot.hasError
+                          ? 'Live owner state could not be refreshed. '
+                              '${_verifiedAgo()}.'
+                          : 'Refreshing live owner state. ${_verifiedAgo()}.',
+                      onRetry: _refresh,
+                    ),
+                    const SizedBox(height: PandoraSpacing.md),
+                    _view(retained),
+                  ],
+                );
+              }
+              if (snapshot.hasError) {
+                return _error();
+              }
+              return _loading();
             },
           ),
         ],
