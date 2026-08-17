@@ -2,40 +2,9 @@ name: ProjectOS security regression
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/projectos-security.yml'
-      - 'api/**'
-      - 'apps/**'
-      - 'packages/**'
-      - 'public/**'
-      - 'scripts/**'
-      - 'src/**'
-      - 'supabase/**'
-      - 'test/**'
-      - 'Dockerfile'
-      - 'docs/supabase/recovery/jcyqixttuebxqqfkjonq/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'tsconfig*.json'
-      - 'vercel.json'
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/projectos-security.yml'
-      - 'api/**'
-      - 'apps/**'
-      - 'packages/**'
-      - 'public/**'
-      - 'scripts/**'
-      - 'src/**'
-      - 'supabase/**'
-      - 'test/**'
-      - 'Dockerfile'
-      - 'docs/supabase/recovery/jcyqixttuebxqqfkjonq/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'tsconfig*.json'
-      - 'vercel.json'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -52,10 +21,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - name: Verify exact source checkout
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+        run: test "$(git rev-pars`HEAD)" = "$EXPECTED_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
