@@ -15,17 +15,15 @@ List<ConnectionSummary> deduplicateConnections(
   }
   final result = unique.values.toList(growable: true)
     ..sort(
-      (left, right) => connectionAttentionRank(right).compareTo(
-        connectionAttentionRank(left),
-      ),
+      (left, right) =>
+          connectionAttentionRank(right)
+              .compareTo(connectionAttentionRank(left)),
     );
   return List<ConnectionSummary>.unmodifiable(result);
 }
 
-String normalizeProviderKey(String value) => value
-    .trim()
-    .toLowerCase()
-    .replaceAll(RegExp(r'[^a-z0-9]+'), '');
+String normalizeProviderKey(String value) =>
+    value.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
 
 int connectionAttentionRank(ConnectionSummary connection) {
   final words = '${connection.state} ${connection.status}'.toLowerCase();
