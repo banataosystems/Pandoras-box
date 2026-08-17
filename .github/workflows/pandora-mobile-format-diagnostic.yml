@@ -5,16 +5,13 @@ on:
     branches:
       - feature/pandora-mobile-premium-foundation
     paths:
-      - 'apps/pandora-mobile/lib/**'
-      - 'apps/pandora-mobile/test/**'
       - '.github/workflows/pandora-mobile-format-diagnostic.yml'
 
 permissions:
-  contents: read
-  checks: write
+  contents: write
 
 jobs:
-  format-diagnostic:
+  apply-pinned-format:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -22,6 +19,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
 
       - name: Install pinned Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -29,56 +27,29 @@ jobs:
           flutter-version: '3.47.0'
           cache: true
 
-      - name: Resolve locked dependencies
-        working-directory: apps/pandora-mobile
-        run: flutter pub get --enforce-lockfile
-
-      - name: Produce exact formatted sources
+      - name: Apply exact pinned Dart formatting
         shell: bash
         run: |
           set -euo pipefail
-          dart format apps/pandora-mobile/lib apps/pandora-mobile/test
+          dart format \
+            apps/pandora-mobile/lib/features/intelligence/owner_intelligence_screen.dart \
+            apps/pandora-mobile/lib/features/settings/settings_screen.dart
+          git diff --check
 
-      - name: Publish exact formatted source evidence
+      - name: Commit exact formatter output
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import base64
-          import json
-          import os
-          from pathlib import Path
-
-          files = {
-              'formatter-owner-source': Path(
-                  'apps/pandora-mobile/lib/features/intelligence/'
-                  'owner_intelligence_screen.dart'
-              ),
-              'formatter-settings-source': Path(
-                  'apps/pandora-mobile/lib/features/settings/'
-                  'settings_screen.dart'
-              ),
-          }
-          for name, path in files.items():
-              encoded = base64.b64encode(path.read_bytes()).decode('ascii')
-              payload = {
-                  'name': name,
-                  'head_sha': os.environ['HEAD_SHA'],
-                  'status': 'completed',
-                  'conclusion': 'neutral',
-                  'output': {
-                      'title': 'Pinned Dart formatted source',
-                      'summary': encoded,
-                  },
-              }
-              Path(f'/tmp/{name}.json').write_text(json.dumps(payload))
-          PY
-          for name in formatter-owner-source formatter-settings-source; do
-            gh api --method POST \
-              -H 'Accept: application/vnd.github+json' \
-              "/repos/${GITHUB_REPOSITORY}/check-runs" \
-              --input "/tmp/${name}.json"
-          done
+          if git diff --quiet -- \
+            apps/pandora-mobile/lib/features/intelligence/owner_intelligence_screen.dart \
+            apps/pandora-mobile/lib/features/settings/settings_screen.dart; then
+            echo 'Pinned formatter already clean.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            apps/pandora-mobile/lib/features/intelligence/owner_intelligence_screen.dart \
+            apps/pandora-mobile/lib/features/settings/settings_screen.dart
+          git commit -m 'style(mobile): apply pinned Dart formatter output'
+          git push origin HEAD:feature/pandora-mobile-premium-foundation
