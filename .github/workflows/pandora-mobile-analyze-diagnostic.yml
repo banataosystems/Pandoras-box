@@ -52,8 +52,11 @@ jobs:
         run: |
           set -uo pipefail
           cd .pandora-mobile-build
+          set +e
           flutter analyze --machine > /tmp/pandora-analyze.txt 2>&1
-          printf '%s' "$?" > /tmp/pandora-analyze-exit.txt
+          code=$?
+          set -e
+          printf '%s' "$code" > /tmp/pandora-analyze-exit.txt
           exit 0
 
       - name: Publish analyzer diagnostics as check evidence
