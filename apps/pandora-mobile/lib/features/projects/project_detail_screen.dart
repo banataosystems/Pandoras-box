@@ -6,8 +6,8 @@ import '../../core/design/pandora_tokens.dart';
 import '../../core/models/pandora_models.dart';
 import '../../core/state/screen_controller.dart';
 import '../../core/widgets/content_state.dart';
-import '../../core/widgets/detail_row.dart';
 import '../../core/widgets/freshness_label.dart';
+import '../../core/widgets/owner_experience.dart';
 import '../../core/widgets/pandora_page.dart';
 import '../../core/widgets/pandora_surface.dart';
 import '../../core/widgets/proof_ladder.dart';
@@ -59,13 +59,20 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             builder: (context, _) {
               final controller = _controller!;
               if (controller.isLoading && controller.data == null) {
-                return const ContentSkeleton(lines: 8);
+                return _LoadingProjectSnapshot(project: widget.project);
               }
               if (controller.error != null && controller.data == null) {
-                return ErrorContent(
-                  title: 'Project detail could not load',
-                  message: _safeError(controller.error),
-                  onRetry: controller.load,
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _ProjectSnapshot(summary: widget.project),
+                    const SizedBox(height: PandoraSpacing.md),
+                    ErrorContent(
+                      title: 'Latest project detail could not load',
+                      message: _safeError(controller.error),
+                      onRetry: controller.load,
+                    ),
+                  ],
                 );
               }
               final detail = controller.data;
@@ -96,6 +103,52 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       );
 }
 
+class _LoadingProjectSnapshot extends StatelessWidget {
+  const _LoadingProjectSnapshot({required this.project});
+
+  final ProjectSummary project;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ProjectSnapshot(summary: project),
+          const SizedBox(height: PandoraSpacing.md),
+          const OwnerSignal(
+            label: 'Refreshing evidence',
+            value:
+                'The last verified summary stays visible while Pandora checks deeper project detail.',
+            icon: Icons.sync_rounded,
+            tone: PandoraStatusTone.informative,
+          ),
+          const SizedBox(height: PandoraSpacing.md),
+          const ContentSkeleton(lines: 4),
+        ],
+      );
+}
+
+class _ProjectSnapshot extends StatelessWidget {
+  const _ProjectSnapshot({required this.summary});
+
+  final ProjectSummary summary;
+
+  @override
+  Widget build(BuildContext context) => OwnerBriefingHero(
+        eyebrow: 'Current project truth',
+        title: summary.phase,
+        message: summary.nextAction ??
+            'No verified next autonomous action is recorded yet.',
+        icon: summary.blocker == null
+            ? Icons.workspaces_outline
+            : Icons.block_rounded,
+        tone: summary.blocker == null
+            ? statusToneFor(summary.status)
+            : PandoraStatusTone.critical,
+        statusLabel: summary.status,
+        footer: FreshnessLabel(freshness: summary.freshness),
+      );
+}
+
 class _DetailContent extends StatelessWidget {
   const _DetailContent({required this.detail});
 
@@ -118,51 +171,71 @@ class _DetailContent extends StatelessWidget {
         .toList();
     final unknown =
         tasks.where((item) => item.state == ProjectTaskState.unknown).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _ProjectSnapshot(summary: detail.summary),
+        if (detail.summary.blocker != null) ...[
+          const SizedBox(height: PandoraSpacing.sm),
+          OwnerSignal(
+            label: 'Blocked by',
+            value: detail.summary.blocker!,
+            icon: Icons.block_rounded,
+            tone: PandoraStatusTone.critical,
+          ),
+        ],
+        const SizedBox(height: PandoraSpacing.md),
+        OwnerMetricGrid(
+          title: 'Work state',
+          metrics: [
+            OwnerMetric(
+              label: 'Done',
+              value: '${done.length}',
+              icon: Icons.check_circle_outline_rounded,
+              tone: PandoraStatusTone.verified,
+            ),
+            OwnerMetric(
+              label: 'In progress',
+              value: '${inProgress.length}',
+              icon: Icons.autorenew_rounded,
+              tone: PandoraStatusTone.informative,
+            ),
+            OwnerMetric(
+              label: 'Blocked',
+              value: '${blocked.length}',
+              icon: Icons.block_rounded,
+              tone: blocked.isEmpty
+                  ? PandoraStatusTone.neutral
+                  : PandoraStatusTone.critical,
+            ),
+          ],
+        ),
+        const SizedBox(height: PandoraSpacing.md),
         PandoraSurface(
-          title: 'Current truth',
-          trailing: StatusBadge(
-            label: detail.summary.status,
-            tone: statusToneFor(detail.summary.status),
-            compact: true,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              DetailRow(label: 'Current phase', value: detail.summary.phase),
-              DetailRow(label: 'Progress', value: detail.summary.progressLabel),
-              FreshnessLabel(freshness: detail.summary.freshness),
-              const SizedBox(height: PandoraSpacing.sm),
-              ProofLadder(stages: detail.summary.evidenceStages),
-            ],
-          ),
+          title: 'Proof ladder',
+          subtitle: detail.summary.progressLabel,
+          trailing: FreshnessLabel(freshness: detail.summary.freshness),
+          child: ProofLadder(stages: detail.summary.evidenceStages),
         ),
-        const SizedBox(height: PandoraSpacing.md),
-        _TaskSection(
-          title: 'Done',
-          tasks: done,
-          empty: 'No work is verified complete.',
-        ),
-        const SizedBox(height: PandoraSpacing.md),
-        _TaskSection(
-          title: 'In progress',
-          tasks: inProgress,
-          empty: 'No active work was returned.',
-        ),
-        const SizedBox(height: PandoraSpacing.md),
-        _TaskSection(
-          title: 'Blocked',
-          tasks: blocked,
-          empty: 'No blockers were returned.',
-        ),
+        if (inProgress.isNotEmpty) ...[
+          const SizedBox(height: PandoraSpacing.md),
+          _TaskSection(title: 'In progress', tasks: inProgress),
+        ],
+        if (blocked.isNotEmpty) ...[
+          const SizedBox(height: PandoraSpacing.md),
+          _TaskSection(title: 'Blocked', tasks: blocked),
+        ],
+        if (done.isNotEmpty) ...[
+          const SizedBox(height: PandoraSpacing.md),
+          _TaskSection(title: 'Done', tasks: done, initiallyExpanded: false),
+        ],
         if (notActive.isNotEmpty) ...[
           const SizedBox(height: PandoraSpacing.md),
           _TaskSection(
             title: 'Not active',
             tasks: notActive,
-            empty: 'No inactive work was returned.',
+            initiallyExpanded: false,
           ),
         ],
         if (unknown.isNotEmpty) ...[
@@ -170,20 +243,22 @@ class _DetailContent extends StatelessWidget {
           _TaskSection(
             title: 'Status not verified',
             tasks: unknown,
-            empty: 'No unrecognized task states were returned.',
+            initiallyExpanded: false,
+          ),
+        ],
+        if (tasks.isEmpty) ...[
+          const SizedBox(height: PandoraSpacing.md),
+          const EmptyContent(
+            title: 'No task breakdown returned',
+            message:
+                'The project summary is visible, but Pandora has not returned task-level proof.',
           ),
         ],
         const SizedBox(height: PandoraSpacing.md),
         PandoraSurface(
-          title: 'Next autonomous action',
-          child: Text(
-            detail.summary.nextAction ??
-                'No verified next action was recorded.',
-          ),
-        ),
-        const SizedBox(height: PandoraSpacing.md),
-        PandoraSurface(
           title: 'Evidence',
+          subtitle:
+              '${detail.evidence.length} active evidence item${detail.evidence.length == 1 ? '' : 's'}',
           child: detail.evidence.isEmpty
               ? const Text('No active evidence was returned.')
               : Column(
@@ -191,14 +266,7 @@ class _DetailContent extends StatelessWidget {
                     for (var index = 0;
                         index < detail.evidence.length;
                         index++) ...[
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.fact_check_outlined),
-                        title: Text(detail.evidence[index].type),
-                        subtitle: Text(
-                          '${detail.evidence[index].provider} · ${detail.evidence[index].verdict ?? detail.evidence[index].status}',
-                        ),
-                      ),
+                      _EvidenceRow(item: detail.evidence[index]),
                       if (index != detail.evidence.length - 1) const Divider(),
                     ],
                   ],
@@ -213,32 +281,69 @@ class _TaskSection extends StatelessWidget {
   const _TaskSection({
     required this.title,
     required this.tasks,
-    required this.empty,
+    this.initiallyExpanded = true,
   });
 
   final String title;
   final List<ProjectTask> tasks;
-  final String empty;
+  final bool initiallyExpanded;
 
   @override
-  Widget build(BuildContext context) => PandoraSurface(
-        title: title,
-        child: tasks.isEmpty
-            ? Text(empty)
-            : Column(
-                children: [
-                  for (var index = 0; index < tasks.length; index++) ...[
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(tasks[index].title),
-                      subtitle: Text(
-                        '${tasks[index].status} · ${tasks[index].risk.label}',
-                      ),
-                    ),
-                    if (index != tasks.length - 1) const Divider(),
-                  ],
-                ],
+  Widget build(BuildContext context) => Card(
+        clipBehavior: Clip.antiAlias,
+        child: ExpansionTile(
+          initiallyExpanded: initiallyExpanded,
+          title: Text(title),
+          subtitle: Text(
+            '${tasks.length} task${tasks.length == 1 ? '' : 's'}',
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(
+            PandoraSpacing.lg,
+            0,
+            PandoraSpacing.lg,
+            PandoraSpacing.md,
+          ),
+          children: [
+            for (var index = 0; index < tasks.length; index++) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(tasks[index].title),
+                subtitle: Text(tasks[index].status),
+                trailing: StatusBadge(
+                  label: tasks[index].risk.label,
+                  tone: statusToneFor(tasks[index].risk.label),
+                  compact: true,
+                ),
               ),
+              if (index != tasks.length - 1) const Divider(),
+            ],
+          ],
+        ),
+      );
+}
+
+class _EvidenceRow extends StatelessWidget {
+  const _EvidenceRow({required this.item});
+
+  final EvidenceItem item;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(providerIconFor(item.provider)),
+        title: Text(item.type),
+        subtitle: Text(
+          [
+            item.provider,
+            item.verdict ?? item.status,
+            ownerRelativeTime(item.observedAt),
+          ].where((value) => value.isNotEmpty).join(' · '),
+        ),
+        trailing: StatusBadge(
+          label: item.verdict ?? item.status,
+          tone: statusToneFor(item.verdict ?? item.status),
+          compact: true,
+        ),
       );
 }
 
