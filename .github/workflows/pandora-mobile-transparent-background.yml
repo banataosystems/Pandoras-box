@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   apply-transparent-background:
-    if: github.actor != 'github-actions[bot]'
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -30,14 +30,17 @@ jobs:
 
       - name: Make mobile shell background transparent
         shell: bash
+        env:
+          TRANSPARENT_GUARD_B64: 'aW1wb3J0ICdkYXJ0OmlvJzsKCmltcG9ydCAncGFja2FnZTpmbHV0dGVyX3Rlc3QvZmx1dHRlcl90ZXN0LmRhcnQnOwoKdm9pZCBtYWluKCkgewogIHRlc3QoJ1BhbmRvcmEgbW9iaWxlIGJhY2tncm91bmQgc3RheXMgdHJhbnNwYXJlbnQnLCAoKSB7CiAgICBmaW5hbCB0aGVtZSA9CiAgICAgICAgRmlsZSgnbGliL2NvcmUvZGVzaWduL3BhbmRvcmFfdGhlbWUuZGFydCcpLnJlYWRBc1N0cmluZ1N5bmMoKTsKICAgIGZpbmFsIGFwcCA9IEZpbGUoJ2xpYi9hcHAvcGFuZG9yYV9hcHAuZGFydCcpLnJlYWRBc1N0cmluZ1N5bmMoKTsKCiAgICBleHBlY3QoCiAgICAgICdiYWNrZ3JvdW5kOiBDb2xvcnMudHJhbnNwYXJlbnQsJy5hbGxNYXRjaGVzKHRoZW1lKS5sZW5ndGgsCiAgICAgIGdyZWF0ZXJUaGFuT3JFcXVhbFRvKDIpLAogICAgKTsKICAgIGV4cGVjdCh0aGVtZSwgaXNOb3QoY29udGFpbnMoJ2JhY2tncm91bmQ6IGNvbnN0IENvbG9yKDB4RkYwRDBFMTIpLCcpKSk7CiAgICBleHBlY3QodGhlbWUsIGNvbnRhaW5zKCdzY2FmZm9sZEJhY2tncm91bmRDb2xvcjogYmFja2dyb3VuZCwnKSk7CiAgICBleHBlY3QodGhlbWUsIGNvbnRhaW5zKCdiYWNrZ3JvdW5kQ29sb3I6IGJhY2tncm91bmQsJykpOwogICAgZXhwZWN0KAogICAgICAnYmFja2dyb3VuZENvbG9yOiBDb2xvcnMudHJhbnNwYXJlbnQsJy5hbGxNYXRjaGVzKHRoZW1lKS5sZW5ndGgsCiAgICAgIGdyZWF0ZXJUaGFuT3JFcXVhbFRvKDIpLAogICAgKTsKICAgIGV4cGVjdChhcHAsIGNvbnRhaW5zKCdjb2xvcjogQ29sb3JzLnRyYW5zcGFyZW50LCcpKTsKICB9KTsKfQo='
         run: |
           set -euo pipefail
           python - <<'PY'
+          import base64
+          import os
           from pathlib import Path
 
           theme_path = Path('apps/pandora-mobile/lib/core/design/pandora_theme.dart')
           theme = theme_path.read_text()
-
           light = 'background: const Color(0xFFF8F8FA),'
           dark = 'background: const Color(0xFF0D0E12),'
           nav = 'backgroundColor: surface,'
@@ -57,48 +60,23 @@ jobs:
               raise SystemExit('Theme scaffold background contract changed unexpectedly')
           if 'backgroundColor: background,' not in theme:
               raise SystemExit('Theme app-bar background contract changed unexpectedly')
-
           theme_path.write_text(theme)
 
           app_path = Path('apps/pandora-mobile/lib/app/pandora_app.dart')
           app = app_path.read_text()
-          anchor = 'title: "Pandora\'s Box",\n'
+          anchor = 'title: "Pandora\\'s Box",\\n'
           if app.count(anchor) != 1:
               raise SystemExit('MaterialApp title anchor changed unexpectedly')
           app = app.replace(
               anchor,
-              anchor + '          color: Colors.transparent,\n',
+              anchor + '          color: Colors.transparent,\\n',
           )
           app_path.write_text(app)
 
           test_path = Path(
               'apps/pandora-mobile/test/transparent_background_source_guard_test.dart'
           )
-          test_path.write_text("""import 'dart:io';
-
-import 'package:flutter_test/flutter_test.dart';
-
-void main() {
-  test('Pandora mobile background stays transparent', () {
-    final theme =
-        File('lib/core/design/pandora_theme.dart').readAsStringSync();
-    final app = File('lib/app/pandora_app.dart').readAsStringSync();
-
-    expect(
-      'background: Colors.transparent,'.allMatches(theme).length,
-      greaterThanOrEqualTo(2),
-    );
-    expect(theme, isNot(contains('background: const Color(0xFF0D0E12),')));
-    expect(theme, contains('scaffoldBackgroundColor: background,'));
-    expect(theme, contains('backgroundColor: background,'));
-    expect(
-      'backgroundColor: Colors.transparent,'.allMatches(theme).length,
-      greaterThanOrEqualTo(2),
-    );
-    expect(app, contains('color: Colors.transparent,'));
-  });
-}
-""")
+          test_path.write_bytes(base64.b64decode(os.environ['TRANSPARENT_GUARD_B64']))
           PY
 
       - name: Materialize acceptance-equivalent Flutter package
