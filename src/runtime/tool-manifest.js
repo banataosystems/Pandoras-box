@@ -60,6 +60,7 @@ const entries = [
     manifest('memory.health', 'memory', 'read', false, 'capability', ['memory:health']),
     manifest('memory.search', 'memory', 'read', false, 'capability', ['memory:read']),
     manifest('memory.canonicalContext', 'memory', 'read', false, 'capability', ['memory:read']),
+    manifest('memory.submitEvidenceCandidate', 'memory', 'write', true, 'project', ['memory:write']),
 ];
 exports.toolManifests = Object.freeze(Object.fromEntries(entries.map((entry) => [entry.name, Object.freeze(entry)])));
 function getToolManifest(toolName) {

@@ -133,14 +133,13 @@ function assertSupabaseAccess(definition, args, configuration) {
     assertRequiredScopes(definition, account.grantedScopes);
 }
 function assertMemoryAccess(definition, args, configuration) {
-    if (definition.manifest.mutation) {
-        throw new Error('Pandora Memory mutations are not registered in MCPMaster');
+    if (definition.manifest.mutation && configuration.allowMutations !== true) {
+        throw new Error('Pandora Memory mutations are disabled');
     }
     assertRequiredScopes(definition, configuration.grantedScopes);
-    // Every namespace-scoped Memory operation is checked here, not just search,
-    // so a new retrieval tool cannot reach an unapproved namespace.
-    if (definition.manifest.name === 'memory.search'
-        || definition.manifest.name === 'memory.canonicalContext') {
+    // All Memory tools except health are namespace-scoped. Keep this generic so
+    // adding a write-capable tool cannot silently bypass namespace enforcement.
+    if (definition.manifest.name !== 'memory.health') {
         const namespace = typeof args.namespace === 'string' ? args.namespace : undefined;
         if (!namespace || !configuration.allowedNamespaces.includes(namespace)) {
             throw new Error(`Pandora Memory namespace is not allowed: ${namespace || 'missing'}`);
