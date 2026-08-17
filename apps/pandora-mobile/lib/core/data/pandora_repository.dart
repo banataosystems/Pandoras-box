@@ -1,5 +1,6 @@
 import '../models/pandora_models.dart';
 import '../network/pandora_api_error.dart';
+import 'owner_projection.dart';
 
 typedef PandoraRepositoryException = PandoraApiError;
 
@@ -92,11 +93,28 @@ class SafetyOverview {
   static List<SafetySection> _integrationSections(Object? value) {
     final integrations = asJsonList(value);
     if (integrations.isEmpty) return const <SafetySection>[];
-    final items = integrations.map((entry) {
+    final unique = <String, JsonMap>{};
+    for (final entry in integrations) {
       final json = asJsonMap(entry);
       final provider = jsonText(json['provider'], fallback: 'Service');
+      final key = normalizeProviderKey(provider);
+      final existing = unique[key];
+      if (existing == null ||
+          _integrationAttentionRank(json) >
+              _integrationAttentionRank(existing)) {
+        unique[key] = json;
+      }
+    }
+    final ordered = unique.values.toList(growable: true)
+      ..sort(
+        (left, right) => _integrationAttentionRank(right).compareTo(
+          _integrationAttentionRank(left),
+        ),
+      );
+    final items = ordered.map((json) {
+      final provider = jsonText(json['provider'], fallback: 'Service');
       return SafetyItem.fromJson(<String, Object?>{
-        'id': 'integration-${provider.toLowerCase()}',
+        'id': 'integration-${normalizeProviderKey(provider)}',
         'title': provider,
         'plainStatus': humanizeToken(
           json['status'],
@@ -114,6 +132,31 @@ class SafetyOverview {
         items: List<SafetyItem>.unmodifiable(items),
       ),
     ];
+  }
+
+  static int _integrationAttentionRank(JsonMap integration) {
+    final words =
+        '${jsonText(integration['status'])} ${jsonText(integration['freshness'])}'
+            .toLowerCase();
+    if (words.contains('down') ||
+        words.contains('failed') ||
+        words.contains('critical') ||
+        words.contains('unhealthy') ||
+        words.contains('blocked')) {
+      return 4;
+    }
+    if (words.contains('degraded') ||
+        words.contains('warning') ||
+        words.contains('stale') ||
+        words.contains('attention')) {
+      return 3;
+    }
+    if (words.contains('healthy') ||
+        words.contains('connected') ||
+        words.contains('ready')) {
+      return 1;
+    }
+    return 2;
   }
 }
 
@@ -167,15 +210,10 @@ abstract interface class PandoraRepository {
   void dispose();
 }
 
-/// Emits whenever owner authorization becomes invalid so every mounted
-/// protected surface can be discarded together, not only the screen that
-/// happened to observe the 401/403 response.
 abstract interface class AuthorizationInvalidationSource {
   Stream<AuthorizationInvalidation> get authorizationInvalidations;
 }
 
-/// Starts a new authenticated identity epoch. Results and diagnostics from
-/// requests started before this boundary must not reach the next owner.
 abstract interface class AuthenticatedIdentityBoundary {
   void beginAuthenticatedIdentityEpoch();
 }
