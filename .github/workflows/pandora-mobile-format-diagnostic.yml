@@ -1,0 +1,74 @@
+name: Pandora mobile format diagnostic
+
+on:
+  push:
+    branches:
+      - feature/pandora-mobile-premium-foundation
+    paths:
+      - 'apps/pandora-mobile/lib/**'
+      - 'apps/pandora-mobile/test/**'
+      - '.github/workflows/pandora-mobile-format-diagnostic.yml'
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  format-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+
+      - name: Resolve locked dependencies
+        working-directory: apps/pandora-mobile
+        run: flutter pub get --enforce-lockfile
+
+      - name: Produce exact formatter diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          dart format apps/pandora-mobile/lib apps/pandora-mobile/test
+          git diff -- apps/pandora-mobile/lib apps/pandora-mobile/test > /tmp/formatter.diff
+          if [[ ! -s /tmp/formatter.diff ]]; then
+            printf 'NO_FORMAT_DIFF\n' > /tmp/formatter.diff
+          fi
+
+      - name: Publish formatter diff as check evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          diff = Path('/tmp/formatter.diff').read_text()
+          payload = {
+              'name': 'formatter-output',
+              'head_sha': os.environ['HEAD_SHA'],
+              'status': 'completed',
+              'conclusion': 'neutral',
+              'output': {
+                  'title': 'Pinned Dart formatter diagnostic',
+                  'summary': '```diff\n' + diff + '\n```',
+              },
+          }
+          Path('/tmp/check.json').write_text(json.dumps(payload))
+          PY
+          gh api --method POST \
+            -H 'Accept: application/vnd.github+json' \
+            "/repos/${GITHUB_REPOSITORY}/check-runs" \
+            --input /tmp/check.json
