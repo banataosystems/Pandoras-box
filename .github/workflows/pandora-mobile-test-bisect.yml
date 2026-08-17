@@ -1,0 +1,78 @@
+name: Pandora mobile transparent test bisect
+
+on:
+  push:
+    branches:
+      - feature/pandora-mobile-premium-foundation
+    paths:
+      - '.github/workflows/pandora-mobile-test-bisect.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bisect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+      - name: Materialize package
+        run: |
+          set -euo pipefail
+          rm -rf .pandora-mobile-build
+          mkdir .pandora-mobile-build
+          cd .pandora-mobile-build
+          flutter create --platforms=android,web --org com.banataosystems --project-name pandora_mobile .
+          rm -rf lib test assets pubspec.yaml pubspec.lock analysis_options.yaml
+          cp -R ../apps/pandora-mobile/lib ./lib
+          cp -R ../apps/pandora-mobile/test ./test
+          cp -R ../apps/pandora-mobile/assets ./assets
+          cp ../apps/pandora-mobile/pubspec.yaml ./pubspec.yaml
+          cp ../apps/pandora-mobile/analysis_options.yaml ./analysis_options.yaml
+          cp ../apps/pandora-mobile/pubspec.lock ./pubspec.lock
+      - name: Resolve locked dependencies
+        working-directory: .pandora-mobile-build
+        run: |
+          cp pubspec.lock pubspec.lock.expected
+          flutter pub get --enforce-lockfile
+          cmp pubspec.lock.expected pubspec.lock
+      - name: Refresh goldens in working copy
+        working-directory: .pandora-mobile-build
+        run: flutter test --update-goldens test/goldens/foundation_catalog_golden_test.dart
+      - name: Accessibility
+        working-directory: .pandora-mobile-build
+        run: flutter test test/accessibility/foundation_accessibility_test.dart
+      - name: Shell
+        working-directory: .pandora-mobile-build
+        run: flutter test test/app/pandora_shell_test.dart
+      - name: Foundation source guard
+        working-directory: .pandora-mobile-build
+        run: flutter test test/architecture/foundation_source_guard_test.dart
+      - name: Owner intelligence guard
+        working-directory: .pandora-mobile-build
+        run: flutter test test/architecture/owner_intelligence_source_guard_test.dart
+      - name: Diagnostics
+        working-directory: .pandora-mobile-build
+        run: flutter test test/core/diagnostics/diagnostics_sanitizer_test.dart
+      - name: Models
+        working-directory: .pandora-mobile-build
+        run: flutter test test/core/models/pandora_models_test.dart
+      - name: API client
+        working-directory: .pandora-mobile-build
+        run: flutter test test/core/network/pandora_api_client_test.dart
+      - name: Screen controller
+        working-directory: .pandora-mobile-build
+        run: flutter test test/core/state/screen_controller_test.dart
+      - name: Foundation widgets
+        working-directory: .pandora-mobile-build
+        run: flutter test test/core/widgets/foundation_widgets_test.dart
+      - name: Contract
+        working-directory: .pandora-mobile-build
+        run: flutter test test/pandora_contract_test.dart
+      - name: Transparent background guard
+        working-directory: .pandora-mobile-build
+        run: flutter test test/transparent_background_source_guard_test.dart
