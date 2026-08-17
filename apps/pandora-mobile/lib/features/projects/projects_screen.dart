@@ -7,6 +7,7 @@ import '../../core/models/pandora_models.dart';
 import '../../core/state/screen_controller.dart';
 import '../../core/widgets/content_state.dart';
 import '../../core/widgets/freshness_label.dart';
+import '../../core/widgets/owner_experience.dart';
 import '../../core/widgets/pandora_page.dart';
 import '../../core/widgets/pandora_surface.dart';
 import '../../core/widgets/proof_ladder.dart';
@@ -56,7 +57,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   List<ProjectSummary> _visible(List<ProjectSummary> projects) {
     final query = _search.text.trim().toLowerCase();
-    return projects.where((project) {
+    final visible = projects.where((project) {
       final matchesQuery = query.isEmpty ||
           '${project.name} ${project.purpose} ${project.phase} ${project.status}'
               .toLowerCase()
@@ -65,9 +66,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       return switch (_filter) {
         ProjectFilter.all => true,
         ProjectFilter.needsMe => project.blocker != null,
-        ProjectFilter.active => project.status.toLowerCase().contains(
-              'active',
-            ),
+        ProjectFilter.active => project.status.toLowerCase().contains('active'),
         ProjectFilter.blocked =>
           project.status.toLowerCase().contains('blocked') ||
               project.blocker != null,
@@ -76,14 +75,15 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           project.evidenceState(EvidenceStage.productionVerified) ==
               EvidenceClaimState.verified,
       };
-    }).toList(growable: false);
+    }).toList(growable: true);
+    visible.sort(_compareProjectAttention);
+    return List<ProjectSummary>.unmodifiable(visible);
   }
 
   @override
   Widget build(BuildContext context) => PandoraPage(
         title: 'Projects',
-        subtitle:
-            'Verified project truth, blockers, proof, and the next safe action.',
+        subtitle: 'Truth, blockers, proof, and the next safe action.',
         actions: [
           IconButton(
             tooltip: 'Refresh Projects',
@@ -92,82 +92,150 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           ),
         ],
         onRefresh: () => _controller!.refresh(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: _search,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                labelText: 'Search projects',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-            ),
-            const SizedBox(height: PandoraSpacing.sm),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final filter in ProjectFilter.values) ...[
-                    FilterChip(
-                      label: Text(filter.label),
-                      selected: _filter == filter,
-                      onSelected: (_) => setState(() => _filter = filter),
-                    ),
-                    if (filter != ProjectFilter.values.last)
-                      const SizedBox(width: PandoraSpacing.xs),
-                  ],
+        child: AnimatedBuilder(
+          animation: _controller!,
+          builder: (context, _) {
+            final controller = _controller!;
+            if (controller.isLoading && controller.data == null) {
+              return const ContentSkeleton(lines: 6);
+            }
+            if (controller.error != null && controller.data == null) {
+              return ErrorContent(
+                title: 'Projects could not load',
+                message: _safeError(controller.error),
+                onRetry: controller.load,
+              );
+            }
+            final allProjects = controller.data ?? const <ProjectSummary>[];
+            final projects = _visible(allProjects);
+            final blocked = allProjects
+                .where(
+                  (project) =>
+                      project.blocker != null ||
+                      project.status.toLowerCase().contains('blocked'),
+                )
+                .length;
+            final stale = allProjects
+                .where(
+                  (project) =>
+                      project.freshness.state != FreshnessState.fresh,
+                )
+                .length;
+            final productionVerified = allProjects
+                .where(
+                  (project) =>
+                      project.evidenceState(EvidenceStage.productionVerified) ==
+                      EvidenceClaimState.verified,
+                )
+                .length;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (controller.degradedReason != null ||
+                    controller.error != null) ...[
+                  DegradedContentNotice(
+                    message: controller.degradedReason ??
+                        controller.error!.message,
+                    onRetry: controller.refresh,
+                  ),
+                  const SizedBox(height: PandoraSpacing.md),
                 ],
-              ),
-            ),
-            const SizedBox(height: PandoraSpacing.lg),
-            AnimatedBuilder(
-              animation: _controller!,
-              builder: (context, _) {
-                final controller = _controller!;
-                if (controller.isLoading && controller.data == null) {
-                  return const ContentSkeleton(lines: 6);
-                }
-                if (controller.error != null && controller.data == null) {
-                  return ErrorContent(
-                    title: 'Projects could not load',
-                    message: _safeError(controller.error),
-                    onRetry: controller.load,
-                  );
-                }
-                final projects = _visible(
-                  controller.data ?? const <ProjectSummary>[],
-                );
-                if (projects.isEmpty) {
-                  return EmptyContent(
+                OwnerMetricGrid(
+                  metrics: [
+                    OwnerMetric(
+                      label: 'Projects',
+                      value: '${allProjects.length}',
+                      icon: Icons.workspaces_outline,
+                      tone: PandoraStatusTone.informative,
+                    ),
+                    OwnerMetric(
+                      label: 'Blocked',
+                      value: '$blocked',
+                      icon: Icons.block_rounded,
+                      tone: blocked > 0
+                          ? PandoraStatusTone.critical
+                          : PandoraStatusTone.neutral,
+                    ),
+                    OwnerMetric(
+                      label: 'Stale proof',
+                      value: '$stale',
+                      icon: Icons.schedule_rounded,
+                      tone: stale > 0
+                          ? PandoraStatusTone.attention
+                          : PandoraStatusTone.neutral,
+                    ),
+                    OwnerMetric(
+                      label: 'Production verified',
+                      value: '$productionVerified',
+                      icon: Icons.verified_outlined,
+                      tone: PandoraStatusTone.verified,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: PandoraSpacing.md),
+                PandoraSurface(
+                  title: 'Find a project',
+                  subtitle: 'Search by name, purpose, phase, or status.',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _search,
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Search projects',
+                          prefixIcon: Icon(Icons.search_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: PandoraSpacing.sm),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            for (final filter in ProjectFilter.values) ...[
+                              FilterChip(
+                                label: Text(filter.label),
+                                selected: _filter == filter,
+                                onSelected: (_) =>
+                                    setState(() => _filter = filter),
+                              ),
+                              if (filter != ProjectFilter.values.last)
+                                const SizedBox(width: PandoraSpacing.xs),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: PandoraSpacing.xl),
+                OwnerSectionHeading(
+                  title: 'Portfolio',
+                  subtitle: projects.isEmpty
+                      ? 'No projects match the current view.'
+                      : '${projects.length} project${projects.length == 1 ? '' : 's'} · attention first',
+                ),
+                const SizedBox(height: PandoraSpacing.sm),
+                if (projects.isEmpty)
+                  EmptyContent(
                     title: 'No matching projects',
                     message:
                         _search.text.isEmpty && _filter == ProjectFilter.all
                             ? 'No verified projects were returned.'
                             : 'Try another search or filter.',
-                  );
-                }
-                return Column(
-                  children: [
-                    if (controller.degradedReason != null ||
-                        controller.error != null) ...[
-                      DegradedContentNotice(
-                        message: controller.degradedReason ??
-                            controller.error!.message,
-                        onRetry: controller.refresh,
-                      ),
-                      const SizedBox(height: PandoraSpacing.md),
-                    ],
-                    for (var index = 0; index < projects.length; index++) ...[
-                      _ProjectCard(project: projects[index]),
-                      if (index != projects.length - 1)
-                        const SizedBox(height: PandoraSpacing.sm),
-                    ],
+                  )
+                else
+                  for (var index = 0;
+                      index < projects.length;
+                      index++) ...[
+                    _ProjectCard(project: projects[index]),
+                    if (index != projects.length - 1)
+                      const SizedBox(height: PandoraSpacing.sm),
                   ],
-                );
-              },
-            ),
-          ],
+              ],
+            );
+          },
         ),
       );
 }
@@ -199,30 +267,60 @@ class _ProjectCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(project.phase,
-                    style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: PandoraSpacing.sm),
-                ProofLadder(stages: project.evidenceStages, compact: true),
-                const SizedBox(height: PandoraSpacing.sm),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: Text(project.progressLabel)),
+                    Expanded(
+                      child: Text(
+                        project.phase,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    const SizedBox(width: PandoraSpacing.sm),
                     FreshnessLabel(freshness: project.freshness),
                   ],
                 ),
+                const SizedBox(height: PandoraSpacing.sm),
+                ProofLadder(stages: project.evidenceStages, compact: true),
                 if (project.blocker != null) ...[
                   const SizedBox(height: PandoraSpacing.sm),
-                  Text('Blocked: ${project.blocker!}'),
+                  OwnerSignal(
+                    label: 'Blocked by',
+                    value: project.blocker!,
+                    icon: Icons.block_rounded,
+                    tone: PandoraStatusTone.critical,
+                  ),
                 ],
                 if (project.nextAction != null) ...[
                   const SizedBox(height: PandoraSpacing.xs),
-                  Text('Next: ${project.nextAction!}'),
+                  OwnerSignal(
+                    label: 'Next safe action',
+                    value: project.nextAction!,
+                    icon: Icons.arrow_forward_rounded,
+                    tone: PandoraStatusTone.informative,
+                  ),
                 ],
               ],
             ),
           ),
         ),
       );
+}
+
+int _compareProjectAttention(ProjectSummary left, ProjectSummary right) {
+  int score(ProjectSummary project) {
+    if (project.blocker != null ||
+        project.status.toLowerCase().contains('blocked')) {
+      return 0;
+    }
+    if (project.freshness.state != FreshnessState.fresh) return 1;
+    if (project.status.toLowerCase().contains('active')) return 2;
+    return 3;
+  }
+
+  final scoreDifference = score(left).compareTo(score(right));
+  if (scoreDifference != 0) return scoreDifference;
+  return left.name.toLowerCase().compareTo(right.name.toLowerCase());
 }
 
 String _safeError(Object? error) {
