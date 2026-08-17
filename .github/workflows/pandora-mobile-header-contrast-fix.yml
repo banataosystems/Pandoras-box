@@ -1,0 +1,109 @@
+name: Pandora mobile transparent header contrast fix
+
+on:
+  push:
+    branches:
+      - feature/pandora-mobile-premium-foundation
+    paths:
+      - '.github/workflows/pandora-mobile-header-contrast-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+
+      - name: Apply local header surface contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          theme_path = Path('apps/pandora-mobile/lib/core/design/pandora_theme.dart')
+          theme = theme_path.read_text()
+          old = 'backgroundColor: background,'
+          new = 'backgroundColor: surface,'
+          if theme.count(old) != 1:
+              raise SystemExit(f'Expected one AppBar background contract, found {theme.count(old)}')
+          theme_path.write_text(theme.replace(old, new))
+
+          guard_path = Path('apps/pandora-mobile/test/transparent_background_source_guard_test.dart')
+          guard = guard_path.read_text()
+          old_guard = "contains('backgroundColor: background,')"
+          new_guard = "contains('backgroundColor: surface,')"
+          if guard.count(old_guard) != 1:
+              raise SystemExit(f'Expected one guard AppBar assertion, found {guard.count(old_guard)}')
+          guard_path.write_text(guard.replace(old_guard, new_guard))
+          PY
+
+      - name: Materialize acceptance package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .pandora-mobile-build
+          mkdir .pandora-mobile-build
+          cd .pandora-mobile-build
+          flutter create --platforms=android,web --org com.banataosystems --project-name pandora_mobile .
+          rm -rf lib test assets pubspec.yaml pubspec.lock analysis_options.yaml
+          cp -R ../apps/pandora-mobile/lib ./lib
+          cp -R ../apps/pandora-mobile/test ./test
+          cp -R ../apps/pandora-mobile/assets ./assets
+          cp ../apps/pandora-mobile/pubspec.yaml ./pubspec.yaml
+          cp ../apps/pandora-mobile/analysis_options.yaml ./analysis_options.yaml
+          cp ../apps/pandora-mobile/pubspec.lock ./pubspec.lock
+
+      - name: Resolve locked dependencies
+        working-directory: .pandora-mobile-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp pubspec.lock pubspec.lock.expected
+          flutter pub get --enforce-lockfile
+          cmp pubspec.lock.expected pubspec.lock
+
+      - name: Format changed source in acceptance context
+        working-directory: .pandora-mobile-build
+        run: dart format lib/core/design/pandora_theme.dart test/transparent_background_source_guard_test.dart
+
+      - name: Verify transparent root contract
+        working-directory: .pandora-mobile-build
+        run: flutter test test/transparent_background_source_guard_test.dart
+
+      - name: Verify accessibility at 320px and 2x text
+        working-directory: .pandora-mobile-build
+        run: flutter test test/accessibility/foundation_accessibility_test.dart --reporter expanded
+
+      - name: Analyze
+        working-directory: .pandora-mobile-build
+        run: flutter analyze
+
+      - name: Copy verified source back
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .pandora-mobile-build/lib/core/design/pandora_theme.dart apps/pandora-mobile/lib/core/design/pandora_theme.dart
+          cp .pandora-mobile-build/test/transparent_background_source_guard_test.dart apps/pandora-mobile/test/transparent_background_source_guard_test.dart
+          git diff --check
+
+      - name: Commit verified header contrast fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/pandora-mobile/lib/core/design/pandora_theme.dart apps/pandora-mobile/test/transparent_background_source_guard_test.dart
+          git commit -m "fix(mobile): preserve transparent root with accessible header surface"
+          git push origin HEAD:feature/pandora-mobile-premium-foundation
