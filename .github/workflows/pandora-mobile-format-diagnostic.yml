@@ -33,17 +33,13 @@ jobs:
         working-directory: apps/pandora-mobile
         run: flutter pub get --enforce-lockfile
 
-      - name: Produce exact formatter diff
+      - name: Produce exact formatted sources
         shell: bash
         run: |
           set -euo pipefail
           dart format apps/pandora-mobile/lib apps/pandora-mobile/test
-          git diff -- apps/pandora-mobile/lib apps/pandora-mobile/test > /tmp/formatter.diff
-          if [[ ! -s /tmp/formatter.diff ]]; then
-            printf 'NO_FORMAT_DIFF\n' > /tmp/formatter.diff
-          fi
 
-      - name: Publish formatter diff as check evidence
+      - name: Publish exact formatted source evidence
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -51,24 +47,38 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          import base64
           import json
           import os
           from pathlib import Path
 
-          diff = Path('/tmp/formatter.diff').read_text()
-          payload = {
-              'name': 'formatter-output',
-              'head_sha': os.environ['HEAD_SHA'],
-              'status': 'completed',
-              'conclusion': 'neutral',
-              'output': {
-                  'title': 'Pinned Dart formatter diagnostic',
-                  'summary': '```diff\n' + diff + '\n```',
-              },
+          files = {
+              'formatter-owner-source': Path(
+                  'apps/pandora-mobile/lib/features/intelligence/'
+                  'owner_intelligence_screen.dart'
+              ),
+              'formatter-settings-source': Path(
+                  'apps/pandora-mobile/lib/features/settings/'
+                  'settings_screen.dart'
+              ),
           }
-          Path('/tmp/check.json').write_text(json.dumps(payload))
+          for name, path in files.items():
+              encoded = base64.b64encode(path.read_bytes()).decode('ascii')
+              payload = {
+                  'name': name,
+                  'head_sha': os.environ['HEAD_SHA'],
+                  'status': 'completed',
+                  'conclusion': 'neutral',
+                  'output': {
+                      'title': 'Pinned Dart formatted source',
+                      'summary': encoded,
+                  },
+              }
+              Path(f'/tmp/{name}.json').write_text(json.dumps(payload))
           PY
-          gh api --method POST \
-            -H 'Accept: application/vnd.github+json' \
-            "/repos/${GITHUB_REPOSITORY}/check-runs" \
-            --input /tmp/check.json
+          for name in formatter-owner-source formatter-settings-source; do
+            gh api --method POST \
+              -H 'Accept: application/vnd.github+json' \
+              "/repos/${GITHUB_REPOSITORY}/check-runs" \
+              --input "/tmp/${name}.json"
+          done
