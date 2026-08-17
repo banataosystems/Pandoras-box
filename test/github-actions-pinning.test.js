@@ -31,13 +31,25 @@ test('security regression runs whenever any workflow changes', () => {
     path.join(workflowDirectory, 'projectos-security.yml'),
     'utf8',
   );
-  const workflowGlobOccurrences = securityWorkflow.match(
-    /- '\.github\/workflows\/\*\*'/g,
+
+  // The gate is always-on: it triggers on every pull request and every push to
+  // main with no path filter at all, so a workflow or patch change can never
+  // route around it. This asserts that policy rather than the earlier
+  // path-glob mechanism, which enumerated the covered directories and could
+  // silently omit one.
+  const triggers = securityWorkflow.slice(
+    securityWorkflow.indexOf('\non:'),
+    securityWorkflow.indexOf('\npermissions:'),
   );
 
-  assert.equal(workflowGlobOccurrences?.length, 2);
-  const patchGlobOccurrences = securityWorkflow.match(/- 'patches\/\*\*'/g);
-  assert.equal(patchGlobOccurrences?.length, 2);
+  assert.match(triggers, /^\s*pull_request:\s*$/m);
+  assert.match(triggers, /^\s*push:\s*$/m);
+  assert.match(triggers, /^\s*branches:\s*\[main\]\s*$/m);
+  assert.doesNotMatch(
+    triggers,
+    /^\s*paths:\s*$/m,
+    'A path filter would let changes outside the listed globs skip the gate.',
+  );
 });
 
 test('exceptional recovery publishers cannot run automatically', () => {
