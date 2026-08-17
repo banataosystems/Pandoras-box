@@ -6,6 +6,7 @@ const assert = require("node:assert/strict");
 const {
   EvidenceCandidateArgsSchema,
   submitEvidenceCandidate,
+  IDEMPOTENCY_CONFLICT_CODE,
 } = require("../src/tools/memory-evidence-intake.js");
 const { memoryTools } = require("../src/tools/memory.js");
 const { getToolManifest } = require("../src/runtime/tool-manifest.js");
@@ -13,6 +14,9 @@ const { executeTool } = require("../src/runtime/tool-catalog.js");
 
 const SHA40 = "0b6d32b9135e2050c4f819a8d7ac3c78e6bc1117";
 const SHA256 = "4a10f26ebe4e760c984b89ecc741ba77ba0213dcad6205f3d1851a887f624545";
+// Pandora Memory always resolves and returns the canonical project pair.
+const CANONICAL_PROJECT_ID = "7c686cbd-d968-49d5-86cc-918f5e777bd2";
+const CANONICAL_PROJECT_KEY = "mcpmaster-pandoras-box";
 
 function validArgs() {
   return {
@@ -53,8 +57,8 @@ function successBody(overrides = {}) {
     status: "pending_review",
     idempotency_key: validArgs().idempotencyKey,
     namespace: "real_life",
-    project_id: null,
-    project_key: "mcpmaster-pandoras-box",
+    project_id: CANONICAL_PROJECT_ID,
+    project_key: CANONICAL_PROJECT_KEY,
     proof_stage: "tested",
     deduplicated: false,
     created_at: "2026-08-14T11:00:00Z",
@@ -112,6 +116,111 @@ test("response identity and proof stage are bound to the submitted candidate", a
         new Response(JSON.stringify(successBody(override)), { status: 200 })),
       pattern,
       name,
+    );
+  }
+});
+
+test("server-resolved canonical project identity is returned once validated", async () => {
+  const { projectKey, ...withoutKey } = validArgs();
+
+  // projectKey-only input still learns the canonical server-resolved UUID.
+  const byKey = await submitEvidenceCandidate(validArgs(), config, async () =>
+    new Response(JSON.stringify(successBody()), { status: 202 }));
+  assert.equal(byKey.projectId, CANONICAL_PROJECT_ID);
+  assert.equal(byKey.projectKey, CANONICAL_PROJECT_KEY);
+
+  // projectId-only input still learns the canonical server-resolved key.
+  const byId = await submitEvidenceCandidate(
+    { ...withoutKey, projectId: CANONICAL_PROJECT_ID },
+    config,
+    async () => new Response(JSON.stringify(successBody()), { status: 202 }),
+  );
+  assert.equal(byId.projectId, CANONICAL_PROJECT_ID);
+  assert.equal(byId.projectKey, CANONICAL_PROJECT_KEY);
+
+  // A matching id + key pair is accepted.
+  const byBoth = await submitEvidenceCandidate(
+    { ...validArgs(), projectId: CANONICAL_PROJECT_ID },
+    config,
+    async () => new Response(JSON.stringify(successBody()), { status: 202 }),
+  );
+  assert.equal(byBoth.projectId, CANONICAL_PROJECT_ID);
+  assert.equal(byBoth.projectKey, CANONICAL_PROJECT_KEY);
+});
+
+test("substituted or malformed canonical project identity fails closed", async () => {
+  const withId = { ...validArgs(), projectId: CANONICAL_PROJECT_ID };
+  // projectId-only input, so the project_key equality gate is skipped and the
+  // canonical-format gate is the one under test.
+  const { projectKey, ...idOnly } = withId;
+  for (const [name, args, override, pattern] of [
+    [
+      "substituted project id",
+      withId,
+      { project_id: "43f619bb-ecc2-4a9a-bd56-424325eb81ac" },
+      /project-id mismatch/,
+    ],
+    [
+      "missing canonical project id",
+      validArgs(),
+      { project_id: null },
+      /canonical project id is invalid/,
+    ],
+    [
+      "malformed canonical project id",
+      validArgs(),
+      { project_id: "not-a-uuid" },
+      /canonical project id is invalid/,
+    ],
+    [
+      "malformed canonical project key",
+      idOnly,
+      { project_key: "NOT A KEY" },
+      /canonical project key is invalid/,
+    ],
+    [
+      "missing canonical project key",
+      idOnly,
+      { project_key: null },
+      /canonical project key is invalid/,
+    ],
+  ]) {
+    await assert.rejects(
+      () => submitEvidenceCandidate(args, config, async () =>
+        new Response(JSON.stringify(successBody(override)), { status: 200 })),
+      pattern,
+      name,
+    );
+  }
+});
+
+test("backend 409 is classified as an explicit idempotency conflict", async () => {
+  await assert.rejects(
+    () => submitEvidenceCandidate(validArgs(), config, async () =>
+      new Response(
+        JSON.stringify({ ok: false, error: "idempotency_conflict", detail: "relation memory_capture_candidates" }),
+        { status: 409 },
+      )),
+    (error) => {
+      assert.equal(error.code, IDEMPOTENCY_CONFLICT_CODE);
+      assert.match(error.message, /idempotency conflict/i);
+      // The backend error body must never be echoed to the caller.
+      assert.doesNotMatch(error.message, /memory_capture_candidates/);
+      return true;
+    },
+  );
+
+  // Transport, auth, and 5xx failures stay distinguishable from a conflict.
+  for (const status of [401, 403, 500, 503]) {
+    await assert.rejects(
+      () => submitEvidenceCandidate(validArgs(), config, async () =>
+        new Response(JSON.stringify({ ok: false, error: "nope" }), { status })),
+      (error) => {
+        assert.equal(error.code, undefined);
+        assert.match(error.message, new RegExp(`submission failed \\(${status}\\)`));
+        return true;
+      },
+      `status ${status}`,
     );
   }
 });

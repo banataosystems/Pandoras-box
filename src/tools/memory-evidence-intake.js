@@ -8,6 +8,26 @@ const { z } = require("zod");
 
 const MAX_RESPONSE_BYTES = 100_000;
 const DEFAULT_TIMEOUT_MS = 8_000;
+// Pandora Memory resolves canonical project identity server-side. These bounds
+// mirror the backend's own validation so a malformed or substituted identity is
+// rejected here instead of being surfaced as if Memory had authorised it.
+const CANONICAL_PROJECT_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CANONICAL_PROJECT_KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{1,95}$/;
+const IDEMPOTENCY_CONFLICT_CODE = "idempotency_conflict";
+
+class MemoryEvidenceIdempotencyConflictError extends Error {
+  constructor() {
+    // Deliberately fixed text: the backend's own error body is never echoed, so
+    // a conflict cannot leak database contents or submitted evidence.
+    super("Pandora Memory candidate idempotency conflict: the same idempotency key was reused with different content");
+    this.name = "MemoryEvidenceIdempotencyConflictError";
+    this.code = IDEMPOTENCY_CONFLICT_CODE;
+  }
+}
+
+exports.MemoryEvidenceIdempotencyConflictError = MemoryEvidenceIdempotencyConflictError;
+exports.IDEMPOTENCY_CONFLICT_CODE = IDEMPOTENCY_CONFLICT_CODE;
 const NamespaceSchema = z.enum(["real_life", "au"]);
 const ProofStageSchema = z.enum([
   "documented",
@@ -133,6 +153,25 @@ function assertBoundResponse(body, input) {
   if (input.projectKey && body?.project_key !== input.projectKey) {
     throw new Error("Pandora Memory candidate response project-key mismatch");
   }
+
+  // Memory resolves the authoritative project identity, so the caller may have
+  // supplied only one half of it. Surface the server-resolved pair, but only
+  // after it is well-formed and agrees with whatever the caller did send above.
+  const canonicalProjectId = body?.project_id;
+  const canonicalProjectKey = body?.project_key;
+  if (
+    typeof canonicalProjectId !== "string" ||
+    !CANONICAL_PROJECT_ID_PATTERN.test(canonicalProjectId)
+  ) {
+    throw new Error("Pandora Memory candidate response canonical project id is invalid");
+  }
+  if (
+    typeof canonicalProjectKey !== "string" ||
+    !CANONICAL_PROJECT_KEY_PATTERN.test(canonicalProjectKey)
+  ) {
+    throw new Error("Pandora Memory candidate response canonical project key is invalid");
+  }
+  return { canonicalProjectId, canonicalProjectKey };
 }
 
 async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis.fetch) {
@@ -195,13 +234,20 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
     } catch {
       throw new Error("Pandora Memory candidate response was not valid JSON");
     }
+    // A 409 is the one failure that carries governed meaning: the same
+    // idempotency key was reused with different content. Classify it distinctly
+    // so callers can tell it apart from transport, auth, and 5xx failures, and
+    // keep every other status on the generic fail-closed path.
+    if (response.status === 409) {
+      throw new MemoryEvidenceIdempotencyConflictError();
+    }
     if (!response.ok || body?.ok === false) {
       throw new Error(`Pandora Memory candidate submission failed (${response.status})`);
     }
     if (body?.status !== "pending_review") {
       throw new Error("Pandora Memory candidate did not remain pending review");
     }
-    assertBoundResponse(body, input);
+    const { canonicalProjectId, canonicalProjectKey } = assertBoundResponse(body, input);
 
     return {
       ok: true,
@@ -210,8 +256,8 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
       deduplicated: body.deduplicated === true,
       idempotencyKey: input.idempotencyKey,
       namespace: input.namespace,
-      projectId: input.projectId ?? null,
-      projectKey: input.projectKey ?? null,
+      projectId: canonicalProjectId,
+      projectKey: canonicalProjectKey,
       proofStage: input.proofStage,
       createdAt: body.created_at ?? null,
       canonicalPromoted: false,
