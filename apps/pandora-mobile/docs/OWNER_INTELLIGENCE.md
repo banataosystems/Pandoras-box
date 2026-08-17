@@ -24,4 +24,6 @@ The mobile client does not:
 
 ## Acceptance boundary
 
+The candidate source and test tree is normalized with the repository-pinned Flutter 3.47.0 Dart formatter before acceptance verification.
+
 Source implementation is only **implemented** until the exact branch head passes the pinned mobile integration workflow (formatting, static analysis, complete Flutter tests/goldens, Web release build, and Android debug artifact) and ProjectOS security regression. A real authenticated Android-device journey, device accessibility/lifecycle verification, independent review when required, deployment, and production verification remain separate proof gates.
