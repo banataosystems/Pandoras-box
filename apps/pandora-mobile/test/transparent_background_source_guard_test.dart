@@ -13,7 +13,7 @@ void main() {
     );
     expect(theme, isNot(contains('background: const Color(0xFF0D0E12),')));
     expect(theme, contains('scaffoldBackgroundColor: background,'));
-    expect(theme, contains('backgroundColor: background,'));
+    expect(theme, contains('backgroundColor: surface,'));
     expect(
       'backgroundColor: Colors.transparent,'.allMatches(theme).length,
       greaterThanOrEqualTo(2),
