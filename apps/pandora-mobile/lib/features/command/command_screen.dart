@@ -5,6 +5,7 @@ import '../../core/data/pandora_repository.dart';
 import '../../core/design/pandora_tokens.dart';
 import '../../core/models/pandora_models.dart';
 import '../../core/network/idempotency_key.dart';
+import '../../core/widgets/owner_experience.dart';
 import '../../core/widgets/pandora_page.dart';
 import '../../core/widgets/pandora_surface.dart';
 import '../../core/widgets/status_badge.dart';
@@ -17,6 +18,13 @@ class CommandScreen extends StatefulWidget {
 }
 
 class _CommandScreenState extends State<CommandScreen> {
+  static const _suggestions = <String>[
+    'Continue the highest-value safe work across my projects.',
+    'Review all blockers and prepare the safest next actions.',
+    'Check connected services and tell me what needs attention.',
+    'Prepare the next verified release gate without deploying.',
+  ];
+
   final _objective = TextEditingController();
   final _idempotencyKeys = IdempotencyKeyFactory();
   bool _submitting = false;
@@ -29,6 +37,18 @@ class _CommandScreenState extends State<CommandScreen> {
   void dispose() {
     _objective.dispose();
     super.dispose();
+  }
+
+  void _useSuggestion(String value) {
+    if (_outcomeUnknown || _submitting) return;
+    _objective
+      ..text = value
+      ..selection = TextSelection.collapsed(offset: value.length);
+    setState(() {
+      _error = null;
+      _receipt = null;
+      _submissionKey = null;
+    });
   }
 
   Future<void> _submit() async {
@@ -91,15 +111,43 @@ class _CommandScreenState extends State<CommandScreen> {
   @override
   Widget build(BuildContext context) => PandoraPage(
         title: 'Command',
-        subtitle:
-            'Describe the outcome. Pandora will prepare a governed plan before protected work runs.',
+        subtitle: 'State the outcome. Pandora governs the steps.',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const OwnerBriefingHero(
+              eyebrow: 'Natural-language control',
+              title: 'Describe the outcome, not the implementation',
+              message:
+                  'Pandora interprets the objective, checks project truth, prepares a plan, and routes protected work for approval.',
+              icon: Icons.auto_awesome_rounded,
+              tone: PandoraStatusTone.informative,
+              statusLabel: 'No protected change runs from this screen',
+            ),
+            const SizedBox(height: PandoraSpacing.md),
+            PandoraSurface(
+              title: 'Start from a common objective',
+              subtitle: 'Tap one to edit it before submission.',
+              child: Wrap(
+                spacing: PandoraSpacing.xs,
+                runSpacing: PandoraSpacing.xs,
+                children: [
+                  for (final suggestion in _suggestions)
+                    ActionChip(
+                      avatar: const Icon(Icons.north_east_rounded, size: 17),
+                      label: Text(suggestion),
+                      onPressed: _outcomeUnknown || _submitting
+                          ? null
+                          : () => _useSuggestion(suggestion),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: PandoraSpacing.md),
             PandoraSurface(
               title: 'What do you want Pandora to do?',
               subtitle:
-                  'Use ordinary language. You will see the plan and any required proof or approval separately.',
+                  'Use ordinary language. You will see the plan and required proof or approval separately.',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -134,6 +182,8 @@ class _CommandScreenState extends State<CommandScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: PandoraSpacing.md),
+            const _GovernedFlow(),
             if (_error != null) ...[
               const SizedBox(height: PandoraSpacing.md),
               PandoraSurface(
@@ -159,6 +209,57 @@ class _CommandScreenState extends State<CommandScreen> {
             ],
           ],
         ),
+      );
+}
+
+class _GovernedFlow extends StatelessWidget {
+  const _GovernedFlow();
+
+  @override
+  Widget build(BuildContext context) => PandoraSurface(
+        title: 'What happens next',
+        child: Column(
+          children: const [
+            _FlowStep(
+              number: '1',
+              title: 'Interpret',
+              message: 'Resolve the project, objective, constraints, and risk.',
+            ),
+            Divider(),
+            _FlowStep(
+              number: '2',
+              title: 'Prepare proof',
+              message: 'Show what exists, what is missing, and how to recover.',
+            ),
+            Divider(),
+            _FlowStep(
+              number: '3',
+              title: 'Govern execution',
+              message:
+                  'Create a plan. Approval and execution remain separate actions.',
+            ),
+          ],
+        ),
+      );
+}
+
+class _FlowStep extends StatelessWidget {
+  const _FlowStep({
+    required this.number,
+    required this.title,
+    required this.message,
+  });
+
+  final String number;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: CircleAvatar(radius: 16, child: Text(number)),
+        title: Text(title),
+        subtitle: Text(message),
       );
 }
 
