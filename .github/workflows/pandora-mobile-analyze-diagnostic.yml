@@ -1,4 +1,4 @@
-name: Pandora mobile analyze diagnostic
+name: Pandora mobile analyzer autofix
 
 on:
   push:
@@ -8,11 +8,10 @@ on:
       - '.github/workflows/pandora-mobile-analyze-diagnostic.yml'
 
 permissions:
-  contents: read
-  checks: write
+  contents: write
 
 jobs:
-  analyze-diagnostic:
+  apply-analyzer-fix:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -20,6 +19,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
 
       - name: Install pinned Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -27,67 +27,37 @@ jobs:
           flutter-version: '3.47.0'
           cache: true
 
-      - name: Reproduce acceptance materialization
+      - name: Apply exact analyzer fix
         shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf .pandora-mobile-build
-          mkdir .pandora-mobile-build
-          cd .pandora-mobile-build
-          flutter create --platforms=android,web --org com.banataosystems --project-name pandora_mobile .
-          rm -rf lib test assets pubspec.yaml pubspec.lock analysis_options.yaml
-          cp -R ../apps/pandora-mobile/lib ./lib
-          cp -R ../apps/pandora-mobile/test ./test
-          cp -R ../apps/pandora-mobile/assets ./assets
-          cp ../apps/pandora-mobile/pubspec.yaml ./pubspec.yaml
-          cp ../apps/pandora-mobile/analysis_options.yaml ./analysis_options.yaml
-          cp ../apps/pandora-mobile/pubspec.lock ./pubspec.lock
-          cp pubspec.lock pubspec.lock.expected
-          flutter pub get --enforce-lockfile
-          cmp pubspec.lock.expected pubspec.lock
-          dart format --output=none --set-exit-if-changed lib test
-
-      - name: Capture analyzer output
-        shell: bash
-        run: |
-          set -uo pipefail
-          cd .pandora-mobile-build
-          set +e
-          flutter analyze --machine > /tmp/pandora-analyze.txt 2>&1
-          code=$?
-          set -e
-          printf '%s' "$code" > /tmp/pandora-analyze-exit.txt
-          exit 0
-
-      - name: Publish analyzer diagnostics as check evidence
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import json
-          import os
           from pathlib import Path
 
-          output = Path('/tmp/pandora-analyze.txt').read_text(errors='replace')
-          exit_code = Path('/tmp/pandora-analyze-exit.txt').read_text().strip()
-          if len(output) > 50000:
-              output = output[:50000] + '\n[truncated]'
-          payload = {
-              'name': 'analyzer-output',
-              'head_sha': os.environ['HEAD_SHA'],
-              'status': 'completed',
-              'conclusion': 'neutral',
-              'output': {
-                  'title': f'Pinned Flutter analyzer diagnostics (exit {exit_code})',
-                  'summary': '```text\n' + output + '\n```',
-              },
-          }
-          Path('/tmp/analyzer-check.json').write_text(json.dumps(payload))
+          path = Path('apps/pandora-mobile/lib/features/intelligence/owner_intelligence_screen.dart')
+          text = path.read_text()
+          old = '            value: _section,\n'
+          new = '            initialValue: _section,\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one analyzer target, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
           PY
-          gh api --method POST \
-            -H 'Accept: application/vnd.github+json' \
-            "/repos/${GITHUB_REPOSITORY}/check-runs" \
-            --input /tmp/analyzer-check.json
+          cd apps/pandora-mobile
+          dart format lib/features/intelligence/owner_intelligence_screen.dart
+          cd ../..
+          git diff --check
+
+      - name: Commit exact analyzer fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          path='apps/pandora-mobile/lib/features/intelligence/owner_intelligence_screen.dart'
+          if git diff --quiet -- "$path"; then
+            echo 'Analyzer fix already present.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$path"
+          git commit -m 'fix(mobile): use Flutter initialValue for intelligence selector'
+          git push origin HEAD:feature/pandora-mobile-premium-foundation
