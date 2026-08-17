@@ -27,15 +27,23 @@ class PandoraPage extends StatelessWidget {
     final content = CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        SliverAppBar.large(
+        SliverAppBar(
+          toolbarHeight: 68,
+          titleSpacing: PandoraSpacing.md,
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (showProductMark) ...[
-                const PandoraMark(),
+                const PandoraMark(size: 36),
                 const SizedBox(width: PandoraSpacing.sm),
               ],
-              Flexible(child: Text(title)),
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
           actions: actions,
@@ -44,7 +52,7 @@ class PandoraPage extends StatelessWidget {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(
             PandoraSpacing.md,
-            PandoraSpacing.xs,
+            PandoraSpacing.md,
             PandoraSpacing.md,
             PandoraSpacing.xxl,
           ),
@@ -60,13 +68,13 @@ class PandoraPage extends StatelessWidget {
                     if (subtitle != null) ...[
                       Text(
                         subtitle!,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Theme.of(context)
                                   .colorScheme
                                   .onSurfaceVariant,
                             ),
                       ),
-                      const SizedBox(height: PandoraSpacing.xl),
+                      const SizedBox(height: PandoraSpacing.md),
                     ],
                     child,
                   ],
@@ -80,9 +88,6 @@ class PandoraPage extends StatelessWidget {
     final scrollable = onRefresh == null
         ? content
         : RefreshIndicator(onRefresh: onRefresh!, child: content);
-    // The boundary is applied here rather than at each call site so that every
-    // page — including pages pushed as their own route outside the shell
-    // Scaffold — has Material ancestry and the deterministic canvas.
     return PandoraRouteBoundary(
       child: SafeArea(top: false, child: scrollable),
     );
