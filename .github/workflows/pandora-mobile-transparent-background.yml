@@ -64,12 +64,12 @@ jobs:
 
           app_path = Path('apps/pandora-mobile/lib/app/pandora_app.dart')
           app = app_path.read_text()
-          anchor = 'title: "Pandora\\'s Box",\\n'
+          anchor = "title: \"Pandora's Box\",\n"
           if app.count(anchor) != 1:
               raise SystemExit('MaterialApp title anchor changed unexpectedly')
           app = app.replace(
               anchor,
-              anchor + '          color: Colors.transparent,\\n',
+              anchor + '          color: Colors.transparent,\n',
           )
           app_path.write_text(app)
 
@@ -93,16 +93,14 @@ jobs:
           cp -R ../apps/pandora-mobile/assets ./assets
           cp ../apps/pandora-mobile/pubspec.yaml ./pubspec.yaml
           cp ../apps/pandora-mobile/analysis_options.yaml ./analysis_options.yaml
-          if [[ -f ../apps/pandora-mobile/pubspec.lock ]]; then
-            cp ../apps/pandora-mobile/pubspec.lock ./pubspec.lock
-          fi
+          test -f ../apps/pandora-mobile/pubspec.lock
+          cp ../apps/pandora-mobile/pubspec.lock ./pubspec.lock
 
       - name: Resolve locked dependencies
         working-directory: .pandora-mobile-build
         shell: bash
         run: |
           set -euo pipefail
-          test -f pubspec.lock
           cp pubspec.lock pubspec.lock.expected
           flutter pub get --enforce-lockfile
           cmp pubspec.lock.expected pubspec.lock
