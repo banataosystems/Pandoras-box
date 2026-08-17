@@ -1,10 +1,13 @@
 name: F1 runner fix
+
 on:
   push:
-    branches: [feature/projectos-memory-evidence-intake]
-    paths: [.github/workflows/f1-runner-fix.yml]
+    branches:
+      - feature/projectos-memory-evidence-intake
+
 permissions:
   contents: write
+
 jobs:
   fix:
     runs-on: ubuntu-latest
@@ -13,10 +16,13 @@ jobs:
         with:
           ref: feature/projectos-memory-evidence-intake
           fetch-depth: 0
-      - run: sed -i 's/node-version: 22/node-version: 24/' .github/workflows/f1-privacy-remediation.yml
-      - run: |
+      - name: Align F1 runner with repository engine
+        run: sed -i 's/node-version: 22/node-version: 24/' .github/workflows/f1-privacy-remediation.yml
+      - name: Commit runner correction
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .github/workflows/f1-privacy-remediation.yml
+          git diff --cached --quiet && exit 0
           git commit -m "chore(review): use required Node 24"
           git push origin HEAD:feature/projectos-memory-evidence-intake
