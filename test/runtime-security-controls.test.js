@@ -25,7 +25,7 @@ async function withServer(app, action) {
   }
 }
 
-function runtime(ledger) {
+function runtime(ledger, toolExecutor) {
   const runtimeSecurity = {
     adminToken: ADMIN_TOKEN,
     approvalToken: APPROVAL_TOKEN,
@@ -40,7 +40,7 @@ function runtime(ledger) {
     rateLimitWindowMs: 60_000,
   }, { async resolve() { return runtimeSecurity; } }, ledger, {
     async consume() { return { allowed: true, limit: 100, remaining: 99, count: 1, resetAt: new Date(Date.now() + 60_000).toISOString(), windowSeconds: 60 }; },
-  }, async () => []);
+  }, async () => [], toolExecutor);
 }
 
 function protectedHeaders(extra = {}) {
@@ -92,6 +92,49 @@ test('write and destructive operations cannot bypass the separate durable plan a
       assert.equal(body.error.code, 'PLAN_REQUIRED');
     }
   });
+});
+
+test('non-OIDC mutation execution requires the durable ledger despite a valid static approval token', async () => {
+  const ledgerCalls = [];
+  const executedTools = [];
+  const ledger = new Proxy({}, {
+    get(_target, property) {
+      return async () => {
+        ledgerCalls.push(String(property));
+        throw new Error(`ledger ${String(property)} must not be reached`);
+      };
+    },
+  });
+  const app = runtime(ledger, async (tool) => {
+    executedTools.push(tool);
+    return { full_name: 'banataosystems/Pandoras-box' };
+  });
+
+  await withServer(app, async (origin) => {
+    const readResponse = await fetch(`${origin}/tools/execute`, {
+      method: 'POST',
+      headers: protectedHeaders(),
+      body: JSON.stringify({
+        tool: 'github.get-repository',
+        args: { owner: 'banataosystems', repo: 'Pandoras-box' },
+      }),
+    });
+    assert.equal(readResponse.status, 200);
+
+    for (const tool of ['github.create-issue', 'github.merge-pull-request']) {
+      const response = await fetch(`${origin}/tools/execute`, {
+        method: 'POST',
+        headers: protectedHeaders({ 'x-approval-token': APPROVAL_TOKEN }),
+        body: JSON.stringify({ tool, args: {} }),
+      });
+      const body = await response.json();
+      assert.equal(response.status, 503);
+      assert.equal(body.error.code, 'DURABLE_LEDGER_REQUIRED');
+    }
+  });
+
+  assert.deepEqual(ledgerCalls, []);
+  assert.deepEqual(executedTools, ['github.get-repository']);
 });
 
 test('approval and execution are separate actions with exact server attribution', async () => {

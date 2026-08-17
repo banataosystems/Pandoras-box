@@ -342,7 +342,7 @@ function planResponse(entry, plan) {
         configuration: plan.tool ? (0, service_config_js_1.inspectToolConfiguration)(plan.tool) : undefined,
     };
 }
-function createHttpApp(config = loadRuntimeConfig(), runtimeSecurityResolver = new runtime_security_resolver_js_1.RuntimeSecurityResolver(), executionLedger = new execution_ledger_client_js_1.ExecutionLedgerClient(), runtimeRateLimiter = new runtime_rate_limit_client_js_1.RuntimeRateLimitClient(), connectionMetadataProvider = service_config_js_1.buildProviderConnectionMetadata) {
+function createHttpApp(config = loadRuntimeConfig(), runtimeSecurityResolver = new runtime_security_resolver_js_1.RuntimeSecurityResolver(), executionLedger = new execution_ledger_client_js_1.ExecutionLedgerClient(), runtimeRateLimiter = new runtime_rate_limit_client_js_1.RuntimeRateLimitClient(), connectionMetadataProvider = service_config_js_1.buildProviderConnectionMetadata, toolExecutor = async (tool, args, context) => (0, index_js_1.executeTool)(tool, args, (0, service_config_js_1.buildToolConfiguration)(tool, context))) {
     const app = (0, express_1.default)();
     const localAuditEvents = [];
     const runtimeMetrics = {
@@ -671,58 +671,30 @@ function createHttpApp(config = loadRuntimeConfig(), runtimeSecurityResolver = n
                     id = claimed.requestId;
                 }
                 else if ((0, tool_policy_js_1.requiresApproval)(tool)) {
-                    const runtimeSecurity = response.locals.runtimeSecurity;
-                    if (!runtimeSecurity || !approvalConfigured(runtimeSecurity)) {
-                        recordLocalAudit({
-                            id: (0, crypto_1.randomUUID)(),
-                            requestId: id,
-                            timestamp: new Date().toISOString(),
-                            tool,
-                            risk,
-                            status: 'denied',
-                            error: 'Approval token is not configured',
-                        });
-                        response.status(503).json({
-                            ok: false,
-                            requestId: id,
-                            error: {
-                                code: 'APPROVALS_NOT_CONFIGURED',
-                                message: 'Write execution is disabled until approval authentication is available.',
-                            },
-                        });
-                        return;
-                    }
-                    if (!approvalTokenValid(request.header('x-approval-token'), runtimeSecurity)) {
-                        recordLocalAudit({
-                            id: (0, crypto_1.randomUUID)(),
-                            requestId: id,
-                            timestamp: new Date().toISOString(),
-                            tool,
-                            risk,
-                            status: 'denied',
-                            error: 'Approval token rejected',
-                        });
-                        response.status(403).json({
-                            ok: false,
-                            requestId: id,
-                            error: { code: 'APPROVAL_REQUIRED', message: 'This tool requires explicit approval.' },
-                        });
-                        return;
-                    }
                     recordLocalAudit({
                         id: (0, crypto_1.randomUUID)(),
                         requestId: id,
                         timestamp: new Date().toISOString(),
                         tool,
                         risk,
-                        status: 'approved',
+                        status: 'denied',
+                        error: 'Durable ledger required',
                     });
+                    response.status(503).json({
+                        ok: false,
+                        requestId: id,
+                        error: {
+                            code: 'DURABLE_LEDGER_REQUIRED',
+                            message: 'Write and destructive execution requires the production durable ledger.',
+                        },
+                    });
+                    return;
                 }
             }
             const entry = index_js_1.toolRegistry[tool];
             if (!entry)
                 throw new service_config_js_1.UnknownToolError(tool);
-            const result = await (0, index_js_1.executeTool)(tool, args, (0, service_config_js_1.buildToolConfiguration)(tool, { vercelOidcToken: oidcToken }));
+            const result = await toolExecutor(tool, args, { vercelOidcToken: oidcToken });
             const durationMs = Date.now() - startedAt;
             if (claimedPlanId && oidcToken) {
                 await executionLedger.finishPlan(oidcToken, {
