@@ -5,14 +5,31 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const repositoryRoot = path.join(__dirname, '..');
 const migrationPath = path.join(
-  __dirname,
-  '..',
+  repositoryRoot,
   'supabase',
   'migrations',
   '20260817130000_projectos_memory_full_capacity_context_gate.sql',
 );
+const rollbackPath = path.join(
+  repositoryRoot,
+  'docs',
+  'supabase',
+  'recovery',
+  'jcyqixttuebxqqfkjonq',
+  'rollback',
+  '20260817130000_restore_projectos_memory_v1_gate.sql',
+);
+const priorMigrationPath = path.join(
+  repositoryRoot,
+  'supabase',
+  'migrations',
+  '20260807083337_projectos_memory_lifecycle_enforcement.sql',
+);
 const sql = fs.readFileSync(migrationPath, 'utf8');
+const rollbackSql = fs.readFileSync(rollbackPath, 'utf8');
+const priorMigrationSql = fs.readFileSync(priorMigrationPath, 'utf8');
 
 const requiredSections = [
   'adaptive_profile',
@@ -32,6 +49,14 @@ const requiredSections = [
   'retrieval_reasoning_summary',
   'warnings',
 ];
+
+function memoryGateDefinition(source) {
+  const match = source.match(
+    /create or replace function private\.enforce_execution_plan_memory_context\(\)[\s\S]*?\n\$\$;/,
+  );
+  assert.ok(match, 'ProjectOS Memory execution gate definition is missing');
+  return match[0];
+}
 
 test('full-capacity context gate preserves v1 while accepting only contract-verified v2', () => {
   assert.match(sql, /v_schema_version not in \('1\.0\.0', '2\.0\.0'\)/);
@@ -107,10 +132,22 @@ test('full-capacity migration preserves the existing execution safety boundary',
   assert.match(sql, /context_hash, ''\)\) !~ '\^\[0-9a-f\]\{64\}\$'/);
   assert.match(sql, /new\.risk = 'read'/);
   assert.match(sql, /context_status not in \('available', 'empty'\)/);
-  assert.match(sql, /context_status is distinct from 'available'/);
+  assert.match(sql, /context_status is distinct from 'availe'/);
   assert.match(sql, /new\.created_at - interval '10 minutes'/);
   assert.match(sql, /clock_timestamp\(\) \+ interval '1 minute'/);
   assert.match(sql, /recorded_at < new\.created_at - interval '2 seconds'/);
   assert.match(sql, /security definer/i);
   assert.match(sql, /set search_path = ''/);
+});
+
+test('rollback artifact restores the exact prior v1 Memory execution gate', () => {
+  assert.match(rollbackSql, /TESTED DATABASE ROLLBACK FOR 20260817130000/);
+  assert.match(rollbackSql, /not an active migration/);
+  assert.equal(
+    memoryGateDefinition(rollbackSql),
+    memoryGateDefinition(priorMigrationSql),
+  );
+  assert.match(rollbackSql, /schemaVersion' <> '1\.0\.0'/);
+  assert.doesNotMatch(rollbackSql, /2\.0\.0/);
+  assert.doesNotMatch(rollbackSql, /capabilityContract/);
 });
