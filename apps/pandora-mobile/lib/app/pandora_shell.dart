@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/design/pandora_tokens.dart';
 import '../features/activity/activity_screen.dart';
@@ -29,6 +30,12 @@ class _PandoraShellState extends State<PandoraShell> {
           _ => const HomeScreen(),
         },
       );
+
+  void _select(int value) {
+    if (value == _index) return;
+    HapticFeedback.selectionClick();
+    setState(() => _index = value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,8 +81,7 @@ class _PandoraShellState extends State<PandoraShell> {
                 SafeArea(
                   child: NavigationRail(
                     selectedIndex: _index,
-                    onDestinationSelected: (value) =>
-                        setState(() => _index = value),
+                    onDestinationSelected: _select,
                     labelType: NavigationRailLabelType.all,
                     destinations: [
                       for (final destination in destinations)
@@ -93,19 +99,29 @@ class _PandoraShellState extends State<PandoraShell> {
             ),
           );
         }
+        final palette = context.pandoraPalette;
         return Scaffold(
           body: body,
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _index,
-            onDestinationSelected: (value) => setState(() => _index = value),
-            destinations: [
-              for (final destination in destinations)
-                NavigationDestination(
-                  icon: Icon(destination.icon),
-                  selectedIcon: Icon(destination.selectedIcon),
-                  label: destination.label,
-                ),
-            ],
+          bottomNavigationBar: DecoratedBox(
+            decoration: BoxDecoration(
+              color: palette.strongSurface,
+              border: Border(top: BorderSide(color: palette.outlineSoft)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: NavigationBar(
+                selectedIndex: _index,
+                onDestinationSelected: _select,
+                destinations: [
+                  for (final destination in destinations)
+                    NavigationDestination(
+                      icon: Icon(destination.icon),
+                      selectedIcon: Icon(destination.selectedIcon),
+                      label: destination.label,
+                    ),
+                ],
+              ),
+            ),
           ),
         );
       },
