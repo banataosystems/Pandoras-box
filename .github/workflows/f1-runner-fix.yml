@@ -17,7 +17,8 @@ jobs:
           ref: feature/projectos-memory-evidence-intake
           fetch-depth: 0
       - name: Align F1 runner with repository engine
-        run: sed -i 's/node-version: 22/node-version: 24/' .github/workflows/f1-privacy-remediation.yml
+        run: |
+          sed -i 's/node-version: 22/node-version: 24/' .github/workflows/f1-privacy-remediation.yml
       - name: Commit runner correction
         run: |
           git config user.name "github-actions[bot]"
