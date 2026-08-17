@@ -39,63 +39,66 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) => PandoraPage(
-    title: 'Home',
-    subtitle: 'What needs you, what Pandora is doing, and what happens next.',
-    showProductMark: true,
-    actions: [
-      IconButton(
-        tooltip: 'Open Settings',
-        onPressed: () => Navigator.of(
-          context,
-        ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen())),
-        icon: const Icon(Icons.settings_outlined),
-      ),
-      IconButton(
-        tooltip: 'Refresh Home',
-        onPressed: () => _controller?.refresh(),
-        icon: const Icon(Icons.refresh_rounded),
-      ),
-    ],
-    onRefresh: () => _controller!.refresh(),
-    child: AnimatedBuilder(
-      animation: _controller!,
-      builder: (context, _) {
-        final controller = _controller!;
-        if (controller.isLoading && controller.data == null) {
-          return const ContentSkeleton(lines: 5);
-        }
-        if (controller.error != null && controller.data == null) {
-          return ErrorContent(
-            title: 'Home could not refresh',
-            message: _safeError(controller.error),
-            onRetry: controller.load,
-          );
-        }
-        final summary = controller.data;
-        if (summary == null) {
-          return EmptyContent(
-            title: 'No owner briefing yet',
-            message: 'Pandora has not returned a verified Home summary.',
-            onAction: controller.load,
-            actionLabel: 'Check again',
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (controller.error != null) ...[
-              DegradedContentNotice(
-                message: controller.error!.message,
-                onRetry: controller.refresh,
-              ),
-              const SizedBox(height: PandoraSpacing.md),
-            ],
-            _HomeContent(summary: summary, refreshing: controller.isLoading),
-          ],
-        );
-      },
-    ),
-  );
+        title: 'Home',
+        subtitle:
+            'What needs you, what Pandora is doing, and what happens next.',
+        showProductMark: true,
+        actions: [
+          IconButton(
+            tooltip: 'Open Settings',
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute<void>(
+                builder: (_) => const SettingsScreen())),
+            icon: const Icon(Icons.settings_outlined),
+          ),
+          IconButton(
+            tooltip: 'Refresh Home',
+            onPressed: () => _controller?.refresh(),
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+        onRefresh: () => _controller!.refresh(),
+        child: AnimatedBuilder(
+          animation: _controller!,
+          builder: (context, _) {
+            final controller = _controller!;
+            if (controller.isLoading && controller.data == null) {
+              return const ContentSkeleton(lines: 5);
+            }
+            if (controller.error != null && controller.data == null) {
+              return ErrorContent(
+                title: 'Home could not refresh',
+                message: _safeError(controller.error),
+                onRetry: controller.load,
+              );
+            }
+            final summary = controller.data;
+            if (summary == null) {
+              return EmptyContent(
+                title: 'No owner briefing yet',
+                message: 'Pandora has not returned a verified Home summary.',
+                onAction: controller.load,
+                actionLabel: 'Check again',
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (controller.error != null) ...[
+                  DegradedContentNotice(
+                    message: controller.error!.message,
+                    onRetry: controller.refresh,
+                  ),
+                  const SizedBox(height: PandoraSpacing.md),
+                ],
+                _HomeContent(
+                    summary: summary, refreshing: controller.isLoading),
+              ],
+            );
+          },
+        ),
+      );
 }
 
 class _HomeContent extends StatelessWidget {
@@ -106,92 +109,93 @@ class _HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      PandoraSurface(
-        title: 'System posture',
-        trailing: refreshing
-            ? const SizedBox.square(
-                dimension: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : null,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            StatusBadge(
-              label: summary.healthLabel,
-              tone: statusToneFor(summary.healthState),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PandoraSurface(
+            title: 'System posture',
+            trailing: refreshing
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : null,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                StatusBadge(
+                  label: summary.healthLabel,
+                  tone: statusToneFor(summary.healthState),
+                ),
+                const SizedBox(height: PandoraSpacing.sm),
+                FreshnessLabel(freshness: summary.freshness),
+              ],
             ),
-            const SizedBox(height: PandoraSpacing.sm),
-            FreshnessLabel(freshness: summary.freshness),
-          ],
-        ),
-      ),
-      const SizedBox(height: PandoraSpacing.md),
-      PandoraSurface(
-        title: 'Needs you',
-        subtitle: summary.priority != null
-            ? 'The highest-value decision waiting for you.'
-            : !summary.countersVerified
-            ? 'Owner decision state is not verified.'
-            : summary.approvalCount == 0
-            ? 'Nothing is waiting for an owner decision.'
-            : '${summary.approvalCount} owner decision${summary.approvalCount == 1 ? '' : 's'} need review.',
-        leading: Icon(
-          Icons.priority_high_rounded,
-          color: context.pandoraPalette.attention,
-        ),
-        child: summary.priority == null
-            ? Text(
-                !summary.countersVerified
-                    ? 'Refresh before relying on this briefing.'
+          ),
+          const SizedBox(height: PandoraSpacing.md),
+          PandoraSurface(
+            title: 'Needs you',
+            subtitle: summary.priority != null
+                ? 'The highest-value decision waiting for you.'
+                : !summary.countersVerified
+                    ? 'Owner decision state is not verified.'
                     : summary.approvalCount == 0
-                    ? 'Pandora will keep watching your projects.'
-                    : 'Open Approvals to inspect the verified queue.',
-              )
-            : _PriorityCard(approval: summary.priority!),
-      ),
-      const SizedBox(height: PandoraSpacing.md),
-      _CounterRow(summary: summary),
-      const SizedBox(height: PandoraSpacing.xl),
-      Semantics(
-        header: true,
-        child: Text('Portfolio', style: Theme.of(context).textTheme.titleLarge),
-      ),
-      const SizedBox(height: PandoraSpacing.sm),
-      if (summary.topProjects.isEmpty)
-        const EmptyContent(
-          title: 'No projects in the briefing',
-          message: 'Open Projects to refresh the verified portfolio list.',
-        )
-      else
-        for (var index = 0; index < summary.topProjects.length; index++) ...[
-          _ProjectBrief(project: summary.topProjects[index]),
-          if (index != summary.topProjects.length - 1)
-            const SizedBox(height: PandoraSpacing.sm),
+                        ? 'Nothing is waiting for an owner decision.'
+                        : '${summary.approvalCount} owner decision${summary.approvalCount == 1 ? '' : 's'} need review.',
+            leading: Icon(
+              Icons.priority_high_rounded,
+              color: context.pandoraPalette.attention,
+            ),
+            child: summary.priority == null
+                ? Text(
+                    !summary.countersVerified
+                        ? 'Refresh before relying on this briefing.'
+                        : summary.approvalCount == 0
+                            ? 'Pandora will keep watching your projects.'
+                            : 'Open Approvals to inspect the verified queue.',
+                  )
+                : _PriorityCard(approval: summary.priority!),
+          ),
+          const SizedBox(height: PandoraSpacing.md),
+          _CounterRow(summary: summary),
+          const SizedBox(height: PandoraSpacing.xl),
+          Semantics(
+            header: true,
+            child: Text('Portfolio',
+                style: Theme.of(context).textTheme.titleLarge),
+          ),
+          const SizedBox(height: PandoraSpacing.sm),
+          if (summary.topProjects.isEmpty)
+            const EmptyContent(
+              title: 'No projects in the briefing',
+              message: 'Open Projects to refresh the verified portfolio list.',
+            )
+          else
+            for (var index = 0;
+                index < summary.topProjects.length;
+                index++) ...[
+              _ProjectBrief(project: summary.topProjects[index]),
+              if (index != summary.topProjects.length - 1)
+                const SizedBox(height: PandoraSpacing.sm),
+            ],
+          const SizedBox(height: PandoraSpacing.xl),
+          PandoraSurface(
+            title: 'Meaningful recent changes',
+            child: summary.recentActivity.isEmpty
+                ? const Text('No recent verified activity was returned.')
+                : Column(
+                    children: [
+                      for (var index = 0;
+                          index < summary.recentActivity.length;
+                          index++) ...[
+                        _ActivityBrief(event: summary.recentActivity[index]),
+                        if (index != summary.recentActivity.length - 1)
+                          const Divider(),
+                      ],
+                    ],
+                  ),
+          ),
         ],
-      const SizedBox(height: PandoraSpacing.xl),
-      PandoraSurface(
-        title: 'Meaningful recent changes',
-        child: summary.recentActivity.isEmpty
-            ? const Text('No recent verified activity was returned.')
-            : Column(
-                children: [
-                  for (
-                    var index = 0;
-                    index < summary.recentActivity.length;
-                    index++
-                  ) ...[
-                    _ActivityBrief(event: summary.recentActivity[index]),
-                    if (index != summary.recentActivity.length - 1)
-                      const Divider(),
-                  ],
-                ],
-              ),
-      ),
-    ],
-  );
+      );
 }
 
 class _PriorityCard extends StatelessWidget {
@@ -201,18 +205,18 @@ class _PriorityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(approval.action, style: Theme.of(context).textTheme.titleMedium),
-      const SizedBox(height: PandoraSpacing.xs),
-      Text(approval.reason),
-      const SizedBox(height: PandoraSpacing.sm),
-      StatusBadge(
-        label: approval.risk.label,
-        tone: statusToneFor(approval.risk.label),
-      ),
-    ],
-  );
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(approval.action, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: PandoraSpacing.xs),
+          Text(approval.reason),
+          const SizedBox(height: PandoraSpacing.sm),
+          StatusBadge(
+            label: approval.risk.label,
+            tone: statusToneFor(approval.risk.label),
+          ),
+        ],
+      );
 }
 
 class _CounterRow extends StatelessWidget {
@@ -222,50 +226,50 @@ class _CounterRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final cards = [
-        _CounterCard(
-          label: 'Approvals',
-          value: summary.countersVerified
-              ? '${summary.approvalCount}'
-              : 'Not verified',
-        ),
-        _CounterCard(
-          label: 'Active projects',
-          value: summary.countersVerified
-              ? '${summary.activeProjectCount}'
-              : 'Not verified',
-        ),
-        _CounterCard(
-          label: 'Needs attention',
-          value: summary.countersVerified
-              ? '${summary.needsAttentionCount}'
-              : 'Not verified',
-        ),
-      ];
-      if (constraints.maxWidth < 460) {
-        return Column(
-          children: [
-            for (var index = 0; index < cards.length; index++) ...[
-              cards[index],
-              if (index != cards.length - 1)
-                const SizedBox(height: PandoraSpacing.xs),
+        builder: (context, constraints) {
+          final cards = [
+            _CounterCard(
+              label: 'Approvals',
+              value: summary.countersVerified
+                  ? '${summary.approvalCount}'
+                  : 'Not verified',
+            ),
+            _CounterCard(
+              label: 'Active projects',
+              value: summary.countersVerified
+                  ? '${summary.activeProjectCount}'
+                  : 'Not verified',
+            ),
+            _CounterCard(
+              label: 'Needs attention',
+              value: summary.countersVerified
+                  ? '${summary.needsAttentionCount}'
+                  : 'Not verified',
+            ),
+          ];
+          if (constraints.maxWidth < 460) {
+            return Column(
+              children: [
+                for (var index = 0; index < cards.length; index++) ...[
+                  cards[index],
+                  if (index != cards.length - 1)
+                    const SizedBox(height: PandoraSpacing.xs),
+                ],
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var index = 0; index < cards.length; index++) ...[
+                Expanded(child: cards[index]),
+                if (index != cards.length - 1)
+                  const SizedBox(width: PandoraSpacing.xs),
+              ],
             ],
-          ],
-        );
-      }
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var index = 0; index < cards.length; index++) ...[
-            Expanded(child: cards[index]),
-            if (index != cards.length - 1)
-              const SizedBox(width: PandoraSpacing.xs),
-          ],
-        ],
+          );
+        },
       );
-    },
-  );
 }
 
 class _CounterCard extends StatelessWidget {
@@ -276,14 +280,14 @@ class _CounterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PandoraSurface(
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(child: Text(label)),
-        Text(value, style: Theme.of(context).textTheme.headlineSmall),
-      ],
-    ),
-  );
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child: Text(label)),
+            Text(value, style: Theme.of(context).textTheme.headlineSmall),
+          ],
+        ),
+      );
 }
 
 class _ProjectBrief extends StatelessWidget {
@@ -293,28 +297,28 @@ class _ProjectBrief extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PandoraSurface(
-    title: project.name,
-    subtitle: project.purpose,
-    trailing: StatusBadge(
-      label: project.status,
-      tone: statusToneFor(project.status),
-      compact: true,
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(project.phase, style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: PandoraSpacing.sm),
-        ProofLadder(stages: project.evidenceStages, compact: true),
-        const SizedBox(height: PandoraSpacing.sm),
-        Text(project.progressLabel),
-        if (project.nextAction != null) ...[
-          const SizedBox(height: PandoraSpacing.xs),
-          Text('Next: ${project.nextAction!}'),
-        ],
-      ],
-    ),
-  );
+        title: project.name,
+        subtitle: project.purpose,
+        trailing: StatusBadge(
+          label: project.status,
+          tone: statusToneFor(project.status),
+          compact: true,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(project.phase, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: PandoraSpacing.sm),
+            ProofLadder(stages: project.evidenceStages, compact: true),
+            const SizedBox(height: PandoraSpacing.sm),
+            Text(project.progressLabel),
+            if (project.nextAction != null) ...[
+              const SizedBox(height: PandoraSpacing.xs),
+              Text('Next: ${project.nextAction!}'),
+            ],
+          ],
+        ),
+      );
 }
 
 class _ActivityBrief extends StatelessWidget {
@@ -324,11 +328,11 @@ class _ActivityBrief extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    leading: const Icon(Icons.history_rounded),
-    title: Text(event.summary),
-    subtitle: Text('${event.actor} · ${event.type}'),
-  );
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.history_rounded),
+        title: Text(event.summary),
+        subtitle: Text('${event.actor} · ${event.type}'),
+      );
 }
 
 String _safeError(Object? error) {

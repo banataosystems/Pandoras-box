@@ -43,57 +43,57 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: PandoraPage(
-      title: widget.project.name,
-      subtitle: widget.project.purpose,
-      actions: [
-        IconButton(
-          tooltip: 'Refresh ${widget.project.name}',
-          onPressed: () => _controller?.refresh(),
-          icon: const Icon(Icons.refresh_rounded),
+        body: PandoraPage(
+          title: widget.project.name,
+          subtitle: widget.project.purpose,
+          actions: [
+            IconButton(
+              tooltip: 'Refresh ${widget.project.name}',
+              onPressed: () => _controller?.refresh(),
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ],
+          onRefresh: () => _controller!.refresh(),
+          child: AnimatedBuilder(
+            animation: _controller!,
+            builder: (context, _) {
+              final controller = _controller!;
+              if (controller.isLoading && controller.data == null) {
+                return const ContentSkeleton(lines: 8);
+              }
+              if (controller.error != null && controller.data == null) {
+                return ErrorContent(
+                  title: 'Project detail could not load',
+                  message: _safeError(controller.error),
+                  onRetry: controller.load,
+                );
+              }
+              final detail = controller.data;
+              if (detail == null) {
+                return const EmptyContent(
+                  title: 'No verified detail',
+                  message: 'Pandora returned no project detail.',
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (controller.degradedReason != null ||
+                      controller.error != null) ...[
+                    DegradedContentNotice(
+                      message: controller.degradedReason ??
+                          controller.error!.message,
+                      onRetry: controller.refresh,
+                    ),
+                    const SizedBox(height: PandoraSpacing.md),
+                  ],
+                  _DetailContent(detail: detail),
+                ],
+              );
+            },
+          ),
         ),
-      ],
-      onRefresh: () => _controller!.refresh(),
-      child: AnimatedBuilder(
-        animation: _controller!,
-        builder: (context, _) {
-          final controller = _controller!;
-          if (controller.isLoading && controller.data == null) {
-            return const ContentSkeleton(lines: 8);
-          }
-          if (controller.error != null && controller.data == null) {
-            return ErrorContent(
-              title: 'Project detail could not load',
-              message: _safeError(controller.error),
-              onRetry: controller.load,
-            );
-          }
-          final detail = controller.data;
-          if (detail == null) {
-            return const EmptyContent(
-              title: 'No verified detail',
-              message: 'Pandora returned no project detail.',
-            );
-          }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (controller.degradedReason != null ||
-                  controller.error != null) ...[
-                DegradedContentNotice(
-                  message:
-                      controller.degradedReason ?? controller.error!.message,
-                  onRetry: controller.refresh,
-                ),
-                const SizedBox(height: PandoraSpacing.md),
-              ],
-              _DetailContent(detail: detail),
-            ],
-          );
-        },
-      ),
-    ),
-  );
+      );
 }
 
 class _DetailContent extends StatelessWidget {
@@ -104,12 +104,10 @@ class _DetailContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tasks = detail.tasks;
-    final done = tasks
-        .where((item) => item.state == ProjectTaskState.complete)
-        .toList();
-    final blocked = tasks
-        .where((item) => item.state == ProjectTaskState.blocked)
-        .toList();
+    final done =
+        tasks.where((item) => item.state == ProjectTaskState.complete).toList();
+    final blocked =
+        tasks.where((item) => item.state == ProjectTaskState.blocked).toList();
     final inProgress = tasks.where((item) => item.state.isActive).toList();
     final notActive = tasks
         .where(
@@ -118,9 +116,8 @@ class _DetailContent extends StatelessWidget {
               item.state == ProjectTaskState.cancelled,
         )
         .toList();
-    final unknown = tasks
-        .where((item) => item.state == ProjectTaskState.unknown)
-        .toList();
+    final unknown =
+        tasks.where((item) => item.state == ProjectTaskState.unknown).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -191,11 +188,9 @@ class _DetailContent extends StatelessWidget {
               ? const Text('No active evidence was returned.')
               : Column(
                   children: [
-                    for (
-                      var index = 0;
-                      index < detail.evidence.length;
-                      index++
-                    ) ...[
+                    for (var index = 0;
+                        index < detail.evidence.length;
+                        index++) ...[
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.fact_check_outlined),
@@ -227,24 +222,24 @@ class _TaskSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PandoraSurface(
-    title: title,
-    child: tasks.isEmpty
-        ? Text(empty)
-        : Column(
-            children: [
-              for (var index = 0; index < tasks.length; index++) ...[
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(tasks[index].title),
-                  subtitle: Text(
-                    '${tasks[index].status} · ${tasks[index].risk.label}',
-                  ),
-                ),
-                if (index != tasks.length - 1) const Divider(),
-              ],
-            ],
-          ),
-  );
+        title: title,
+        child: tasks.isEmpty
+            ? Text(empty)
+            : Column(
+                children: [
+                  for (var index = 0; index < tasks.length; index++) ...[
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(tasks[index].title),
+                      subtitle: Text(
+                        '${tasks[index].status} · ${tasks[index].risk.label}',
+                      ),
+                    ),
+                    if (index != tasks.length - 1) const Divider(),
+                  ],
+                ],
+              ),
+      );
 }
 
 String _safeError(Object? error) {
