@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/data/pandora_repository.dart';
 import '../core/design/pandora_theme.dart';
+import '../core/design/pandora_tokens.dart';
 import '../core/diagnostics/diagnostics_store.dart';
 import '../core/security/pandora_auth.dart';
 import '../features/auth/auth_gate.dart';
@@ -37,7 +38,9 @@ class _PandoraAppState extends State<PandoraApp> {
         diagnostics: widget.diagnostics,
         child: MaterialApp(
           title: "Pandora's Box",
-          color: Colors.transparent,
+          // Opaque task-switcher and window colour. A transparent value here
+          // lets the black Android window underlay show through.
+          color: PandoraPalette.porcelain.canvas,
           debugShowCheckedModeBanner: false,
           themeMode: ThemeMode.system,
           theme: PandoraTheme.porcelain,

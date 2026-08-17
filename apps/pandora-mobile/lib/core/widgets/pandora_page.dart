@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../design/pandora_tokens.dart';
 import 'pandora_mark.dart';
+import 'pandora_route_boundary.dart';
 
 class PandoraPage extends StatelessWidget {
   const PandoraPage({
@@ -79,6 +80,11 @@ class PandoraPage extends StatelessWidget {
     final scrollable = onRefresh == null
         ? content
         : RefreshIndicator(onRefresh: onRefresh!, child: content);
-    return SafeArea(top: false, child: scrollable);
+    // The boundary is applied here rather than at each call site so that every
+    // page — including pages pushed as their own route outside the shell
+    // Scaffold — has Material ancestry and the deterministic canvas.
+    return PandoraRouteBoundary(
+      child: SafeArea(top: false, child: scrollable),
+    );
   }
 }

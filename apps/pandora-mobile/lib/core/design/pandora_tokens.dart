@@ -39,6 +39,7 @@ abstract final class PandoraSize {
 @immutable
 class PandoraPalette extends ThemeExtension<PandoraPalette> {
   const PandoraPalette({
+    required this.canvas,
     required this.verified,
     required this.onVerified,
     required this.attention,
@@ -51,6 +52,15 @@ class PandoraPalette extends ThemeExtension<PandoraPalette> {
     required this.strongSurface,
     required this.outlineSoft,
   });
+
+  /// The deterministic, always-opaque application canvas.
+  ///
+  /// Every Pandora route paints this colour before any local translucency is
+  /// composited on top of it. It is the single guarantee that the owner never
+  /// sees the bare Android window underlay, which is black in dark mode. The
+  /// native window background is kept byte-identical to these values so cold
+  /// start, warm start, resume, and system theme changes stay continuous.
+  final Color canvas;
 
   final Color verified;
   final Color onVerified;
@@ -65,6 +75,7 @@ class PandoraPalette extends ThemeExtension<PandoraPalette> {
   final Color outlineSoft;
 
   static const porcelain = PandoraPalette(
+    canvas: Color(0xFFF6F5F2),
     verified: Color(0xFF0B6B45),
     onVerified: Color(0xFFFFFFFF),
     attention: Color(0xFF9A5A00),
@@ -79,6 +90,7 @@ class PandoraPalette extends ThemeExtension<PandoraPalette> {
   );
 
   static const graphite = PandoraPalette(
+    canvas: Color(0xFF121317),
     verified: Color(0xFF67D7A3),
     onVerified: Color(0xFF052216),
     attention: Color(0xFFFFB95C),
@@ -94,6 +106,7 @@ class PandoraPalette extends ThemeExtension<PandoraPalette> {
 
   @override
   PandoraPalette copyWith({
+    Color? canvas,
     Color? verified,
     Color? onVerified,
     Color? attention,
@@ -107,6 +120,7 @@ class PandoraPalette extends ThemeExtension<PandoraPalette> {
     Color? outlineSoft,
   }) =>
       PandoraPalette(
+        canvas: canvas ?? this.canvas,
         verified: verified ?? this.verified,
         onVerified: onVerified ?? this.onVerified,
         attention: attention ?? this.attention,
@@ -124,6 +138,7 @@ class PandoraPalette extends ThemeExtension<PandoraPalette> {
   PandoraPalette lerp(ThemeExtension<PandoraPalette>? other, double t) {
     if (other is! PandoraPalette) return this;
     return PandoraPalette(
+      canvas: Color.lerp(canvas, other.canvas, t)!,
       verified: Color.lerp(verified, other.verified, t)!,
       onVerified: Color.lerp(onVerified, other.onVerified, t)!,
       attention: Color.lerp(attention, other.attention, t)!,

@@ -5,17 +5,19 @@ import 'pandora_tokens.dart';
 abstract final class PandoraTheme {
   static const Color _primary = Color(0xFF4D55C7);
 
+  /// Warm neutral premium canvas rather than sterile pure white.
   static ThemeData get porcelain => _build(
         brightness: Brightness.light,
         palette: PandoraPalette.porcelain,
-        background: Colors.transparent,
+        background: PandoraPalette.porcelain.canvas,
         surface: const Color(0xFFFFFFFF),
       );
 
+  /// Premium charcoal rather than pure black or the bare Android underlay.
   static ThemeData get graphite => _build(
         brightness: Brightness.dark,
         palette: PandoraPalette.graphite,
-        background: Colors.transparent,
+        background: PandoraPalette.graphite.canvas,
         surface: const Color(0xFF17181D),
       );
 

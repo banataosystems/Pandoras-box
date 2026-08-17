@@ -46,10 +46,17 @@ jobs:
           mkdir .pandora-mobile-build
           cd .pandora-mobile-build
           flutter create --platforms=android,web --org com.banataosystems --project-name pandora_mobile .
+          # The generated Android theme uses a platform-default window
+          # background that appears black behind translucent Flutter regions.
+          # Overlay the deterministic Porcelain/Graphite window underlay.
+          cp -R ../apps/pandora-mobile/platform/android/. ./android/
           rm -rf lib test assets pubspec.yaml pubspec.lock analysis_options.yaml
           cp -R ../apps/pandora-mobile/lib ./lib
           cp -R ../apps/pandora-mobile/test ./test
           cp -R ../apps/pandora-mobile/assets ./assets
+          # Kept alongside the tests so the canvas parity guard can compare the
+          # Android window underlay against the Dart tokens.
+          cp -R ../apps/pandora-mobile/platform ./platform
           cp ../apps/pandora-mobile/pubspec.yaml ./pubspec.yaml
           cp ../apps/pandora-mobile/analysis_options.yaml ./analysis_options.yaml
           if [[ -f ../apps/pandora-mobile/pubspec.lock ]]; then
