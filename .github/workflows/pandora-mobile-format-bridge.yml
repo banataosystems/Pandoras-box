@@ -1,0 +1,56 @@
+name: Pandora mobile format bridge
+
+on:
+  push:
+    branches:
+      - feature/pandora-mobile-owner-experience-p1
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: 3.47.0
+          channel: stable
+          cache: true
+
+      - name: Format changed Pandora mobile sources
+        working-directory: apps/pandora-mobile
+        run: |
+          set -euo pipefail
+          dart format \
+            lib/core/data/owner_projection.dart \
+            lib/core/widgets/owner_experience.dart \
+            lib/features/activity/activity_screen.dart \
+            lib/features/approvals/approvals_screen.dart \
+            lib/features/connections/connections_screen.dart \
+            lib/features/home/home_screen.dart \
+            lib/features/projects/projects_screen.dart \
+            test/core/data/safety_overview_deduplication_test.dart
+          tar -czf "$GITHUB_WORKSPACE/pandora-mobile-formatted.tar.gz" \
+            lib/core/data/owner_projection.dart \
+            lib/core/widgets/owner_experience.dart \
+            lib/features/activity/activity_screen.dart \
+            lib/features/approvals/approvals_screen.dart \
+            lib/features/connections/connections_screen.dart \
+            lib/features/home/home_screen.dart \
+            lib/features/projects/projects_screen.dart \
+            test/core/data/safety_overview_deduplication_test.dart
+
+      - name: Upload exact formatter output
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pandora-mobile-formatted-${{ github.sha }}
+          path: pandora-mobile-formatted.tar.gz
+          if-no-files-found: error
+          retention-days: 1
