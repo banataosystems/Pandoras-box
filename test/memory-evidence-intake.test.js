@@ -239,6 +239,32 @@ test("direct identifiers and credential signatures are rejected before network I
   assert.equal(called, false);
 });
 
+test("privacy boundary rejects broader identifiers, secrets, nesting, and encoded variants before I/O", async () => {
+  const attacks = [
+    [{ ...validArgs(), summary: "contact +63 917 123 4567" }, /direct_identifier_phone/],
+    [{ ...validArgs(), summary: "name: Jane Doe" }, /direct_identifier_name/],
+    [{ ...validArgs(), summary: "office 123 Rizal Street, Makati" }, /direct_identifier_address/],
+    [{ ...validArgs(), claim: "password=hunter2-super-secret" }, /secret_assignment/],
+    [{ ...validArgs(), claim: "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI\/K7MDENG\/bPxRfiCYEXAMPLEKEY" }, /secret_assignment/],
+    [{ ...validArgs(), claim: "AKIAIOSFODNN7EXAMPLE" }, /cloud_credential_signature/],
+    [{ ...validArgs(), claim: "-----BEGIN PRIVATE KEY-----" }, /private_key_material/],
+    [{ ...validArgs(), provenance: { ...validArgs().provenance, source_locator: "owner%40example.com" } }, /direct_identifier_email/],
+    [{ ...validArgs(), provenance: { ...validArgs().provenance, source_locator: "owner＠example.com" } }, /direct_identifier_email/],
+    [{ ...validArgs(), evidenceRefs: [{ ...validArgs().evidenceRefs[0], ref: "phone%3A%20%2B63%20917%20123%204567" }] }, /direct_identifier_phone/],
+  ];
+  for (const [args, expected] of attacks) {
+    let called = false;
+    await assert.rejects(
+      () => submitEvidenceCandidate(args, config, async () => {
+        called = true;
+        throw new Error("must not call");
+      }),
+      expected,
+    );
+    assert.equal(called, false);
+  }
+});
+
 test("write scope is fail-closed and non-pending responses are rejected", async () => {
   await assert.rejects(
     () => submitEvidenceCandidate(validArgs(), { ...config, grantedScopes: ["memory:read"] }, async () => {
