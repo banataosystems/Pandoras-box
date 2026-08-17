@@ -15,7 +15,7 @@ Semantic colors:
 - green: verified success
 - amber: attention
 - red: destructive/critical
-- product-mark red: identity, not universal button color
+- identity red: reserved for separately approved ownership identity, not universal button color
 
 ## Typography
 
@@ -57,14 +57,16 @@ Use sparingly for selection, success, warning, and destructive confirmation. Hap
 
 ## Product mark
 
-Reconcile the exact approved spiral apple from PR #12.
+Use the exact approved monochrome spiral apple from PR #12. Its black field and
+white artwork are part of the approved source; identity red is not a product-mark
+recolor instruction.
 
 Required deterministic derivatives:
 - Android adaptive launcher foreground/background
 - splash mark
 - sign-in mark
 - small product/about mark
-- Android monochrome notification mark where required
+- Android monochrome notification mark only after a transparent derivative is approved
 - web favicon/manifest derivatives if supported
 
 For every derivative record source SHA-256, transform method/version, output dimensions, output SHA-256.

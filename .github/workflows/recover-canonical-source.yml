@@ -2,12 +2,6 @@ name: Recover canonical MCPMaster source
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'recovery/mcpmaster-source.part-*'
-      - 'recovery/SOURCE_RECOVERY_MANIFEST.md'
-      - '.github/workflows/recover-canonical-source.yml'
 
 permissions:
   contents: write
@@ -16,7 +10,7 @@ jobs:
   recover:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
       - name: Validate recovery parts
