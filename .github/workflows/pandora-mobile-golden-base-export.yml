@@ -1,0 +1,27 @@
+name: Pandora mobile golden base export
+
+on:
+  push:
+    branches:
+      - feature/pandora-mobile-owner-experience-p1
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out preserved P0 source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: 06df84ef3bb4989294657074fc41ac1ee4e320db
+          path: p0
+
+      - name: Upload preserved visual baselines
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pandora-mobile-p0-golden-baselines
+          path: p0/apps/pandora-mobile/test/goldens/baselines
+          if-no-files-found: error
+          retention-days: 1
