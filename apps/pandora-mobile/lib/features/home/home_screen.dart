@@ -48,7 +48,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) => PandoraPage(
         title: 'Pandora',
-        subtitle: 'Your verified operating briefing.',
+        subtitle:
+            'What needs attention, what is moving, and what Pandora recommends.',
         showProductMark: true,
         actions: [
           IconButton(
@@ -143,6 +144,8 @@ class _HomeContent extends StatelessWidget {
         (summary.countersVerified
             ? 'Pandora is continuing safe work and watching for blockers.'
             : 'Refresh before relying on approval and portfolio counters.');
+    final activeProject = _firstVerifiedActiveProject(projects);
+    final recommendation = _recommendedNextAction(summary, projects);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -153,7 +156,7 @@ class _HomeContent extends StatelessWidget {
           message: heroMessage,
           icon: needsDecision
               ? Icons.priority_high_rounded
-              : Icons.auto_awesome_rounded,
+              : Icons.radar_rounded,
           tone: heroTone,
           statusLabel: summary.healthLabel,
           actionLabel: needsDecision ? 'Review approvals' : 'Open projects',
@@ -215,6 +218,33 @@ class _HomeContent extends StatelessWidget {
                   : 'Needs attention: not verified',
             ),
           ],
+        ),
+        const SizedBox(height: PandoraSpacing.xl),
+        const OwnerSectionHeading(
+          title: 'Right now',
+          subtitle: 'The simplest verified view of motion and direction.',
+        ),
+        const SizedBox(height: PandoraSpacing.sm),
+        OwnerSignal(
+          label: 'Pandora is doing',
+          value: activeProject == null
+              ? 'No verified active work was returned.'
+              : '${activeProject.name} · ${activeProject.phase}',
+          icon: activeProject == null
+              ? Icons.pause_circle_outline_rounded
+              : Icons.play_circle_outline_rounded,
+          tone: activeProject == null
+              ? PandoraStatusTone.neutral
+              : PandoraStatusTone.informative,
+        ),
+        const SizedBox(height: PandoraSpacing.xs),
+        OwnerSignal(
+          label: 'Pandora recommends next',
+          value: recommendation,
+          icon: Icons.arrow_forward_rounded,
+          tone: needsDecision
+              ? PandoraStatusTone.attention
+              : PandoraStatusTone.informative,
         ),
         const SizedBox(height: PandoraSpacing.xl),
         OwnerSectionHeading(
@@ -292,8 +322,10 @@ class _ProjectBrief extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(project.phase,
-                    style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  project.phase,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
                 const SizedBox(height: PandoraSpacing.sm),
                 ProofLadder(stages: project.evidenceStages, compact: true),
                 if (project.blocker != null) ...[
@@ -346,6 +378,39 @@ class _ActivityBrief extends StatelessWidget {
                 compact: true,
               ),
       );
+}
+
+ProjectSummary? _firstVerifiedActiveProject(List<ProjectSummary> projects) {
+  for (final project in projects) {
+    if (!project.freshness.isFresh || project.blocker != null) continue;
+    final state = project.status.toLowerCase();
+    if (state.contains('active') ||
+        state.contains('working') ||
+        state.contains('building') ||
+        state.contains('testing') ||
+        state.contains('review') ||
+        state.contains('waiting')) {
+      return project;
+    }
+  }
+  return null;
+}
+
+String _recommendedNextAction(
+  HomeSummary summary,
+  List<ProjectSummary> projects,
+) {
+  final priorityAction = summary.priority?.action.trim();
+  if (priorityAction != null && priorityAction.isNotEmpty) {
+    return priorityAction;
+  }
+  for (final project in projects) {
+    final nextAction = project.nextAction?.trim();
+    if (nextAction != null && nextAction.isNotEmpty) {
+      return '${project.name}: $nextAction';
+    }
+  }
+  return 'Open Projects to review the latest verified next actions.';
 }
 
 int _compareProjectAttention(ProjectSummary left, ProjectSummary right) {
