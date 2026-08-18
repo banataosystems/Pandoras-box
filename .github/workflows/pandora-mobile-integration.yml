@@ -10,7 +10,6 @@ on:
       - 'assets/brand/pandoras-box/product-mark/**'
       - 'scripts/verify-pandora-brand-assets.mjs'
       - 'scripts/create-transparent-pandora-mark.py'
-      - 'scripts/check-private-key-literals.sh'
   pull_request:
     paths:
       - 'apps/pandora-mobile/**'
@@ -18,7 +17,6 @@ on:
       - 'assets/brand/pandoras-box/product-mark/**'
       - 'scripts/verify-pandora-brand-assets.mjs'
       - 'scripts/create-transparent-pandora-mark.py'
-      - 'scripts/check-private-key-literals.sh'
   workflow_dispatch:
     inputs:
       update_goldens:
@@ -76,13 +74,12 @@ jobs:
           include-hidden-files: true
       - name: Scan exact mobile source for private keys
         run: >-
-          bash scripts/check-private-key-literals.sh
+          bash apps/pandora-mobile/tool/check_private_key_literals.sh
           apps/pandora-mobile
           assets/brand/pandoras-box/product-mark
           .github/workflows/pandora-mobile-integration.yml
           scripts/verify-pandora-brand-assets.mjs
           scripts/create-transparent-pandora-mark.py
-          scripts/check-private-key-literals.sh
       - name: Install pinned Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
