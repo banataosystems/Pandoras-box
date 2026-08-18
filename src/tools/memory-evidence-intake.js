@@ -73,7 +73,9 @@ class MemoryEvidenceSubmissionError extends Error {
     // without accepting arbitrary provider text or confidential response data.
     super(JSON.stringify(failure));
     this.name = "MemoryEvidenceSubmissionError";
-    this.code = failure.safeErrorCode;
+    if (failure.safeErrorCode === IDEMPOTENCY_CONFLICT_CODE) {
+      this.code = failure.safeErrorCode;
+    }
     this.status = input.outerStatus;
     this.failure = failure;
   }
