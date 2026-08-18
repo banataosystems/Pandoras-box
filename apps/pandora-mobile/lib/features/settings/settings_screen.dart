@@ -6,6 +6,7 @@ import '../../core/security/pandora_auth.dart';
 import '../../core/widgets/owner_experience.dart';
 import '../../core/widgets/pandora_page.dart';
 import '../../core/widgets/status_badge.dart';
+import '../../pandora_config.dart';
 import '../connections/connections_screen.dart';
 import '../diagnostics/developer_diagnostics_screen.dart';
 import '../intelligence/owner_intelligence_screen.dart';
@@ -57,6 +58,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.tune_rounded,
               tone: PandoraStatusTone.informative,
               statusLabel: 'Owner-only controls',
+            ),
+            const SizedBox(height: PandoraSpacing.md),
+            const OwnerSignal(
+              label: 'Installed build',
+              value:
+                  '${PandoraConfig.releaseLabel} · ${PandoraConfig.artifactClass} · Not a production release',
+              icon: Icons.science_outlined,
+              tone: PandoraStatusTone.informative,
             ),
             const SizedBox(height: PandoraSpacing.xl),
             const OwnerSectionHeading(
