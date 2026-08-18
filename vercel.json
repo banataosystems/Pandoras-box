@@ -4,6 +4,8 @@
   "framework": "express",
   "env": {
     "PANDORA_MEMORY_BASE_URL": "https://pandorasbox-memory.vercel.app",
+    "PANDORA_MEMORY_GRANTED_SCOPES": "memory:health,memory:read,memory:write",
+    "PANDORA_MEMORY_ALLOW_MUTATIONS": "true",
     "PROJECTOS_MCP_RESOURCE_ORIGIN": "https://mcpmaster.vercel.app",
     "FLUTTERFLOW_ACCOUNTS_JSON": "[{\"id\":\"pandora-mobile\",\"label\":\"Pandora Mobile (FlutterFlow)\",\"tokenEnv\":\"FLUTTERFLOW_API_TOKEN\",\"allowedProjectIds\":[\"pandoras-box-gj9hnb\"],\"grantedScopes\":[\"projects:read\",\"project_schema:read\"]}]"
   },
