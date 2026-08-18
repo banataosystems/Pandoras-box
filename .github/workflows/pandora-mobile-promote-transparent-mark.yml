@@ -1,0 +1,58 @@
+name: Pandora mobile transparent-mark promotion
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pandora-mobile-promote-transparent-mark.yml'
+      - 'scripts/create-transparent-pandora-mark.py'
+      - 'assets/brand/pandoras-box/product-mark/derived/ui-mark-1024.png'
+      - 'apps/pandora-mobile/assets/brand/pandora-product-mark-ui-1024.png'
+
+permissions:
+  contents: write
+
+jobs:
+  promote-reviewed-bytes:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      EXPECTED_SHA256: 8a35b74baec47b960a42bb74587f9c531d6cbf8d45f16061836a9e63f00efcc5
+    steps:
+      - name: Check out exact source without stored credentials
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - name: Reproduce reviewed transparent mark
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=assets/brand/pandoras-box/product-mark/derived/ui-mark-1024.png
+          output=.pandora-transparent-promotion/pandora-product-mark-ui-1024.png
+          python3 scripts/create-transparent-pandora-mark.py "$source" "$output"
+          test "$(sha256sum "$output" | cut -d ' ' -f1)" = "$EXPECTED_SHA256"
+      - name: Commit reviewed bytes to the existing mobile branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          candidate=.pandora-transparent-promotion/pandora-product-mark-ui-1024.png
+          app_asset=apps/pandora-mobile/assets/brand/pandora-product-mark-ui-1024.png
+          canonical_asset=assets/brand/pandoras-box/product-mark/derived/ui-mark-transparent-1024.png
+          cp "$candidate" "$app_asset"
+          cp "$candidate" "$canonical_asset"
+          git add "$app_asset" "$canonical_asset"
+          if git diff --cached --quiet; then
+            echo 'Reviewed transparent mark is already committed.'
+            exit 0
+          fi
+          git config user.name 'pandora-mobile-worker[bot]'
+          git config user.email 'pandora-mobile-worker[bot]@users.noreply.github.com'
+          git commit -m 'fix(mobile): use the reviewed transparent Pandora mark'
+          git push \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:${HEAD_BRANCH}"
