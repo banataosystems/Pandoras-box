@@ -6,6 +6,13 @@ if [[ "$#" -eq 0 ]]; then
   exit 2
 fi
 
+for target in "$@"; do
+  if [[ ! -e "$target" ]]; then
+    echo "Private-key scan target does not exist: $target" >&2
+    exit 2
+  fi
+done
+
 scan_temp_root="${RUNNER_TEMP:-${TMPDIR:-.}}"
 scan_output="$(mktemp "${scan_temp_root%/}/pandora-mobile-private-key-scan.XXXXXX")"
 trap 'rm -f "$scan_output"' EXIT
@@ -17,9 +24,11 @@ for key_label in '' 'RSA ' 'EC ' 'OPENSSH '; do
 done
 
 set +e
-grep -RIl \
+LC_ALL=C grep -RIl \
+  --binary-files=without-match \
   --exclude='*.md' \
   --exclude='*.patch' \
+  --exclude='*.png' \
   --exclude-dir='.git' \
   "${private_key_patterns[@]}" \
   -- "$@" > "$scan_output"
@@ -32,7 +41,9 @@ if [[ "$scan_status" -gt 1 ]]; then
 fi
 
 if [[ -s "$scan_output" ]]; then
-  echo 'Private-key marker found in Pandora mobile source:' >&2
+  echo 'Private-key marker found in Pandora Mobile operational source:' >&2
   sed 's/^/  /' "$scan_output" >&2
   exit 1
 fi
+
+echo 'Pandora Mobile private-key marker scan passed.'
