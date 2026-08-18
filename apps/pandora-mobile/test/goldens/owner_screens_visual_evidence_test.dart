@@ -78,13 +78,13 @@ class _FixtureRepository implements PandoraRepository {
   }
 
   RepositorySnapshot<T> _snapshot<T>(T data) => RepositorySnapshot<T>(
-        data: data,
-        source: RepositorySource.network,
-        fetchedAt: _verifiedAt,
-        verifiedAt: _verifiedAt,
-        staleAfter: _staleAfter,
-        requestId: 'visual-evidence-fixture',
-      );
+    data: data,
+    source: RepositorySource.network,
+    fetchedAt: _verifiedAt,
+    verifiedAt: _verifiedAt,
+    staleAfter: _staleAfter,
+    requestId: 'visual-evidence-fixture',
+  );
 
   List<T> _list<T>(String name, T Function(Object?) parse) =>
       asJsonList(_read(name)).map(parse).toList(growable: false);
@@ -93,9 +93,7 @@ class _FixtureRepository implements PandoraRepository {
   Future<RepositorySnapshot<HomeSummary>> home() async {
     if (pending) return _pending<HomeSummary>();
     _guard();
-    return _snapshot(
-      HomeSummary.fromJson(asJsonMap(_read('home.json'))),
-    );
+    return _snapshot(HomeSummary.fromJson(asJsonMap(_read('home.json'))));
   }
 
   @override
@@ -123,10 +121,7 @@ class _FixtureRepository implements PandoraRepository {
   }) async {
     _guard();
     return _snapshot(
-      _list<ConnectionSummary>(
-        'connections.json',
-        ConnectionSummary.fromJson,
-      ),
+      _list<ConnectionSummary>('connections.json', ConnectionSummary.fromJson),
     );
   }
 
@@ -143,9 +138,7 @@ class _FixtureRepository implements PandoraRepository {
     bool allowCached = false,
   }) async {
     _guard();
-    return _snapshot(
-      _list<AuditEvent>('activity.json', AuditEvent.fromJson),
-    );
+    return _snapshot(_list<AuditEvent>('activity.json', AuditEvent.fromJson));
   }
 
   @override
@@ -167,8 +160,7 @@ class _FixtureRepository implements PandoraRepository {
     required String message,
     String? projectId,
     String? idempotencyKey,
-  }) =>
-      throw UnimplementedError('Visual evidence never performs mutations.');
+  }) => throw UnimplementedError('Visual evidence never performs mutations.');
 
   @override
   Future<IntakeReceipt> runAction({
@@ -176,16 +168,14 @@ class _FixtureRepository implements PandoraRepository {
     String? projectId,
     String? message,
     String? idempotencyKey,
-  }) =>
-      throw UnimplementedError('Visual evidence never performs mutations.');
+  }) => throw UnimplementedError('Visual evidence never performs mutations.');
 
   @override
   Future<ApprovalDecisionResult> decideApproval({
     required String approvalId,
     required ApprovalDecision decision,
     String reason = '',
-  }) =>
-      throw UnimplementedError('Visual evidence never performs mutations.');
+  }) => throw UnimplementedError('Visual evidence never performs mutations.');
 
   @override
   void clearReadOnlyCache() {}
@@ -194,10 +184,7 @@ class _FixtureRepository implements PandoraRepository {
   void dispose() {}
 }
 
-Future<void> _captureScreen(
-  WidgetTester tester,
-  _VisualCase visual,
-) async {
+Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
   await setTestSurface(tester, logicalSize: visual.logicalSize);
   final repository = _FixtureRepository(
     failing: visual.failing,
@@ -211,10 +198,7 @@ Future<void> _captureScreen(
       child: testApp(
         themeMode: visual.themeMode,
         textScaler: visual.textScaler,
-        child: RepaintBoundary(
-          key: _surfaceKey,
-          child: visual.build(),
-        ),
+        child: RepaintBoundary(key: _surfaceKey, child: visual.build()),
       ),
     ),
   );

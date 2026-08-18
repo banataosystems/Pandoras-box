@@ -47,69 +47,69 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) => PandoraPage(
-        title: 'Pandora',
-        subtitle:
-            'What needs attention, what is moving, and what Pandora recommends.',
-        showProductMark: true,
-        actions: [
-          IconButton(
-            tooltip: 'Open Settings',
-            onPressed: () => _open(const SettingsScreen()),
-            icon: const Icon(Icons.settings_outlined),
-          ),
-          IconButton(
-            tooltip: 'Refresh Home',
-            onPressed: () => _controller?.refresh(),
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
-        onRefresh: () => _controller!.refresh(),
-        child: AnimatedBuilder(
-          animation: _controller!,
-          builder: (context, _) {
-            final controller = _controller!;
-            if (controller.isLoading && controller.data == null) {
-              return const ContentSkeleton(lines: 5);
-            }
-            if (controller.error != null && controller.data == null) {
-              return ErrorContent(
-                title: 'Home could not refresh',
-                message: _safeError(controller.error),
-                onRetry: controller.load,
-              );
-            }
-            final summary = controller.data;
-            if (summary == null) {
-              return EmptyContent(
-                title: 'No owner briefing yet',
-                message: 'Pandora has not returned a verified Home summary.',
-                onAction: controller.load,
-                actionLabel: 'Check again',
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (controller.error != null) ...[
-                  DegradedContentNotice(
-                    message: controller.error!.message,
-                    onRetry: controller.refresh,
-                  ),
-                  const SizedBox(height: PandoraSpacing.md),
-                ],
-                _HomeContent(
-                  summary: summary,
-                  refreshing: controller.isLoading,
-                  onOpenApprovals: () => _open(const ApprovalsScreen()),
-                  onOpenProjects: () => _open(const ProjectsScreen()),
-                  onOpenProject: (project) =>
-                      _open(ProjectDetailScreen(project: project)),
-                ),
-              ],
-            );
-          },
-        ),
-      );
+    title: 'Pandora',
+    subtitle:
+        'What needs attention, what is moving, and what Pandora recommends.',
+    showProductMark: true,
+    actions: [
+      IconButton(
+        tooltip: 'Open Settings',
+        onPressed: () => _open(const SettingsScreen()),
+        icon: const Icon(Icons.settings_outlined),
+      ),
+      IconButton(
+        tooltip: 'Refresh Home',
+        onPressed: () => _controller?.refresh(),
+        icon: const Icon(Icons.refresh_rounded),
+      ),
+    ],
+    onRefresh: () => _controller!.refresh(),
+    child: AnimatedBuilder(
+      animation: _controller!,
+      builder: (context, _) {
+        final controller = _controller!;
+        if (controller.isLoading && controller.data == null) {
+          return const ContentSkeleton(lines: 5);
+        }
+        if (controller.error != null && controller.data == null) {
+          return ErrorContent(
+            title: 'Home could not refresh',
+            message: _safeError(controller.error),
+            onRetry: controller.load,
+          );
+        }
+        final summary = controller.data;
+        if (summary == null) {
+          return EmptyContent(
+            title: 'No owner briefing yet',
+            message: 'Pandora has not returned a verified Home summary.',
+            onAction: controller.load,
+            actionLabel: 'Check again',
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (controller.error != null) ...[
+              DegradedContentNotice(
+                message: controller.error!.message,
+                onRetry: controller.refresh,
+              ),
+              const SizedBox(height: PandoraSpacing.md),
+            ],
+            _HomeContent(
+              summary: summary,
+              refreshing: controller.isLoading,
+              onOpenApprovals: () => _open(const ApprovalsScreen()),
+              onOpenProjects: () => _open(const ProjectsScreen()),
+              onOpenProject: (project) =>
+                  _open(ProjectDetailScreen(project: project)),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }
 
 class _HomeContent extends StatelessWidget {
@@ -129,18 +129,21 @@ class _HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final needsDecision = summary.priority != null ||
+    final needsDecision =
+        summary.priority != null ||
         (summary.countersVerified && summary.approvalCount > 0);
     final projects = List<ProjectSummary>.of(summary.topProjects)
       ..sort(_compareProjectAttention);
     final heroTone = needsDecision
         ? PandoraStatusTone.attention
         : statusToneFor(summary.healthState);
-    final heroTitle = summary.priority?.action ??
+    final heroTitle =
+        summary.priority?.action ??
         (summary.countersVerified
             ? 'Nothing requires your decision'
             : 'Owner decision state is not verified');
-    final heroMessage = summary.priority?.reason ??
+    final heroMessage =
+        summary.priority?.reason ??
         (summary.countersVerified
             ? 'Pandora is continuing safe work and watching for blockers.'
             : 'Refresh before relying on approval and portfolio counters.');
@@ -184,14 +187,16 @@ class _HomeContent extends StatelessWidget {
           metrics: [
             OwnerMetric(
               label: 'Approvals',
-              value:
-                  summary.countersVerified ? '${summary.approvalCount}' : '—',
+              value: summary.countersVerified
+                  ? '${summary.approvalCount}'
+                  : '—',
               icon: Icons.approval_outlined,
               tone: summary.countersVerified && summary.approvalCount > 0
                   ? PandoraStatusTone.attention
                   : PandoraStatusTone.neutral,
-              semanticLabel:
-                  summary.countersVerified ? null : 'Approvals: not verified',
+              semanticLabel: summary.countersVerified
+                  ? null
+                  : 'Approvals: not verified',
             ),
             OwnerMetric(
               label: 'Active projects',
@@ -283,9 +288,11 @@ class _HomeContent extends StatelessWidget {
               ? const Text('No recent verified activity was returned.')
               : Column(
                   children: [
-                    for (var index = 0;
-                        index < summary.recentActivity.length;
-                        index++) ...[
+                    for (
+                      var index = 0;
+                      index < summary.recentActivity.length;
+                      index++
+                    ) ...[
                       _ActivityBrief(event: summary.recentActivity[index]),
                       if (index != summary.recentActivity.length - 1)
                         const Divider(),
@@ -306,51 +313,48 @@ class _ProjectBrief extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Semantics(
-        button: true,
-        label: 'Open ${project.name}',
-        child: InkWell(
-          borderRadius: PandoraRadius.cardBorder,
-          onTap: onTap,
-          child: PandoraSurface(
-            title: project.name,
-            subtitle: project.purpose,
-            trailing: StatusBadge(
-              label: project.status,
-              tone: statusToneFor(project.status),
-              compact: true,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  project.phase,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: PandoraSpacing.sm),
-                ProofLadder(stages: project.evidenceStages, compact: true),
-                if (project.blocker != null) ...[
-                  const SizedBox(height: PandoraSpacing.sm),
-                  OwnerSignal(
-                    label: 'Blocked by',
-                    value: project.blocker!,
-                    icon: Icons.block_rounded,
-                    tone: PandoraStatusTone.critical,
-                  ),
-                ],
-                if (project.nextAction != null) ...[
-                  const SizedBox(height: PandoraSpacing.xs),
-                  OwnerSignal(
-                    label: 'Pandora will do next',
-                    value: project.nextAction!,
-                    icon: Icons.arrow_forward_rounded,
-                    tone: PandoraStatusTone.informative,
-                  ),
-                ],
-              ],
-            ),
-          ),
+    button: true,
+    label: 'Open ${project.name}',
+    child: InkWell(
+      borderRadius: PandoraRadius.cardBorder,
+      onTap: onTap,
+      child: PandoraSurface(
+        title: project.name,
+        subtitle: project.purpose,
+        trailing: StatusBadge(
+          label: project.status,
+          tone: statusToneFor(project.status),
+          compact: true,
         ),
-      );
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(project.phase, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: PandoraSpacing.sm),
+            ProofLadder(stages: project.evidenceStages, compact: true),
+            if (project.blocker != null) ...[
+              const SizedBox(height: PandoraSpacing.sm),
+              OwnerSignal(
+                label: 'Blocked by',
+                value: project.blocker!,
+                icon: Icons.block_rounded,
+                tone: PandoraStatusTone.critical,
+              ),
+            ],
+            if (project.nextAction != null) ...[
+              const SizedBox(height: PandoraSpacing.xs),
+              OwnerSignal(
+                label: 'Pandora will do next',
+                value: project.nextAction!,
+                icon: Icons.arrow_forward_rounded,
+                tone: PandoraStatusTone.informative,
+              ),
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _ActivityBrief extends StatelessWidget {
@@ -360,24 +364,24 @@ class _ActivityBrief extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(providerIconFor(event.provider ?? event.type)),
-        title: Text(event.summary),
-        subtitle: Text(
-          [
-            event.project,
-            event.provider,
-            ownerRelativeTime(event.happenedAt),
-          ].whereType<String>().where((item) => item.isNotEmpty).join(' · '),
-        ),
-        trailing: event.result == null
-            ? null
-            : StatusBadge(
-                label: event.result!,
-                tone: statusToneFor(event.result!),
-                compact: true,
-              ),
-      );
+    contentPadding: EdgeInsets.zero,
+    leading: Icon(providerIconFor(event.provider ?? event.type)),
+    title: Text(event.summary),
+    subtitle: Text(
+      [
+        event.project,
+        event.provider,
+        ownerRelativeTime(event.happenedAt),
+      ].whereType<String>().where((item) => item.isNotEmpty).join(' · '),
+    ),
+    trailing: event.result == null
+        ? null
+        : StatusBadge(
+            label: event.result!,
+            tone: statusToneFor(event.result!),
+            compact: true,
+          ),
+  );
 }
 
 ProjectSummary? _firstVerifiedActiveProject(List<ProjectSummary> projects) {

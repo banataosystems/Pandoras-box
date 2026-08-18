@@ -40,7 +40,9 @@ void main() {
 
   test('Graphite window underlay matches the Flutter canvas', () {
     expect(
-        canvasResource('values-night'), argb(PandoraPalette.graphite.canvas));
+      canvasResource('values-night'),
+      argb(PandoraPalette.graphite.canvas),
+    );
   });
 
   test('Graphite canvas is premium charcoal rather than pure black', () {
@@ -49,9 +51,10 @@ void main() {
 
   // Only the effective declarations are asserted. XML comments in these files
   // legitimately name the platform defaults they exist to override.
-  String declarations(String path) => File(path)
-      .readAsStringSync()
-      .replaceAll(RegExp(r'<!--.*?-->', dotAll: true), '');
+  String declarations(String path) =>
+      File(path)
+          .readAsStringSync()
+          .replaceAll(RegExp(r'<!--.*?-->', dotAll: true), '');
 
   test('the splash never hardcodes platform white', () {
     for (final dir in const ['drawable', 'drawable-night']) {

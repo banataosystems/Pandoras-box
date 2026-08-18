@@ -90,9 +90,8 @@ class _PandoraErrorFallbackState extends State<PandoraErrorFallback> {
                   if (widget.reference != null) ...[
                     const SizedBox(height: PandoraSpacing.sm),
                     TextButton(
-                      onPressed: () => setState(
-                        () => _showTechnical = !_showTechnical,
-                      ),
+                      onPressed: () =>
+                          setState(() => _showTechnical = !_showTechnical),
                       child: Text(
                         _showTechnical
                             ? 'Hide technical details'
@@ -136,9 +135,9 @@ void installPandoraErrorHandling({
   required void Function(String summary) record,
 }) {
   ErrorWidget.builder = (details) => PandoraErrorFallback(
-        surface: 'This screen',
-        reference: _reference(details.exception),
-      );
+    surface: 'This screen',
+    reference: _reference(details.exception),
+  );
 
   final previousOnError = FlutterError.onError;
   FlutterError.onError = (details) {
@@ -160,7 +159,8 @@ const _sanitizer = DiagnosticsSanitizer();
 String _reference(Object error) {
   final type = error.runtimeType.toString();
   final sanitized = _sanitizer.sanitizeText(error.toString());
-  final trimmed =
-      sanitized.length > 160 ? '${sanitized.substring(0, 160)}…' : sanitized;
+  final trimmed = sanitized.length > 160
+      ? '${sanitized.substring(0, 160)}…'
+      : sanitized;
   return '$type: $trimmed';
 }

@@ -15,8 +15,9 @@ List<ConnectionSummary> deduplicateConnections(
   }
   final result = unique.values.toList(growable: true)
     ..sort(
-      (left, right) => connectionAttentionRank(right)
-          .compareTo(connectionAttentionRank(left)),
+      (left, right) =>
+          connectionAttentionRank(right)
+              .compareTo(connectionAttentionRank(left)),
     );
   return List<ConnectionSummary>.unmodifiable(result);
 }
