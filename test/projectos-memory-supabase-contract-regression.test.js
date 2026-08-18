@@ -110,6 +110,7 @@ function failureFrom(error) {
     "correlationId",
     "httpStatus",
     "operation",
+    "privacyScanVersion",
     "provider",
     "retryable",
     "summary",
@@ -121,6 +122,7 @@ function failureFrom(error) {
   assert.equal(parsed.schemaVersion, "1.0.0");
   assert.equal(parsed.provider, "pandora-memory");
   assert.equal(parsed.operation, "memory.submitEvidenceCandidate");
+  assert.equal(parsed.privacyScanVersion, "evidence_privacy_v2");
   assert.equal(typeof parsed.summary, "string");
   assert.match(parsed.correlationId, /^[A-Za-z0-9._:-]{1,128}$/);
   assert.ok(Number.isFinite(Date.parse(parsed.timestamp)));
@@ -219,6 +221,7 @@ test("published client translates every candidate field exactly and keeps succes
     projectKey: args.projectKey,
     proofStage: args.proofStage,
     createdAt: "2026-08-19T05:15:10.000Z",
+    privacyScanVersion: "evidence_privacy_v2",
     canonicalPromoted: false,
   });
 });
@@ -471,4 +474,153 @@ test("ProjectOS caller and hash-linked audit receive the same sanitized structur
   assert.equal(callerFailure.retryable, false);
   assert.equal(callerFailure.correlationId, "audit-contract-correlation");
   assert.doesNotMatch(finishInput.error, /never persist|backend detail/);
+});
+
+
+test("Memory submission errors clamp every non-4xx outer status to 502", () => {
+  const common = {
+    httpStatus: 200,
+    safeErrorCode: "memory_submission_failed",
+    validationCategory: "unknown_downstream",
+    retryable: false,
+    correlationId: "clamp-status",
+    timestamp: "2026-08-19T06:00:00.000Z",
+  };
+  for (const outerStatus of [null, 0, 200, 201, 399, 500, 503]) {
+    const error = new MemoryEvidenceSubmissionError({ ...common, outerStatus });
+    assert.equal(error.status, 502);
+  }
+  for (const outerStatus of [400, 408, 409, 429, 499]) {
+    const error = new MemoryEvidenceSubmissionError({ ...common, outerStatus });
+    assert.equal(error.status, outerStatus);
+  }
+});
+
+test("body-level Memory failure can never surface as HTTP 2xx", async () => {
+  const args = evidenceArgs();
+  let finishInput;
+  const ledger = {
+    async claimPlan(_token, planId) {
+      return {
+        planId,
+        requestId: "55555555-5555-4555-8555-555555555555",
+        tool: "memory.submitEvidenceCandidate",
+        risk: "write",
+        args,
+        payloadHash: executionPayloadHash("memory.submitEvidenceCandidate", args),
+        status: "executing",
+      };
+    },
+    async finishPlan(_token, input) {
+      finishInput = input;
+      return { planId: input.planId, status: input.status };
+    },
+  };
+  const handler = createProjectOsMcpHandler(handlerDependencies({
+    ledger,
+    toolConfiguration: () => memoryConfig,
+    async execute(_name, receivedArgs, config) {
+      return submitEvidenceCandidate(receivedArgs, config, async () =>
+        new Response(JSON.stringify({
+          ok: false,
+          error: "evidence_candidate_invalid",
+        }), {
+          status: 200,
+          headers: { "x-request-id": "body-failure-http-200" },
+        }));
+    },
+  }));
+  const response = responseRecorder();
+  await handler(request("projectos_execute_plan", { planId: PLAN_ID }), response);
+
+  assert.equal(response.statusCode, 502);
+  assert.equal(finishInput.status, "failed");
+  const callerFailure = JSON.parse(response.body.error.message);
+  const auditFailure = JSON.parse(finishInput.error);
+  assert.deepEqual(auditFailure, callerFailure);
+  assert.equal(callerFailure.httpStatus, 200);
+  assert.equal(callerFailure.safeErrorCode, "evidence_candidate_invalid");
+  assert.equal(callerFailure.retryable, false);
+  assert.equal(callerFailure.privacyScanVersion, "evidence_privacy_v2");
+});
+
+test("429 remains retryable and carries a bounded Retry-After instruction", async () => {
+  await assert.rejects(
+    () => submitEvidenceCandidate(evidenceArgs(), memoryConfig, async () =>
+      new Response(JSON.stringify({ ok: false, error: "rate_limited" }), {
+        status: 429,
+        headers: {
+          "retry-after": "7",
+          "x-request-id": "memory-rate-limit",
+        },
+      })),
+    (error) => {
+      assert.ok(error instanceof MemoryEvidenceSubmissionError);
+      assert.equal(error.status, 429);
+      const failure = JSON.parse(error.message);
+      assert.equal(failure.httpStatus, 429);
+      assert.equal(failure.safeErrorCode, "provider_rate_limited");
+      assert.equal(failure.validationCategory, "rate_limit");
+      assert.equal(failure.retryable, true);
+      assert.equal(failure.retryAfterMs, 7000);
+      assert.equal(failure.privacyScanVersion, "evidence_privacy_v2");
+      assert.doesNotMatch(error.message, /"rate_limited"/);
+      return true;
+    },
+  );
+});
+
+test("408 is classified as a retryable provider timeout", async () => {
+  await assert.rejects(
+    () => submitEvidenceCandidate(evidenceArgs(), memoryConfig, async () =>
+      new Response(JSON.stringify({ ok: false, error: "private-timeout-detail" }), {
+        status: 408,
+      })),
+    (error) => {
+      assert.ok(error instanceof MemoryEvidenceSubmissionError);
+      assert.equal(error.status, 408);
+      const failure = JSON.parse(error.message);
+      assert.equal(failure.httpStatus, 408);
+      assert.equal(failure.safeErrorCode, "provider_timeout");
+      assert.equal(failure.validationCategory, "timeout");
+      assert.equal(failure.retryable, true);
+      assert.equal("retryAfterMs" in failure, false);
+      assert.doesNotMatch(error.message, /private-timeout-detail/);
+      return true;
+    },
+  );
+});
+
+test("a non-idempotency 409 is a generic downstream conflict", async () => {
+  await assert.rejects(
+    () => submitEvidenceCandidate(evidenceArgs(), memoryConfig, async () =>
+      new Response(JSON.stringify({
+        ok: false,
+        error: "candidate_already_promoted",
+        detail: "private conflict detail",
+      }), { status: 409 })),
+    (error) => {
+      assert.ok(error instanceof MemoryEvidenceSubmissionError);
+      assert.equal(error instanceof MemoryEvidenceIdempotencyConflictError, false);
+      assert.equal(error.status, 409);
+      const failure = JSON.parse(error.message);
+      assert.equal(failure.httpStatus, 409);
+      assert.equal(failure.safeErrorCode, "provider_conflict");
+      assert.equal(failure.validationCategory, "downstream_conflict");
+      assert.equal(failure.retryable, false);
+      assert.doesNotMatch(error.message, /candidate_already_promoted|private conflict/);
+      return true;
+    },
+  );
+});
+
+test("privacy preflight version is attested without widening the strict body contract", async () => {
+  const args = evidenceArgs();
+  let privacyVersion;
+  const result = await submitEvidenceCandidate(args, memoryConfig, async (_url, init) => {
+    privacyVersion = init.headers["x-pandora-privacy-scan-version"];
+    return new Response(JSON.stringify(pendingReviewResponse(args)), { status: 201 });
+  });
+  assert.equal(privacyVersion, "evidence_privacy_v2");
+  assert.equal(result.privacyScanVersion, "evidence_privacy_v2");
 });

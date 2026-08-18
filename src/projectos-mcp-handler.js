@@ -362,6 +362,10 @@ function assertToolScope(name, actor) {
     }
     const projectScopes = [...granted].filter((scope) => scope.startsWith("projectos:"));
     if (projectScopes.length === 0) {
+        // Existing ChatGPT installations were consented before ProjectOS action
+        // scopes existed. Keep only that exact identity grant compatible until
+        // staged connector re-consent is complete; any broader or malformed
+        // non-ProjectOS grant remains fail closed.
         const isBoundedLegacyGrant = IDENTITY_SCOPES.every((scope) => granted.has(scope))
             && [...granted].every((scope) => LEGACY_IDENTITY_SCOPES.has(scope));
         if (isBoundedLegacyGrant) return;

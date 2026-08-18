@@ -17,6 +17,8 @@ const IDEMPOTENCY_CONFLICT_CODE = "idempotency_conflict";
 const FAILURE_SCHEMA_VERSION = "1.0.0";
 const FAILURE_PROVIDER = "pandora-memory";
 const FAILURE_OPERATION = "memory.submitEvidenceCandidate";
+const EVIDENCE_PRIVACY_SCAN_VERSION = "evidence_privacy_v2";
+const MAX_RETRY_AFTER_MS = 86_400_000;
 
 const SAFE_BACKEND_FAILURES = new Map([
   ["unsupported_action", { validationCategory: "capability_contract", retryable: false }],
@@ -49,7 +51,34 @@ function responseCorrelationId(response, fallback) {
   ) || fallback;
 }
 
+function retryableStatus(status) {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function normalizeOuterFailureStatus(status) {
+  return Number.isInteger(status) && status >= 400 && status < 500
+    ? status
+    : 502;
+}
+
+function responseRetryAfterMs(response) {
+  const raw = response?.headers?.get?.("retry-after");
+  if (typeof raw !== "string") return null;
+  const value = raw.trim();
+  if (/^\d{1,9}$/.test(value)) {
+    return Math.min(Number(value) * 1000, MAX_RETRY_AFTER_MS);
+  }
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.min(Math.max(parsed - Date.now(), 0), MAX_RETRY_AFTER_MS);
+}
+
 function failureEnvelope(input) {
+  const retryAfterMs = Number.isInteger(input.retryAfterMs)
+    && input.retryAfterMs >= 0
+    && input.retryAfterMs <= MAX_RETRY_AFTER_MS
+    ? input.retryAfterMs
+    : null;
   return Object.freeze({
     schemaVersion: FAILURE_SCHEMA_VERSION,
     provider: FAILURE_PROVIDER,
@@ -61,6 +90,8 @@ function failureEnvelope(input) {
     safeErrorCode: input.safeErrorCode,
     validationCategory: input.validationCategory,
     retryable: input.retryable === true,
+    ...(retryAfterMs === null ? {} : { retryAfterMs }),
+    privacyScanVersion: EVIDENCE_PRIVACY_SCAN_VERSION,
     correlationId: input.correlationId,
     timestamp: input.timestamp,
   });
@@ -78,7 +109,7 @@ class MemoryEvidenceSubmissionError extends Error {
     if (failure.safeErrorCode === IDEMPOTENCY_CONFLICT_CODE) {
       this.code = failure.safeErrorCode;
     }
-    this.status = input.outerStatus;
+    this.status = normalizeOuterFailureStatus(input.outerStatus);
     this.failure = failure;
   }
 }
@@ -102,6 +133,7 @@ class MemoryEvidenceIdempotencyConflictError extends MemoryEvidenceSubmissionErr
 
 exports.MemoryEvidenceIdempotencyConflictError = MemoryEvidenceIdempotencyConflictError;
 exports.IDEMPOTENCY_CONFLICT_CODE = IDEMPOTENCY_CONFLICT_CODE;
+exports.EVIDENCE_PRIVACY_SCAN_VERSION = EVIDENCE_PRIVACY_SCAN_VERSION;
 
 const NamespaceSchema = z.enum(["real_life", "au"]);
 const ProofStageSchema = z.enum([
@@ -337,6 +369,34 @@ function assertBoundResponse(body, input) {
 
 function safeBackendFailure(status, body) {
   const candidateCode = body?.error;
+  if (status === 429) {
+    return {
+      safeErrorCode: "provider_rate_limited",
+      validationCategory: "rate_limit",
+      retryable: true,
+    };
+  }
+  if (status === 408) {
+    return {
+      safeErrorCode: "provider_timeout",
+      validationCategory: "timeout",
+      retryable: true,
+    };
+  }
+  if (status === 409) {
+    if (candidateCode === IDEMPOTENCY_CONFLICT_CODE) {
+      return {
+        safeErrorCode: IDEMPOTENCY_CONFLICT_CODE,
+        validationCategory: "idempotency",
+        retryable: false,
+      };
+    }
+    return {
+      safeErrorCode: "provider_conflict",
+      validationCategory: "downstream_conflict",
+      retryable: false,
+    };
+  }
   const known = typeof candidateCode === "string"
     ? SAFE_BACKEND_FAILURES.get(candidateCode)
     : undefined;
@@ -368,6 +428,7 @@ function submissionFailure(input) {
     safeErrorCode: input.safeErrorCode,
     validationCategory: input.validationCategory,
     retryable: input.retryable,
+    retryAfterMs: input.retryAfterMs,
     correlationId: input.correlationId,
     timestamp: new Date().toISOString(),
     outerStatus: input.outerStatus,
@@ -423,6 +484,9 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
           "accept": "application/json",
           "x-pandora-vercel-oidc": configuration.oidcToken,
           "x-request-id": correlationId,
+          // The strict JSON body remains unchanged. This bounded header and the
+          // structured result/error envelope attest which privacy preflight ran.
+          "x-pandora-privacy-scan-version": EVIDENCE_PRIVACY_SCAN_VERSION,
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
@@ -453,7 +517,7 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
         httpStatus: Number.isInteger(response.status) ? response.status : null,
         safeErrorCode: "response_contract_error",
         validationCategory: "response_contract",
-        retryable: response.status >= 500,
+        retryable: retryableStatus(response.status),
         correlationId: resolvedCorrelationId,
         outerStatus: 502,
       });
@@ -467,13 +531,16 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
         httpStatus: Number.isInteger(response.status) ? response.status : null,
         safeErrorCode: "response_contract_error",
         validationCategory: "response_contract",
-        retryable: response.status >= 500,
+        retryable: retryableStatus(response.status),
         correlationId: resolvedCorrelationId,
         outerStatus: 502,
       });
     }
 
-    if (response.status === 409) {
+    if (
+      response.status === 409
+      && body?.error === IDEMPOTENCY_CONFLICT_CODE
+    ) {
       throw new MemoryEvidenceIdempotencyConflictError({
         correlationId: resolvedCorrelationId,
         timestamp: new Date().toISOString(),
@@ -484,8 +551,9 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
       throw submissionFailure({
         httpStatus: response.status,
         ...classified,
+        retryAfterMs: responseRetryAfterMs(response),
         correlationId: resolvedCorrelationId,
-        outerStatus: response.status >= 500 ? 502 : response.status,
+        outerStatus: normalizeOuterFailureStatus(response.status),
       });
     }
     if (body?.status !== "pending_review") {
@@ -505,6 +573,7 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
       projectKey: canonicalProjectKey,
       proofStage: input.proofStage,
       createdAt: body.created_at ?? null,
+      privacyScanVersion: EVIDENCE_PRIVACY_SCAN_VERSION,
       canonicalPromoted: false,
     };
   } finally {
