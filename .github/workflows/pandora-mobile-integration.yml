@@ -1,6 +1,16 @@
 name: Pandora mobile integration
 
 on:
+  push:
+    branches:
+      - 'integration/pandora-mobile-p1-current-main-20260819'
+    paths:
+      - 'apps/pandora-mobile/**'
+      - '.github/workflows/pandora-mobile-integration.yml'
+      - 'assets/brand/pandoras-box/product-mark/**'
+      - 'scripts/verify-pandora-brand-assets.mjs'
+      - 'scripts/create-transparent-pandora-mark.py'
+      - 'scripts/check-private-key-literals.sh'
   pull_request:
     paths:
       - 'apps/pandora-mobile/**'
