@@ -7,6 +7,7 @@ on:
       - '.github/workflows/pandora-mobile-integration.yml'
       - 'assets/brand/pandoras-box/product-mark/**'
       - 'scripts/verify-pandora-brand-assets.mjs'
+      - 'scripts/create-transparent-pandora-mark.py'
       - 'scripts/check-private-key-literals.sh'
   workflow_dispatch:
     inputs:
@@ -39,32 +40,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source=apps/pandora-mobile/assets/brand/pandora-product-mark-ui-1024.png
-          output=.pandora-mobile-brand-candidate/pandora-product-mark-transparent-1024.png
-          mkdir -p "$(dirname "$output")"
-          convert "$source" \
-            -colorspace Gray \
-            \( +clone -negate \) \
-            -alpha off -compose CopyOpacity -composite \
-            -fill white -colorize 100 \
-            "$output"
-          dimensions="$(identify -format '%wx%h' "$output")"
-          channels="$(identify -format '%[channels]' "$output")"
-          corner_alpha="$(convert "$output" -format '%[fx:a.p{0,0}]' info:)"
-          test "$dimensions" = '1024x1024'
-          case "$channels" in
-            *a*) ;;
-            *) echo "Transparent mark candidate has no alpha channel: $channels" >&2; exit 1 ;;
-          esac
-          awk -v alpha="$corner_alpha" 'BEGIN { exit !(alpha <= 0.001) }'
+          mkdir -p .pandora-mobile-brand-candidate
+          python3 scripts/create-transparent-pandora-mark.py \
+            apps/pandora-mobile/assets/brand/pandora-product-mark-ui-1024.png \
+            .pandora-mobile-brand-candidate/pandora-product-mark-transparent-1024.png \
+            --manifest .pandora-mobile-brand-candidate/manifest.json
           {
             echo "source_sha=${SOURCE_SHA}"
-            echo "candidate_sha256=$(sha256sum "$output" | cut -d ' ' -f1)"
-            echo "dimensions=${dimensions}"
-            echo "channels=${channels}"
-            echo "corner_alpha=${corner_alpha}"
             echo "review_status=unapproved_candidate"
-          } > .pandora-mobile-brand-candidate/manifest.txt
+          } > .pandora-mobile-brand-candidate/source.txt
       - name: Upload transparent mobile-mark review candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
@@ -79,6 +63,7 @@ jobs:
           assets/brand/pandoras-box/product-mark
           .github/workflows/pandora-mobile-integration.yml
           scripts/verify-pandora-brand-assets.mjs
+          scripts/create-transparent-pandora-mark.py
           scripts/check-private-key-literals.sh
       - name: Install pinned Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
