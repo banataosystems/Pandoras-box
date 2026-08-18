@@ -1,9 +1,9 @@
 name: Worker 1 apply independent-review fixes
 
 on:
-  push:
-    branches:
-      - fix/projectos-memory-supabase-contracts-20260819
+  pull_request:
+    types: [synchronize]
+    branches: [main]
     paths:
       - '.github/workflows/worker1-apply-review-fixes.yml'
 
@@ -11,18 +11,19 @@ permissions:
   contents: write
 
 concurrency:
-  group: worker1-review-fixes-${{ github.ref }}
+  group: worker1-review-fixes-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   apply:
+    if: github.event.pull_request.head.ref == 'fix/projectos-memory-supabase-contracts-20260819'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - name: Check out triggering branch head
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Apply exact independent-review corrections
