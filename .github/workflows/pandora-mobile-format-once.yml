@@ -1,0 +1,48 @@
+name: Pandora mobile one-time formatter
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pandora-mobile-format-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  format-mobile-source:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Check out exact source without stored credentials
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+      - name: Format only the Pandora mobile Dart source
+        run: dart format apps/pandora-mobile/lib apps/pandora-mobile/test
+      - name: Commit formatter output to the existing mobile branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          git add apps/pandora-mobile/lib apps/pandora-mobile/test
+          if git diff --cached --quiet; then
+            echo 'Pandora mobile source is already formatted.'
+            exit 0
+          fi
+          git config user.name 'pandora-mobile-worker[bot]'
+          git config user.email 'pandora-mobile-worker[bot]@users.noreply.github.com'
+          git commit -m 'style(mobile): apply the pinned Dart formatter'
+          git push \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:${HEAD_BRANCH}"
