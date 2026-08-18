@@ -11,7 +11,6 @@ import 'package:pandora_mobile/core/data/pandora_repository.dart';
 import 'package:pandora_mobile/core/diagnostics/diagnostics_store.dart';
 import 'package:pandora_mobile/core/models/pandora_models.dart';
 import 'package:pandora_mobile/core/network/pandora_api_error.dart';
-import 'package:pandora_mobile/core/widgets/pandora_mark.dart';
 import 'package:pandora_mobile/features/activity/activity_screen.dart';
 import 'package:pandora_mobile/features/approvals/approvals_screen.dart';
 import 'package:pandora_mobile/features/command/command_screen.dart';
@@ -221,19 +220,15 @@ Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
       ),
     ),
   );
-  await tester.runAsync(
-    () => precacheImage(
-      const AssetImage(PandoraMark.assetPath),
-      tester.element(find.byKey(_surfaceKey)),
-    ),
-  );
-  if (visual.pending) {
-    await tester.pump();
-  } else {
-    for (final frame in _renderFrames) {
-      await tester.pump(frame);
-    }
+
+  // Keep image decoding, repository microtasks, and visual state changes inside
+  // the widget-test clock. Every case receives the same finite frame budget, so
+  // no screenshot can conceal later CI stages behind an unbounded settle or
+  // an out-of-clock async image-cache wait.
+  for (final frame in _renderFrames) {
+    await tester.pump(frame);
   }
+
   expect(
     tester.takeException(),
     isNull,
