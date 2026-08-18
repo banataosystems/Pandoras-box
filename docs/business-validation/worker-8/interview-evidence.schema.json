@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pandora.local/schemas/worker-8/interview-evidence.schema.json",
+  "title": "Pandora Worker 8 Privacy-Safe Interview Evidence",
+  "description": "Structured customer-discovery evidence. Raw transcripts, customer messages, credentials, protected identifiers, financial documents, and private customer records are prohibited.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "interview_id",
+    "customer_code",
+    "observed_at",
+    "segment",
+    "role",
+    "problem",
+    "frequency",
+    "current_solution",
+    "severity",
+    "urgency",
+    "decision_process",
+    "budget_signal",
+    "willingness_to_pay_signal",
+    "desired_outcome",
+    "evidence_level"
+  ],
+  "properties": {
+    "interview_id": {
+      "type": "string",
+      "pattern": "^W8-I-[0-9]{4}$"
+    },
+    "customer_code": {
+      "type": "string",
+      "pattern": "^CUST-[A-Z0-9]{4,12}$"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "segment": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "buyer",
+        "user",
+        "approver",
+        "beneficiary",
+        "buyer_user",
+        "other"
+      ]
+    },
+    "problem": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "frequency": {
+      "type": "string",
+      "enum": [
+        "daily",
+        "multiple_weekly",
+        "weekly",
+        "monthly",
+        "quarterly_or_less",
+        "unknown"
+      ]
+    },
+    "current_solution": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "current_cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "currency",
+        "amount",
+        "period",
+        "notes"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "measured",
+            "estimated_by_customer",
+            "unknown"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        },
+        "amount": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "period": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "event",
+            "week",
+            "month",
+            "year",
+            null
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical",
+        "unknown"
+      ]
+    },
+    "urgency": {
+      "type": "string",
+      "enum": [
+        "none",
+        "this_quarter",
+        "this_month",
+        "this_week",
+        "immediate",
+        "unknown"
+      ]
+    },
+    "alternatives_tried": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "maxLength": 240
+      }
+    },
+    "decision_process": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "budget_signal": {
+      "type": "string",
+      "enum": [
+        "none",
+        "hypothetical",
+        "prior_spend",
+        "budget_range_shared",
+        "procurement_requested",
+        "unknown"
+      ]
+    },
+    "willingness_to_pay_signal": {
+      "type": "string",
+      "enum": [
+        "weak",
+        "moderate",
+        "strong_unpaid",
+        "paid",
+        "unknown"
+      ]
+    },
+    "objections": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "maxLength": 240
+      }
+    },
+    "desired_outcome": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "follow_up": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "behavioral_commitments": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "maxLength": 240
+      }
+    },
+    "price_discussed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "currency",
+        "amount"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "not_discussed",
+            "quoted",
+            "countered",
+            "accepted",
+            "rejected"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 3
+        },
+        "amount": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "evidence_level": {
+      "type": "string",
+      "enum": [
+        "HYPOTHESIS",
+        "QUALITATIVE_EVIDENCE",
+        "BEHAVIORAL_EVIDENCE",
+        "PAID_EVIDENCE",
+        "RETENTION_EVIDENCE",
+        "ECONOMIC_EVIDENCE",
+        "SCALE_EVIDENCE"
+      ]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "contains_raw_transcript": {
+      "const": false
+    },
+    "contains_personal_identifiers": {
+      "const": false
+    },
+    "contains_secrets": {
+      "const": false
+    }
+  }
+}
