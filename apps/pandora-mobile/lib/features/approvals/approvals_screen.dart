@@ -152,7 +152,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
   @override
   Widget build(BuildContext context) => PandoraPage(
         title: 'Approvals',
-        subtitle: 'Decide with target, risk, proof, and recovery in view.',
+        subtitle: 'Decide with target, risk, cost, proof, and recovery in view.',
         actions: [
           IconButton(
             tooltip: 'Refresh Approvals',
@@ -320,6 +320,16 @@ class _ApprovalCard extends StatelessWidget {
                   tone: PandoraStatusTone.informative,
                   compact: true,
                 ),
+              StatusBadge(
+                label: 'Environment not verified',
+                tone: PandoraStatusTone.attention,
+                compact: true,
+              ),
+              StatusBadge(
+                label: 'Cost impact not verified',
+                tone: PandoraStatusTone.attention,
+                compact: true,
+              ),
               StatusBadge(
                 label: approval.reversible
                     ? 'Recovery recorded'
