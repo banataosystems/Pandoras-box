@@ -27,7 +27,10 @@ class PandoraConfig {
     defaultValue: '2270b266-59da-4c39-bfd9-9f8d08352af0',
   );
 
-  static const appVersion = '0.2.0+3';
+  static const appVersion = '0.3.0-rc.1+4';
+  static const releaseLabel = '0.3.0-rc.1 Owner Test';
+  static const artifactClass = 'Owner Test — Android debug signed';
+  static const productionRelease = false;
 
   static const sourceRevision = String.fromEnvironment(
     'PANDORA_SOURCE_REVISION',
