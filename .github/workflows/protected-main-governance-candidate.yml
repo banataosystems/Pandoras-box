@@ -1,0 +1,224 @@
+name: Protected main governance candidate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: protected-main-candidate-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  governance-contract:
+    name: Governance source contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Assert exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+
+      - name: Validate governance source with independent test modules
+        run: >-
+          node --test
+          test/github-governance-contract.test.js
+          test/github-governance-provider.test.js
+          test/trusted-governance-validator.test.js
+
+      - name: Prove raw-provider validator rejects adversarial state
+        run: node scripts/check-github-governance-provider.mjs --self-test
+
+  core-proof:
+    name: Core source proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Assert exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24.x"
+
+      - name: Install exact locked dependencies
+        run: npm ci --no-fund
+
+      - name: Typecheck and source checks
+        run: npm run check
+
+      - name: Full regression suite
+        run: npm test
+
+  dependency-advisory:
+    name: Informational production dependency audit
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24.x"
+
+      - name: Install exact locked dependencies
+        run: npm ci --no-fund
+
+      - name: Audit production dependencies without controlling mergeability
+        run: npm audit --omit=dev --audit-level=high
+
+  mobile-proof:
+    name: Mobile source proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Assert exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+
+      - name: Detect mobile-critical changes
+        id: mobile
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          BEFORE_SHA: ${{ github.event.before || '' }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            range="${BASE_SHA}...${EXPECTED_HEAD}"
+          elif [[ -n "${BEFORE_SHA}" && "${BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
+            range="${BEFORE_SHA}..${EXPECTED_HEAD}"
+          else
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git diff --name-only "$range" > "$RUNNER_TEMP/changed-files.txt"
+          cat "$RUNNER_TEMP/changed-files.txt"
+          if grep -Eq '^(apps/pandora-mobile/|assets/brand/pandoras-box/product-mark/|scripts/verify-pandora-brand-assets\.mjs$|\.github/workflows/pandora-mobile-integration\.yml$)' "$RUNNER_TEMP/changed-files.txt"; then
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "mobile=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify approved brand assets
+        if: steps.mobile.outputs.mobile == 'true'
+        run: node scripts/verify-pandora-brand-assets.mjs
+
+      - name: Install pinned Flutter
+        if: steps.mobile.outputs.mobile == 'true'
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.47.0"
+          cache: false
+
+      - name: Materialize disposable Flutter platforms
+        if: steps.mobile.outputs.mobile == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .pandora-mobile-build
+          mkdir .pandora-mobile-build
+          cd .pandora-mobile-build
+          flutter create --platforms=android,web --org com.banataosystems --project-name pandora_mobile .
+          cp -R ../apps/pandora-mobile/platform/android/. ./android/
+          rm -rf lib test assets pubspec.yaml pubspec.lock analysis_options.yaml
+          cp -R ../apps/pandora-mobile/lib ./lib
+          cp -R ../apps/pandora-mobile/test ./test
+          cp -R ../apps/pandora-mobile/assets ./assets
+          cp -R ../apps/pandora-mobile/platform ./platform
+          cp ../apps/pandora-mobile/pubspec.yaml ./pubspec.yaml
+          cp ../apps/pandora-mobile/analysis_options.yaml ./analysis_options.yaml
+          test -f ../apps/pandora-mobile/pubspec.lock
+          cp ../apps/pandora-mobile/pubspec.lock ./pubspec.lock
+
+      - name: Resolve exact mobile dependencies
+        if: steps.mobile.outputs.mobile == 'true'
+        working-directory: .pandora-mobile-build
+        run: |
+          set -euo pipefail
+          cp pubspec.lock pubspec.lock.expected
+          flutter pub get --enforce-lockfile
+          cmp pubspec.lock.expected pubspec.lock
+
+      - name: Format, analyze, and test mobile source
+        if: steps.mobile.outputs.mobile == 'true'
+        working-directory: .pandora-mobile-build
+        run: |
+          set -euo pipefail
+          dart format --output=none --set-exit-if-changed lib test
+          flutter analyze
+          flutter test --reporter expanded
+
+      - name: Build mobile web and Android debug proofs
+        if: steps.mobile.outputs.mobile == 'true'
+        working-directory: .pandora-mobile-build
+        run: |
+          set -euo pipefail
+          flutter build web --release --dart-define=PANDORA_SOURCE_REVISION=${EXPECTED_HEAD}
+          flutter build apk --debug --dart-define=PANDORA_SOURCE_REVISION=${EXPECTED_HEAD}
+
+  required:
+    name: Governance candidate exact-head proof
+    if: always()
+    needs:
+      - governance-contract
+      - core-proof
+      - mobile-proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every deterministic exact-head proof
+        shell: bash
+        env:
+          GOVERNANCE_RESULT: ${{ needs.governance-contract.result }}
+          CORE_RESULT: ${{ needs.core-proof.result }}
+          MOBILE_RESULT: ${{ needs.mobile-proof.result }}
+        run: |
+          set -euo pipefail
+          test "$GOVERNANCE_RESULT" = "success"
+          test "$CORE_RESULT" = "success"
+          test "$MOBILE_RESULT" = "success"

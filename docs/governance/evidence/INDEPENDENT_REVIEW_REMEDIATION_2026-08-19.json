@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0.0",
+  "observed_at": "2026-08-18T21:53:48Z",
+  "repository": "banataosystems/Pandoras-box",
+  "pull_request": 57,
+  "reviewed_head": "103c08338b1cf9a7216b8323c160f3dd8da30476",
+  "reviewed_tree": "131d9ab3aea5e6358663b9f5d3fac9b825494bec",
+  "review_id": "PRR_kwDOTxRJPc8AAAABKACv4A",
+  "review_event": "COMMENTED",
+  "reviewer_model": "Claude Opus 5",
+  "reviewer_vendor": "Anthropic",
+  "qualifying_github_approval": false,
+  "verdict": "FAIL",
+  "provider_application_performed": false,
+  "blocking_findings": [
+    {
+      "id": "F1",
+      "severity": "HIGH",
+      "finding": "Bypass validation used a nonexistent normalized field and defaulted absence to empty.",
+      "remediation": "Raw pull-request review protection is now required; bypass allowances must be present and all users, teams, and apps empty. Missing data fails. Personal-repository dismissal capability is explicitly modeled and nonempty actors fail."
+    },
+    {
+      "id": "F2",
+      "severity": "HIGH",
+      "finding": "The validator accepted a hand-built normalized document and did not fetch GitHub.",
+      "remediation": "The provider tool now fetches bounded raw endpoints, preserves a content-hashed raw envelope, validates endpoint provenance, normalizes real provider wrappers, and rejects manual normalized input as evidence."
+    },
+    {
+      "id": "F3",
+      "severity": "HIGH",
+      "finding": "One required approval was operationally impossible with only the author identity verified.",
+      "remediation": "The reviewer registry is truthfully empty, provider application is explicitly blocked, and provider validation requires a non-owner qualifying collaborator before application."
+    },
+    {
+      "id": "F4",
+      "severity": "MEDIUM",
+      "finding": "The required check used a context string without an App binding.",
+      "remediation": "The payload now uses checks with GitHub Actions App ID 15368, and raw check-run App identity must be read back on an exact-head test PR before application."
+    },
+    {
+      "id": "F5",
+      "severity": "MEDIUM",
+      "finding": "The candidate defined the workflow and tests that claimed to gate itself.",
+      "remediation": "Candidate proof and trusted gate are separated. Default-branch trusted code never executes PR source and posts an app-bound custom check directly to the exact head after validating workflow identity and exact-head review evidence."
+    },
+    {
+      "id": "F6",
+      "severity": "MEDIUM",
+      "finding": "Current main contains write-capable recovery workflows inconsistent with the claimed posture.",
+      "remediation": "Exact workflows and blobs are inventoried as a blocking active-lane dependency. Worker 3 does not edit PR #53-owned paths; provider application cannot proceed until reviewed remediation lands and this branch is rebased."
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "id": "F7",
+      "remediation": "Both governance modules now have explicit entry-point guards and are import-testable."
+    },
+    {
+      "id": "F8",
+      "remediation": "Provider validation now covers lock_branch, allow_fork_syncing, block_creations, restrictions, CODEOWNER review setting, and bypass actors."
+    },
+    {
+      "id": "F9",
+      "remediation": "Live cross-lane heads are no longer embedded as current claims in policy documentation; timestamped evidence remains historical."
+    },
+    {
+      "id": "F10",
+      "remediation": "Dependency audit remains visible but is no longer part of the deterministic required aggregate."
+    }
+  ],
+  "new_source_tests": {
+    "governance_contract_cases": 14,
+    "provider_module_cases": 12,
+    "trusted_evaluator_cases": 8,
+    "total_local_cases": 34,
+    "provider_self_test_cases": 12,
+    "local_result": "PASS"
+  },
+  "remaining_gates": [
+    "fresh exact-head GitHub CI",
+    "fresh independent review of the remediated head",
+    "provider-verified second reviewer",
+    "active-lane recovery workflow resolution",
+    "production-sensitive source landing authorization",
+    "trusted check bootstrap test",
+    "fresh Administration-read provider capture",
+    "new reviewed provider mutation plan",
+    "provider readback and behavior verification"
+  ],
+  "additional_internal_findings": [
+    {
+      "id": "I1",
+      "severity": "HIGH",
+      "finding": "A trusted workflow triggered by review or workflow-run events cannot assume github.sha is the default-branch commit.",
+      "remediation": "The workflow now resolves the repository default branch at run start, records the exact checked-out SHA, and fails if that SHA equals the candidate head."
+    },
+    {
+      "id": "I2",
+      "severity": "HIGH",
+      "finding": "The first provider-capture design incorrectly required the harmless test-PR head to equal the current main SHA.",
+      "remediation": "Current main and the test-PR check head are normalized and validated independently; regression coverage proves they may differ."
+    },
+    {
+      "id": "I3",
+      "severity": "HIGH",
+      "finding": "Reviewer capacity alone did not prove the source-controlled reviewer registry matched a qualifying provider identity.",
+      "remediation": "Provider validation now requires an open, timestamped registry and exact membership in GitHub’s qualifying non-owner collaborator set."
+    }
+  ]
+}

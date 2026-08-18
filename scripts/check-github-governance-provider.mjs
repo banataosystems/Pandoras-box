@@ -1,181 +1,94 @@
 #!/usr/bin/env node
-import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  buildCaptureEnvelope,
+  endpointUrls,
+  readDefaultPolicy,
+  sha256,
+} from "./github-governance-provider-model.mjs";
+import { validateProviderCapture } from "./github-governance-provider-validation.mjs";
+export * from "./github-governance-provider-model.mjs";
+export * from "./github-governance-provider-validation.mjs";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const policy = JSON.parse(
-  fs.readFileSync(path.join(ROOT, ".github/governance/main-policy.json"), "utf8"),
-);
+const THIS_FILE = fileURLToPath(import.meta.url);
+const ROOT = path.resolve(path.dirname(THIS_FILE), "..");
+const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 
-function requireEqual(actual, expected, label, errors) {
-  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-    errors.push(`${label} drifted`);
-  }
-}
-
-export function validateProviderCapture(capture, options = {}) {
-  const errors = [];
-  const maxAgeMs = options.maxAgeMs ?? 60 * 60 * 1000;
-  const nowMs = options.nowMs ?? Date.now();
-
-  if (capture.schema_version !== "1.0.0") {
-    errors.push("capture schema_version must be 1.0.0");
-  }
-  requireEqual(capture.repository?.full_name, policy.repository.full_name, "repository", errors);
-  requireEqual(capture.repository?.repository_id, policy.repository.repository_id, "repository_id", errors);
-  requireEqual(capture.repository?.default_branch, policy.repository.default_branch, "default_branch", errors);
-
-  const observedMs = Date.parse(capture.observed_at ?? "");
-  if (!Number.isFinite(observedMs)) {
-    errors.push("observed_at is invalid");
-  } else if (observedMs > nowMs + 5 * 60 * 1000) {
-    errors.push("observed_at is in the future");
-  } else if (nowMs - observedMs > maxAgeMs) {
-    errors.push("provider capture is stale");
-  }
-
-  if (capture.main?.protected !== true) {
-    errors.push("main is not provider-protected");
-  }
-
-  const expectedContexts = policy.status_checks.required_contexts.map(
-    ({ context }) => context,
-  );
-  requireEqual(capture.protection?.required_status_checks?.strict, true, "strict status checks", errors);
-  requireEqual(
-    capture.protection?.required_status_checks?.contexts,
-    expectedContexts,
-    "required status contexts",
-    errors,
-  );
-  requireEqual(capture.protection?.enforce_admins, true, "administrator enforcement", errors);
-  requireEqual(
-    capture.protection?.required_pull_request_reviews?.required_approving_review_count,
-    1,
-    "approval count",
-    errors,
-  );
-  requireEqual(
-    capture.protection?.required_pull_request_reviews?.dismiss_stale_reviews,
-    true,
-    "stale review dismissal",
-    errors,
-  );
-  requireEqual(
-    capture.protection?.required_pull_request_reviews?.require_last_push_approval,
-    true,
-    "latest-push approval",
-    errors,
-  );
-  requireEqual(
-    capture.protection?.required_conversation_resolution,
-    true,
-    "conversation resolution",
-    errors,
-  );
-  requireEqual(capture.protection?.required_linear_history, true, "linear history", errors);
-  requireEqual(capture.protection?.allow_force_pushes, false, "force-push policy", errors);
-  requireEqual(capture.protection?.allow_deletions, false, "branch-deletion policy", errors);
-  requireEqual(capture.protection?.bypass_actors ?? [], [], "bypass actors", errors);
-
-  requireEqual(
-    capture.repository_settings,
-    policy.repository_settings,
-    "repository merge settings",
-    errors,
-  );
-  requireEqual(capture.actions, policy.actions, "Actions default permissions", errors);
-
-  return errors;
-}
-
-function goodCapture(now) {
-  return {
-    schema_version: "1.0.0",
-    observed_at: now,
-    repository: {
-      full_name: policy.repository.full_name,
-      repository_id: policy.repository.repository_id,
-      default_branch: policy.repository.default_branch,
+async function fetchJson(url, token, apiVersion) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`,
+      "X-GitHub-Api-Version": apiVersion, "User-Agent": "pandora-protected-main-provider-audit",
     },
-    main: { protected: true },
-    protection: {
-      required_status_checks: {
-        strict: true,
-        contexts: policy.status_checks.required_contexts.map(({ context }) => context),
-      },
-      enforce_admins: true,
-      required_pull_request_reviews: {
-        required_approving_review_count: 1,
-        dismiss_stale_reviews: true,
-        require_last_push_approval: true,
-      },
-      required_conversation_resolution: true,
-      required_linear_history: true,
-      allow_force_pushes: false,
-      allow_deletions: false,
-      bypass_actors: [],
-    },
-    repository_settings: policy.repository_settings,
-    actions: policy.actions,
-  };
+  });
+  const text = await response.text();
+  let responseBody;
+  try { responseBody = text ? JSON.parse(text) : null; }
+  catch { responseBody = { non_json_response_sha256: sha256(text), byte_length: Buffer.byteLength(text) }; }
+  return { request: { method: "GET", url }, response: { status: response.status, body: responseBody } };
 }
 
-function runSelfTest() {
-  const nowMs = Date.parse("2026-08-18T21:36:19Z");
-  const now = new Date(nowMs).toISOString();
-  assert.deepEqual(validateProviderCapture(goodCapture(now), { nowMs }), []);
-
-  const mutations = [
-    ["unprotected main", (capture) => { capture.main.protected = false; }],
-    ["missing check", (capture) => { capture.protection.required_status_checks.contexts = []; }],
-    ["non-strict checks", (capture) => { capture.protection.required_status_checks.strict = false; }],
-    ["zero approvals", (capture) => { capture.protection.required_pull_request_reviews.required_approving_review_count = 0; }],
-    ["stale approvals retained", (capture) => { capture.protection.required_pull_request_reviews.dismiss_stale_reviews = false; }],
-    ["last-push approval disabled", (capture) => { capture.protection.required_pull_request_reviews.require_last_push_approval = false; }],
-    ["admin bypass", (capture) => { capture.protection.enforce_admins = false; }],
-    ["force pushes", (capture) => { capture.protection.allow_force_pushes = true; }],
-    ["branch deletion", (capture) => { capture.protection.allow_deletions = true; }],
-    ["merge commit enabled", (capture) => { capture.repository_settings.allow_merge_commit = true; }],
-    ["Actions write default", (capture) => { capture.actions.default_workflow_permissions = "write"; }],
-    ["bypass actor added", (capture) => { capture.protection.bypass_actors = ["RepositoryRole:admin"]; }],
-  ];
-
-  for (const [name, mutate] of mutations) {
-    const capture = structuredClone(goodCapture(now));
-    mutate(capture);
-    assert.ok(
-      validateProviderCapture(capture, { nowMs }).length > 0,
-      `${name} must be rejected`,
-    );
-  }
-
-  const stale = goodCapture("2026-08-18T19:00:00Z");
-  assert.ok(validateProviderCapture(stale, { nowMs }).includes("provider capture is stale"));
-  console.log(`Provider-drift self-test passed: ${mutations.length + 2} cases`);
+export async function fetchProviderCapture({ token, outputDir, headSha, policy = readDefaultPolicy() }) {
+  if (!token) throw new Error("GITHUB_ADMIN_READ_TOKEN or GH_TOKEN is required");
+  if (!/^[0-9a-f]{40}$/.test(headSha ?? "")) throw new Error("--head-sha must be a full 40-hex SHA");
+  const entries = await Promise.all(Object.entries(endpointUrls(policy, headSha)).map(async ([name, url]) =>
+    [name, await fetchJson(url, token, policy.provider_capture.api_version)]));
+  const envelope = buildCaptureEnvelope({
+    observed_at: new Date().toISOString(), api_version: policy.provider_capture.api_version,
+    repository: policy.repository.full_name, head_sha: headSha, endpoints: Object.fromEntries(entries),
+  });
+  fs.mkdirSync(outputDir, { recursive: true });
+  const rawPath = path.join(outputDir, "github-governance-provider-raw.json");
+  fs.writeFileSync(rawPath, `${JSON.stringify(envelope, null, 2)}\n`);
+  const result = validateProviderCapture(envelope, policy);
+  const normalizedPath = path.join(outputDir, "github-governance-provider-normalized.json");
+  const reportPath = path.join(outputDir, "github-governance-provider-report.json");
+  fs.writeFileSync(normalizedPath, `${JSON.stringify(result.normalized, null, 2)}\n`);
+  fs.writeFileSync(reportPath, `${JSON.stringify({ errors: result.errors }, null, 2)}\n`);
+  return { envelope, ...result, rawPath, normalizedPath, reportPath };
 }
 
-if (process.argv.includes("--self-test")) {
-  runSelfTest();
-} else {
-  const capturePath = process.argv[2];
-  if (!capturePath) {
-    console.error(
-      "Usage: node scripts/check-github-governance-provider.mjs <fresh-provider-capture.json>",
-    );
-    process.exit(2);
-  }
+export function runSelfTest() {
+  const result = spawnSync(process.execPath, ["--test", path.join(ROOT, "test/github-governance-provider.test.js")], {
+    cwd: ROOT, stdio: "inherit",
+  });
+  if (result.status !== 0) throw new Error(`Provider capture self-test failed with status ${result.status}`);
+  console.log("Provider capture self-test passed through the independent provider test module.");
+}
 
-  const capture = JSON.parse(fs.readFileSync(path.resolve(capturePath), "utf8"));
-  const errors = validateProviderCapture(capture);
-  if (errors.length) {
-    console.error("GitHub governance provider drift detected:");
-    for (const error of errors) console.error(`- ${error}`);
-    process.exit(1);
+async function main() {
+  const args = process.argv.slice(2);
+  if (args.includes("--self-test")) return runSelfTest();
+  if (args[0] === "--fetch") {
+    const headIndex = args.indexOf("--head-sha");
+    const result = await fetchProviderCapture({
+      token: process.env.GITHUB_ADMIN_READ_TOKEN ?? process.env.GH_TOKEN,
+      outputDir: args[1], headSha: headIndex >= 0 ? args[headIndex + 1] : null,
+    });
+    if (result.errors.length) {
+      console.error("GitHub governance provider drift or bootstrap block detected:");
+      for (const error of result.errors) console.error(`- ${error}`);
+      process.exitCode = 1;
+    } else console.log(`Provider capture matches policy: ${result.rawPath}`);
+    return;
   }
+  if (args[0] === "--validate") {
+    if (!args[1]) throw new Error("Usage: --validate <raw-provider-capture.json>");
+    const result = validateProviderCapture(readJson(path.resolve(args[1])));
+    if (result.errors.length) {
+      console.error("GitHub governance provider drift or bootstrap block detected:");
+      for (const error of result.errors) console.error(`- ${error}`);
+      process.exitCode = 1;
+    } else console.log("Raw GitHub provider capture matches policy.");
+    return;
+  }
+  throw new Error("Usage: --self-test | --fetch <dir> --head-sha <sha> | --validate <raw-capture.json>");
+}
 
-  console.log("GitHub governance provider capture matches policy.");
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(THIS_FILE)) {
+  main().catch((error) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 2; });
 }
