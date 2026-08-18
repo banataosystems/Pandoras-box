@@ -54,7 +54,9 @@ function failureEnvelope(input) {
     schemaVersion: FAILURE_SCHEMA_VERSION,
     provider: FAILURE_PROVIDER,
     operation: FAILURE_OPERATION,
-    summary: input.summary || "Pandora Memory evidence submission failed",
+    summary: input.summary || (Number.isInteger(input.httpStatus)
+      ? `Pandora Memory candidate submission failed (${input.httpStatus})`
+      : "Pandora Memory candidate submission failed"),
     httpStatus: Number.isInteger(input.httpStatus) ? input.httpStatus : null,
     safeErrorCode: input.safeErrorCode,
     validationCategory: input.validationCategory,
