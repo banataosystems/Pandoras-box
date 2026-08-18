@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   verify:
@@ -38,6 +39,18 @@ jobs:
       OWNER_TEST_FILENAME: pandora-mobile-0.3.0-rc.1-owner-test.apk
       EXPECTED_APP_VERSION: 0.3.0-rc.1+4
     steps:
+      - name: Register exact-head evidence run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${SOURCE_SHA}" \
+            -f state='pending' \
+            -f context='Pandora Mobile exact-head' \
+            -f description='Owner-test verification is running.' \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
       - name: Check out exact source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -290,3 +303,31 @@ jobs:
             .pandora-mobile-build/android-package-evidence
           if-no-files-found: error
           include-hidden-files: true
+      - name: Publish exact-head verdict
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          case "$JOB_STATUS" in
+            success)
+              state='success'
+              description='Owner-test format, analysis, tests, visuals, web, and Android passed.'
+              ;;
+            failure)
+              state='failure'
+              description='Owner-test verification failed. Open the exact run for evidence.'
+              ;;
+            *)
+              state='error'
+              description='Owner-test verification did not complete.'
+              ;;
+          esac
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${SOURCE_SHA}" \
+            -f state="$state" \
+            -f context='Pandora Mobile exact-head' \
+            -f description="$description" \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
