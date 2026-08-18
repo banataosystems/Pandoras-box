@@ -78,13 +78,13 @@ class _FixtureRepository implements PandoraRepository {
   }
 
   RepositorySnapshot<T> _snapshot<T>(T data) => RepositorySnapshot<T>(
-    data: data,
-    source: RepositorySource.network,
-    fetchedAt: _verifiedAt,
-    verifiedAt: _verifiedAt,
-    staleAfter: _staleAfter,
-    requestId: 'visual-evidence-fixture',
-  );
+        data: data,
+        source: RepositorySource.network,
+        fetchedAt: _verifiedAt,
+        verifiedAt: _verifiedAt,
+        staleAfter: _staleAfter,
+        requestId: 'visual-evidence-fixture',
+      );
 
   List<T> _list<T>(String name, T Function(Object?) parse) =>
       asJsonList(_read(name)).map(parse).toList(growable: false);
@@ -160,7 +160,8 @@ class _FixtureRepository implements PandoraRepository {
     required String message,
     String? projectId,
     String? idempotencyKey,
-  }) => throw UnimplementedError('Visual evidence never performs mutations.');
+  }) =>
+      throw UnimplementedError('Visual evidence never performs mutations.');
 
   @override
   Future<IntakeReceipt> runAction({
@@ -168,14 +169,16 @@ class _FixtureRepository implements PandoraRepository {
     String? projectId,
     String? message,
     String? idempotencyKey,
-  }) => throw UnimplementedError('Visual evidence never performs mutations.');
+  }) =>
+      throw UnimplementedError('Visual evidence never performs mutations.');
 
   @override
   Future<ApprovalDecisionResult> decideApproval({
     required String approvalId,
     required ApprovalDecision decision,
     String reason = '',
-  }) => throw UnimplementedError('Visual evidence never performs mutations.');
+  }) =>
+      throw UnimplementedError('Visual evidence never performs mutations.');
 
   @override
   void clearReadOnlyCache() {}

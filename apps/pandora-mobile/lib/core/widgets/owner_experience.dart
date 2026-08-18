@@ -36,13 +36,13 @@ class OwnerBriefingHero extends StatelessWidget {
       PandoraStatusTone.attention => (palette.attention, palette.onAttention),
       PandoraStatusTone.critical => (palette.critical, palette.onCritical),
       PandoraStatusTone.informative => (
-        palette.informative,
-        palette.onInformative,
-      ),
+          palette.informative,
+          palette.onInformative,
+        ),
       PandoraStatusTone.neutral => (
-        scheme.surfaceContainerHighest,
-        scheme.onSurfaceVariant,
-      ),
+          scheme.surfaceContainerHighest,
+          scheme.onSurfaceVariant,
+        ),
     };
 
     return Semantics(
@@ -73,17 +73,19 @@ class OwnerBriefingHero extends StatelessWidget {
                       children: [
                         Text(
                           eyebrow.toUpperCase(),
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.9,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.9,
+                                  ),
                         ),
                         const SizedBox(height: PandoraSpacing.xxs),
                         Text(
                           title,
-                          style: Theme.of(context).textTheme.headlineSmall
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
                               ?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: -0.4,
@@ -178,8 +180,8 @@ class OwnerMetricGrid extends StatelessWidget {
                 final maximumColumns = constraints.maxWidth >= 560
                     ? 4
                     : metrics.length == 4
-                    ? 2
-                    : 3;
+                        ? 2
+                        : 3;
                 final columns = metrics.length < maximumColumns
                     ? metrics.length
                     : maximumColumns;
@@ -251,16 +253,18 @@ class _MetricCell extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.4,
-                  ),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.4,
+                      ),
                 ),
                 const SizedBox(height: PandoraSpacing.xxs),
                 Text(
                   metric.label,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
                       ?.copyWith(color: scheme.onSurfaceVariant),
                 ),
               ],
@@ -286,34 +290,35 @@ class OwnerSectionHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Semantics(
-              header: true,
-              child: Text(title, style: Theme.of(context).textTheme.titleLarge),
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: PandoraSpacing.xxs),
-              Text(
-                subtitle!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(title,
+                      style: Theme.of(context).textTheme.titleLarge),
                 ),
-              ),
-            ],
+                if (subtitle != null) ...[
+                  const SizedBox(height: PandoraSpacing.xxs),
+                  Text(
+                    subtitle!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: PandoraSpacing.sm),
+            trailing!,
           ],
-        ),
-      ),
-      if (trailing != null) ...[
-        const SizedBox(width: PandoraSpacing.sm),
-        trailing!,
-      ],
-    ],
-  );
+        ],
+      );
 }
 
 class OwnerSignal extends StatelessWidget {
@@ -361,9 +366,9 @@ class OwnerSignal extends StatelessWidget {
                 Text(
                   label,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
-                  ),
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
                 const SizedBox(height: PandoraSpacing.xxs),
                 Text(value),

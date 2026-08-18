@@ -45,10 +45,10 @@ class FakeRepository implements PandoraRepository {
   bool failing = false;
 
   RepositorySnapshot<T> _snapshot<T>(T data) => RepositorySnapshot<T>(
-    data: data,
-    source: RepositorySource.network,
-    fetchedAt: DateTime.utc(2026, 8, 14),
-  );
+        data: data,
+        source: RepositorySource.network,
+        fetchedAt: DateTime.utc(2026, 8, 14),
+      );
 
   void _guard() {
     if (failing) {
@@ -151,14 +151,16 @@ class FakeRepository implements PandoraRepository {
     required String message,
     String? projectId,
     String? idempotencyKey,
-  }) => throw UnimplementedError();
+  }) =>
+      throw UnimplementedError();
 
   @override
   Future<ApprovalDecisionResult> decideApproval({
     required String approvalId,
     required ApprovalDecision decision,
     String reason = '',
-  }) => throw UnimplementedError();
+  }) =>
+      throw UnimplementedError();
 
   @override
   Future<IntakeReceipt> runAction({
@@ -166,7 +168,8 @@ class FakeRepository implements PandoraRepository {
     String? projectId,
     String? message,
     String? idempotencyKey,
-  }) => throw UnimplementedError();
+  }) =>
+      throw UnimplementedError();
 
   @override
   void clearReadOnlyCache() {}
