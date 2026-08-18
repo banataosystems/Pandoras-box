@@ -1,0 +1,147 @@
+{
+  "schema_version": "1.0.0",
+  "observed_at": "2026-08-18T21:36:19Z",
+  "lane": "PANDORA_WORKER_3_GITHUB_GOVERNANCE",
+  "authority": {
+    "pandora_memory_health": "healthy",
+    "pandora_memory_canonical_context": {
+      "degraded": true,
+      "freshest_approved_record_at": "2026-08-14T02:42:46.235Z",
+      "fallback_authority": "github_and_supabase"
+    },
+    "pandora_github_transport": {
+      "status": "failed",
+      "http_status": 502,
+      "classification": "upstream_external_service",
+      "sanitized": true
+    },
+    "direct_github": {
+      "status": "healthy",
+      "authenticated_login": "banataosystems",
+      "authenticated_user_id": 314296438
+    }
+  },
+  "repositories": [
+    {
+      "full_name": "banataosystems/Pandoras-box",
+      "repository_id": 1326729533,
+      "visibility": "public",
+      "default_branch": "main",
+      "main_sha": "c2cc635383b78d457d1731294a6f5b306d85f6be",
+      "main_tree_sha": "d6d848a1d87b0e9e5561fceba200c4cad05fb4e8",
+      "main_protected": false,
+      "required_status_checks": [],
+      "permissions": {
+        "admin": true,
+        "maintain": true,
+        "push": true,
+        "triage": true,
+        "pull": true
+      },
+      "merge_settings": {
+        "allow_merge_commit": true,
+        "allow_squash_merge": true,
+        "allow_rebase_merge": true,
+        "allow_auto_merge": false,
+        "allow_update_branch": false
+      },
+      "open_pull_requests": [
+        {
+          "number": 56,
+          "head": "f5d150a4ccbfdac7a86cecf62bd3de6a9bd73bea",
+          "branch": "fix/projectos-memory-supabase-contracts-20260819",
+          "draft": true,
+          "lane": "worker_1",
+          "exact_head_ci": "failed",
+          "workflow_run_id": 32187633349,
+          "job_id": 95874831688
+        },
+        {
+          "number": 53,
+          "head": "2a07efe69dd02cc94972860c1b8d21d952a8f265",
+          "branch": "integration/pandora-mobile-p1-current-main-20260819",
+          "draft": true,
+          "lane": "mobile_feature",
+          "exact_head_ci": "not_reclassified_by_worker_3"
+        }
+      ]
+    },
+    {
+      "full_name": "banataosystems/pandoras-box-memory",
+      "repository_id": 1327294429,
+      "visibility": "public",
+      "default_branch": "main",
+      "main_sha": "27a3db9c009b0f5282308588d6a9a8ef3cb7d416",
+      "main_tree_sha": "349d686418bcc4fd2d1bf933544146d72cb005d4",
+      "main_protected": false,
+      "required_status_checks": [],
+      "permissions": {
+        "admin": true,
+        "maintain": true,
+        "push": true,
+        "triage": true,
+        "pull": true
+      },
+      "merge_settings": {
+        "allow_merge_commit": true,
+        "allow_squash_merge": true,
+        "allow_rebase_merge": true,
+        "allow_auto_merge": false,
+        "allow_update_branch": false
+      },
+      "governance_candidate": {
+        "pull_request": 30,
+        "head": "d5c076762bc618dc16f246a2873bd23222f97b59",
+        "tree": "3a4e9e7dae07bcac479c77a2fef7b45a75bc160e",
+        "required_checks": [
+          {
+            "context": "Verify exact candidate source",
+            "run_id": 32110972880,
+            "job_id": 95630123519,
+            "conclusion": "success"
+          },
+          {
+            "context": "Validate exact-head evidence registry",
+            "run_id": 32110972855,
+            "job_id": 95630123294,
+            "conclusion": "success"
+          },
+          {
+            "context": "no-literal-secrets",
+            "run_id": 32110972810,
+            "job_id": 95630123161,
+            "conclusion": "success"
+          },
+          {
+            "context": "Prove same-owner cross-namespace denial",
+            "run_id": 32110972920,
+            "job_id": 95630123559,
+            "conclusion": "success"
+          }
+        ],
+        "qualifying_independent_approval": false,
+        "provider_applied": false
+      }
+    }
+  ],
+  "release_coupling": {
+    "classification": "release_sensitive_until_worker_4_proves_otherwise",
+    "evidence": [
+      "Pandoras-box PR #56 explicitly records automatic Vercel production deployment from main",
+      "the exact PR head reports a Vercel status"
+    ],
+    "production_release_triggered_by_this_lane": false
+  },
+  "proof_state": {
+    "documented": true,
+    "implemented": false,
+    "tested": false,
+    "provider_applied": false,
+    "production_verified": false
+  },
+  "limitations": [
+    "Detailed ruleset and branch-protection objects were unavailable through the Pandora GitHub adapter because its bounded reads returned 502.",
+    "Direct GitHub branch readback proves both main branches are currently unprotected.",
+    "No independent reviewer identity is currently recorded for either governance candidate."
+  ]
+}
