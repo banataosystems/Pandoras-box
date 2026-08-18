@@ -1,0 +1,70 @@
+name: Pandora mobile resolved-package formatter
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pandora-mobile-resolved-format-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  format-resolved-mobile-package:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Check out exact source without stored credentials
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - name: Verify exact source checkout
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+      - name: Resolve locked mobile package
+        working-directory: apps/pandora-mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp pubspec.lock pubspec.lock.expected
+          flutter pub get --enforce-lockfile
+          cmp pubspec.lock.expected pubspec.lock
+      - name: Format under the declared package language version
+        working-directory: apps/pandora-mobile
+        run: dart format lib test
+      - name: Commit only resolved formatter output
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(git diff --name-only)
+          for path in "${changed[@]}"; do
+            case "$path" in
+              apps/pandora-mobile/lib/*.dart|apps/pandora-mobile/lib/**/*.dart|apps/pandora-mobile/test/*.dart|apps/pandora-mobile/test/**/*.dart) ;;
+              *)
+                echo "Unexpected formatter change: $path" >&2
+                exit 1
+                ;;
+            esac
+          done
+          git add apps/pandora-mobile/lib apps/pandora-mobile/test
+          if git diff --cached --quiet; then
+            echo 'Resolved mobile package is already formatted.'
+            exit 0
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git config user.name 'pandora-mobile-worker[bot]'
+          git config user.email 'pandora-mobile-worker[bot]@users.noreply.github.com'
+          git commit -m 'style(mobile): format under resolved package language version'
+          git push \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:${HEAD_BRANCH}"
