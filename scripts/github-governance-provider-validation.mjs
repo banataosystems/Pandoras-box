@@ -16,8 +16,18 @@ function requireEmptyActors(value, label, errors) {
   if (value.users.length || value.teams.length || value.apps.length) errors.push(`${label} contains bypass or dismissal actors`);
 }
 
-export function validateNormalizedProviderState(state, policy = readDefaultPolicy(), options = {}) {
-  const errors = [];
+const CONTROL_ENDPOINTS = [
+  "repository",
+  "branch",
+  "branch_protection",
+  "pull_request_review_protection",
+  "actions_permissions",
+  "workflow_permissions",
+  "rulesets",
+];
+const READINESS_ENDPOINTS = ["collaborators", "candidate_workflow", "trusted_workflow", "check_runs"];
+
+function validateCaptureFreshnessAndIdentity(state, policy, options, errors) {
   const now = options.nowMs ?? Date.now();
   const observed = Date.parse(state.observed_at ?? "");
   if (state.schema_version !== "2.0.0") errors.push("normalized schema_version must be 2.0.0");
@@ -25,15 +35,20 @@ export function validateNormalizedProviderState(state, policy = readDefaultPolic
   if (!Number.isFinite(observed)) errors.push("observed_at is invalid");
   else if (observed > now + 300000) errors.push("observed_at is in the future");
   else if (now - observed > (options.maxAgeMs ?? policy.provider_capture.max_age_ms)) errors.push("provider capture is stale");
-  for (const endpoint of policy.provider_capture.required_endpoints) {
-    if (state.endpoint_statuses?.[endpoint] !== 200) errors.push(`provider endpoint did not return 200: ${endpoint}`);
-  }
   requireSame(state.repository.id, policy.repository.repository_id, "repository id", errors);
   requireSame(state.repository.full_name, policy.repository.full_name, "repository full_name", errors);
   requireSame(state.repository.owner_type, policy.repository.owner_type, "repository owner type", errors);
   requireSame(state.repository.default_branch, policy.repository.default_branch, "default branch", errors);
   requireSame(state.main.name, policy.repository.default_branch, "protected branch name", errors);
   if (!/^[0-9a-f]{40}$/.test(state.main.sha ?? "")) errors.push("captured main SHA is invalid");
+}
+
+export function validateProviderControlState(state, policy = readDefaultPolicy(), options = {}) {
+  const errors = [];
+  validateCaptureFreshnessAndIdentity(state, policy, options, errors);
+  for (const endpoint of CONTROL_ENDPOINTS) {
+    if (state.endpoint_statuses?.[endpoint] !== 200) errors.push(`provider endpoint did not return 200: ${endpoint}`);
+  }
   requireSame(state.main.protected, true, "main protection", errors);
   const expectedChecks = policy.status_checks.required_checks.map(({ context, app_id }) => ({ context, app_id }));
   requireSame(state.protection.required_status_checks.strict, true, "strict status checks", errors);
@@ -74,6 +89,14 @@ export function validateNormalizedProviderState(state, policy = readDefaultPolic
   requireSame(state.actions.can_approve_pull_request_reviews, policy.actions.can_approve_pull_request_reviews, "Actions review approval permission", errors);
   if (!Array.isArray(state.rulesets)) errors.push("ruleset readback is malformed");
   else if (state.rulesets.some(({ enforcement }) => enforcement === "active")) errors.push("an active ruleset conflicts with classic branch protection authority");
+  return errors;
+}
+
+export function validateOperationalReadiness(state, policy = readDefaultPolicy(), options = {}) {
+  const errors = [];
+  for (const endpoint of READINESS_ENDPOINTS) {
+    if (state.endpoint_statuses?.[endpoint] !== 200) errors.push(`provider endpoint did not return 200: ${endpoint}`);
+  }
   const qualifyingNonOwner = state.collaborator_capacity.qualifying_non_owner_logins;
   if (!Array.isArray(qualifyingNonOwner) || qualifyingNonOwner.length < 1) {
     errors.push("no provider-verified non-owner qualifying reviewer exists");
@@ -115,6 +138,17 @@ export function validateNormalizedProviderState(state, policy = readDefaultPolic
   return errors;
 }
 
+export function validateNormalizedProviderState(state, policy = readDefaultPolicy(), options = {}) {
+  const phase = options.phase ?? policy.provider_capture.validation_phase ?? "steady_state";
+  if (!["provider_controls", "operational_readiness", "steady_state"].includes(phase)) {
+    return [`unknown governance validation phase: ${phase}`];
+  }
+  const errors = [];
+  if (phase !== "operational_readiness") errors.push(...validateProviderControlState(state, policy, options));
+  if (phase !== "provider_controls") errors.push(...validateOperationalReadiness(state, policy, options));
+  return errors;
+}
+
 export function validateProviderCapture(envelope, policy = readDefaultPolicy(), options = {}) {
   const errors = [...validateCaptureIntegrity(envelope), ...validateProvenance(envelope, policy)];
   if (errors.length) return { errors, normalized: null };
@@ -122,4 +156,3 @@ export function validateProviderCapture(envelope, policy = readDefaultPolicy(), 
   errors.push(...validateNormalizedProviderState(normalized, policy, options));
   return { errors, normalized };
 }
-

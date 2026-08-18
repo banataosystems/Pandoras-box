@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "lane": "Pandora Worker 3 — GitHub Governance / Protected Main / Merge Safety",
+  "superseded_reviewed_head": "103c08338b1cf9a7216b8323c160f3dd8da30476",
+  "reconciled_parent_head": "cabdc66b24c3a43dc60bb0019dd9fcb558a84892",
+  "review_verdict": "FAIL",
+  "findings_addressed": [
+    "real GitHub response-shape validation for enforce_admins and all enabled wrappers",
+    "explicit bypass_pull_request_allowances presence and empty users/teams/apps",
+    "provider-control validation separated from operational reviewer readiness",
+    "app-bound exact-head bootstrap check",
+    "legitimate independent no-bypass merge-path evaluator",
+    "adversarial regression coverage for self, stale, latest-pusher, pre-push, bypass, check-provenance, conversation, and branch-control failures"
+  ],
+  "provider_application_authorized_by_owner": true,
+  "merge_authorized": false,
+  "release_authorized": false,
+  "provider_application_target": "bounded bootstrap; steady-state trusted gate remains a later migration",
+  "proof_note": "Provider-applied is claimable only after GitHub readback. Valid-path production verification remains blocked until a real qualifying reviewer and harmless PR exercise the path."
+}
