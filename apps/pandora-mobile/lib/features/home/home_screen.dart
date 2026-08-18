@@ -173,6 +173,10 @@ class _HomeContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: PandoraSpacing.md),
+        // An unverified counter is shown as an em dash so it can never be read
+        // as a real value. The dash carries no meaning to a screen reader, so
+        // each cell states "not verified" explicitly, and an unverified counter
+        // never drives an attention tone.
         OwnerMetricGrid(
           metrics: [
             OwnerMetric(
@@ -180,9 +184,11 @@ class _HomeContent extends StatelessWidget {
               value:
                   summary.countersVerified ? '${summary.approvalCount}' : '—',
               icon: Icons.approval_outlined,
-              tone: summary.approvalCount > 0
+              tone: summary.countersVerified && summary.approvalCount > 0
                   ? PandoraStatusTone.attention
                   : PandoraStatusTone.neutral,
+              semanticLabel:
+                  summary.countersVerified ? null : 'Approvals: not verified',
             ),
             OwnerMetric(
               label: 'Active projects',
@@ -191,6 +197,9 @@ class _HomeContent extends StatelessWidget {
                   : '—',
               icon: Icons.workspaces_outline,
               tone: PandoraStatusTone.informative,
+              semanticLabel: summary.countersVerified
+                  ? null
+                  : 'Active projects: not verified',
             ),
             OwnerMetric(
               label: 'Needs attention',
@@ -198,9 +207,12 @@ class _HomeContent extends StatelessWidget {
                   ? '${summary.needsAttentionCount}'
                   : '—',
               icon: Icons.warning_amber_rounded,
-              tone: summary.needsAttentionCount > 0
+              tone: summary.countersVerified && summary.needsAttentionCount > 0
                   ? PandoraStatusTone.attention
                   : PandoraStatusTone.neutral,
+              semanticLabel: summary.countersVerified
+                  ? null
+                  : 'Needs attention: not verified',
             ),
           ],
         ),
