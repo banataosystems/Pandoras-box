@@ -54,6 +54,7 @@ function failureEnvelope(input) {
     schemaVersion: FAILURE_SCHEMA_VERSION,
     provider: FAILURE_PROVIDER,
     operation: FAILURE_OPERATION,
+    summary: input.summary || "Pandora Memory evidence submission failed",
     httpStatus: Number.isInteger(input.httpStatus) ? input.httpStatus : null,
     safeErrorCode: input.safeErrorCode,
     validationCategory: input.validationCategory,
@@ -83,6 +84,7 @@ class MemoryEvidenceIdempotencyConflictError extends MemoryEvidenceSubmissionErr
   constructor(input) {
     super({
       httpStatus: 409,
+      summary: "Pandora Memory candidate idempotency conflict",
       safeErrorCode: IDEMPOTENCY_CONFLICT_CODE,
       validationCategory: "idempotency",
       retryable: false,
@@ -358,6 +360,7 @@ function safeBackendFailure(status, body) {
 function submissionFailure(input) {
   return new MemoryEvidenceSubmissionError({
     httpStatus: input.httpStatus,
+    summary: input.summary,
     safeErrorCode: input.safeErrorCode,
     validationCategory: input.validationCategory,
     retryable: input.retryable,
@@ -482,30 +485,10 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
       });
     }
     if (body?.status !== "pending_review") {
-      throw submissionFailure({
-        httpStatus: response.status,
-        safeErrorCode: "response_contract_error",
-        validationCategory: "response_contract",
-        retryable: false,
-        correlationId: resolvedCorrelationId,
-        outerStatus: 502,
-      });
+      throw new Error("Pandora Memory candidate did not remain pending review");
     }
 
-    let binding;
-    try {
-      binding = assertBoundResponse(body, input);
-    } catch {
-      throw submissionFailure({
-        httpStatus: response.status,
-        safeErrorCode: "response_contract_error",
-        validationCategory: "response_contract",
-        retryable: false,
-        correlationId: resolvedCorrelationId,
-        outerStatus: 502,
-      });
-    }
-    const { canonicalProjectId, canonicalProjectKey } = binding;
+    const { canonicalProjectId, canonicalProjectKey } = assertBoundResponse(body, input);
 
     return {
       ok: true,
