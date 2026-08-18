@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Create a matte-free RGBA Pandora mark from the approved grayscale source.
+"""Create a deterministic, matte-free RGBA Pandora product mark.
 
-The checked-in UI source is an 8-bit, non-interlaced grayscale PNG with a
-white background. This script converts luminance into opacity, writes only
-IHDR/IDAT/IEND chunks, and therefore cannot preserve a white/black matte or a
-PNG background hint. It uses only Python's standard library so CI output does
-not depend on runner image packages.
+The approved mobile source is an 8-bit, non-interlaced grayscale PNG. Its
+outer edge establishes whether the unwanted matte is light or dark. This
+script turns distance from that edge luminance into opacity, writes only
+IHDR/IDAT/IEND chunks, and therefore cannot preserve a PNG background hint.
+It uses only Python's standard library so CI output is runner-independent.
 """
 
 from __future__ import annotations
@@ -138,24 +138,60 @@ def _chunk(chunk_type: bytes, payload: bytes) -> bytes:
     )
 
 
+def _edge_luminance(
+    width: int,
+    height: int,
+    grayscale_rows: list[bytes],
+) -> int:
+    band = max(1, min(16, min(width, height) // 32))
+    samples: list[int] = []
+    for row_index, row in enumerate(grayscale_rows):
+        if row_index < band or row_index >= height - band:
+            samples.extend(row)
+        else:
+            samples.extend(row[:band])
+            samples.extend(row[width - band :])
+    samples.sort()
+    return samples[len(samples) // 2]
+
+
+def _alpha_from_luminance(luminance: int, background: int) -> int:
+    if background < 128:
+        alpha = round(max(0, luminance - background) * 255 / max(1, 255 - background))
+    else:
+        alpha = round(max(0, background - luminance) * 255 / max(1, background))
+    if alpha <= 3:
+        return 0
+    if alpha >= 252:
+        return 255
+    return alpha
+
+
 def _write_transparent_png(
     path: Path,
     width: int,
     height: int,
     grayscale_rows: list[bytes],
 ) -> dict[str, int | str]:
+    background = _edge_luminance(width, height, grayscale_rows)
+    matte_mode = "dark" if background < 128 else "light"
+    foreground = 255 if matte_mode == "dark" else 0
+
     rgba = bytearray()
     transparent_pixels = 0
     visible_pixels = 0
     opaque_pixels = 0
     min_alpha = 255
     max_alpha = 0
+    edge_transparent_pixels = 0
+    edge_pixels = 0
+    edge_band = max(1, min(16, min(width, height) // 32))
 
-    for row in grayscale_rows:
+    for row_index, row in enumerate(grayscale_rows):
         rgba.append(0)  # deterministic PNG filter: None
-        for luminance in row:
-            alpha = 255 - luminance
-            rgba.extend((0, 0, 0, alpha))
+        for column_index, luminance in enumerate(row):
+            alpha = _alpha_from_luminance(luminance, background)
+            rgba.extend((foreground, foreground, foreground, alpha))
             min_alpha = min(min_alpha, alpha)
             max_alpha = max(max_alpha, alpha)
             if alpha == 0:
@@ -164,6 +200,16 @@ def _write_transparent_png(
                 visible_pixels += 1
             if alpha == 255:
                 opaque_pixels += 1
+            is_edge = (
+                row_index < edge_band
+                or row_index >= height - edge_band
+                or column_index < edge_band
+                or column_index >= width - edge_band
+            )
+            if is_edge:
+                edge_pixels += 1
+                if alpha == 0:
+                    edge_transparent_pixels += 1
 
     pixel_count = width * height
     if transparent_pixels == 0 or visible_pixels == 0:
@@ -172,6 +218,8 @@ def _write_transparent_png(
         )
     if transparent_pixels < pixel_count // 20:
         raise ValueError("Converted mark has too little transparent area")
+    if edge_transparent_pixels * 100 < edge_pixels * 95:
+        raise ValueError("Converted mark retains visible pixels around its outer matte")
 
     ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
     output = (
@@ -187,9 +235,13 @@ def _write_transparent_png(
         "width": width,
         "height": height,
         "colour_type": 6,
+        "matte_mode": matte_mode,
+        "edge_luminance": background,
         "transparent_pixels": transparent_pixels,
         "visible_pixels": visible_pixels,
         "opaque_pixels": opaque_pixels,
+        "edge_pixels": edge_pixels,
+        "edge_transparent_pixels": edge_transparent_pixels,
         "min_alpha": min_alpha,
         "max_alpha": max_alpha,
         "sha256": hashlib.sha256(output).hexdigest(),
