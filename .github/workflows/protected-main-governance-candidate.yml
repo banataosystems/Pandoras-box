@@ -41,6 +41,7 @@ jobs:
           node --test
           test/github-governance-contract.test.js
           test/github-governance-provider.test.js
+          test/github-governance-bootstrap-adversarial.test.js
           test/trusted-governance-validator.test.js
 
       - name: Prove raw-provider validator rejects adversarial state
