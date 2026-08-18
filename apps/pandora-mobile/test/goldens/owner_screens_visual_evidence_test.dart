@@ -29,6 +29,12 @@ import '../helpers/test_app.dart';
 const _surfaceKey = ValueKey<String>('owner-screen-evidence');
 const _phoneSize = Size(390, 844);
 const _compactPhoneSize = Size(320, 800);
+const _renderFrames = <Duration>[
+  Duration.zero,
+  Duration(milliseconds: 50),
+  Duration(milliseconds: 200),
+  Duration(milliseconds: 500),
+];
 
 class _VisualCase {
   const _VisualCase({
@@ -55,6 +61,7 @@ class _FixtureRepository implements PandoraRepository {
 
   final bool failing;
   final bool pending;
+  Completer<RepositorySnapshot<HomeSummary>>? _pendingHome;
   static final DateTime _verifiedAt = DateTime.utc(2026, 8, 14, 1);
   static final DateTime _staleAfter = DateTime.utc(2030, 8, 14, 1);
 
@@ -73,10 +80,6 @@ class _FixtureRepository implements PandoraRepository {
     }
   }
 
-  Future<RepositorySnapshot<T>> _pending<T>() {
-    return Completer<RepositorySnapshot<T>>().future;
-  }
-
   RepositorySnapshot<T> _snapshot<T>(T data) => RepositorySnapshot<T>(
         data: data,
         source: RepositorySource.network,
@@ -89,9 +92,20 @@ class _FixtureRepository implements PandoraRepository {
   List<T> _list<T>(String name, T Function(Object?) parse) =>
       asJsonList(_read(name)).map(parse).toList(growable: false);
 
+  void completePendingHome() {
+    final completer = _pendingHome;
+    if (completer == null || completer.isCompleted) return;
+    completer.complete(
+      _snapshot(HomeSummary.fromJson(asJsonMap(_read('home.json')))),
+    );
+  }
+
   @override
   Future<RepositorySnapshot<HomeSummary>> home() async {
-    if (pending) return _pending<HomeSummary>();
+    if (pending) {
+      _pendingHome ??= Completer<RepositorySnapshot<HomeSummary>>();
+      return _pendingHome!.future;
+    }
     _guard();
     return _snapshot(HomeSummary.fromJson(asJsonMap(_read('home.json'))));
   }
@@ -184,7 +198,9 @@ class _FixtureRepository implements PandoraRepository {
   void clearReadOnlyCache() {}
 
   @override
-  void dispose() {}
+  void dispose() {
+    completePendingHome();
+  }
 }
 
 Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
@@ -214,7 +230,9 @@ Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
   if (visual.pending) {
     await tester.pump();
   } else {
-    await tester.pumpAndSettle();
+    for (final frame in _renderFrames) {
+      await tester.pump(frame);
+    }
   }
   expect(
     tester.takeException(),
@@ -244,6 +262,10 @@ Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
       matchesGoldenFile(baseline.path),
     );
   }
+
+  repository.completePendingHome();
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump();
 }
 
 void main() {
