@@ -25,6 +25,10 @@ const appAssetPath = join(
   repoRoot,
   'apps/pandora-mobile/assets/brand/pandora-product-mark-ui-1024.png',
 );
+const transparentGeneratorPath = join(
+  repoRoot,
+  'scripts/create-transparent-pandora-mark.py',
+);
 const shouldWrite = process.argv.includes('--write');
 const shouldReproduce = shouldWrite || process.argv.includes('--reproduce');
 
@@ -33,13 +37,15 @@ const source = Object.freeze({
   gitBlobSha1: 'b3b185aaebbb6307d0af6cfc033ffff4b3d580e9',
 });
 
-const outputs = Object.freeze([
+const opaqueOutputs = Object.freeze([
   {
     name: 'ui-mark-1024.png',
     sha256: '129ce23920d37db06e0cd0dd7b8847ace4796a13f243ac80cef4534cb5e1b940',
     gitBlobSha1: '6dd4a4f5950bbe90c832de92becf9dc863fe9f4b',
     width: 1024,
     height: 1024,
+    colorType: 0,
+    alpha: false,
   },
   {
     name: 'ui-mark-512.png',
@@ -47,6 +53,8 @@ const outputs = Object.freeze([
     gitBlobSha1: 'b9cc38464621a40e146450f07d75d8d2c98e7e2c',
     width: 512,
     height: 512,
+    colorType: 0,
+    alpha: false,
   },
   {
     name: 'ui-mark-192.png',
@@ -54,6 +62,8 @@ const outputs = Object.freeze([
     gitBlobSha1: '536adbb36ec74ef8c06f8a6054c4bebb53d9407d',
     width: 192,
     height: 192,
+    colorType: 0,
+    alpha: false,
   },
   {
     name: 'ui-mark-48.png',
@@ -61,6 +71,8 @@ const outputs = Object.freeze([
     gitBlobSha1: 'a01aa82d2f2c59033998edb1091c80c09861b4aa',
     width: 48,
     height: 48,
+    colorType: 0,
+    alpha: false,
   },
   {
     name: 'favicon-32.png',
@@ -68,6 +80,8 @@ const outputs = Object.freeze([
     gitBlobSha1: '8a058e01bab2ae0d931be728a9708248e1569a6c',
     width: 32,
     height: 32,
+    colorType: 0,
+    alpha: false,
   },
   {
     name: 'launcher-safe-1024.png',
@@ -75,6 +89,8 @@ const outputs = Object.freeze([
     gitBlobSha1: '48917e41a72352f147c6b19436fd361ec93cd26a',
     width: 1024,
     height: 1024,
+    colorType: 0,
+    alpha: false,
   },
   {
     name: 'pwa-512.png',
@@ -82,6 +98,8 @@ const outputs = Object.freeze([
     gitBlobSha1: '327f4dbaa831100686fa8646701a7d2e807d2039',
     width: 512,
     height: 512,
+    colorType: 0,
+    alpha: false,
   },
   {
     name: 'pwa-192.png',
@@ -89,8 +107,22 @@ const outputs = Object.freeze([
     gitBlobSha1: 'f16c5db68ae6506a8e8ea83e13152ef310994509',
     width: 192,
     height: 192,
+    colorType: 0,
+    alpha: false,
   },
 ]);
+
+const transparentUiOutput = Object.freeze({
+  name: 'ui-mark-transparent-1024.png',
+  sha256: '8a35b74baec47b960a42bb74587f9c531d6cbf8d45f16061836a9e63f00efcc5',
+  gitBlobSha1: 'b1b3f3977fc3ad52bcf6d6c135f1bcc6dc1b0b40',
+  width: 1024,
+  height: 1024,
+  colorType: 6,
+  alpha: true,
+});
+
+const outputs = Object.freeze([...opaqueOutputs, transparentUiOutput]);
 
 const fixedPngTime = Object.freeze({
   iso: '2026-08-10T10:39:16Z',
@@ -166,27 +198,31 @@ function normalizePngTime(path) {
   writeFileSync(path, png);
 }
 
-function assertPngMetadata(path, width, height, expectNormalizedTime) {
+function assertPngMetadata(path, expected, expectNormalizedTime) {
   const png = readFileSync(path);
   assertEqual(png.toString('hex', 0, 8), '89504e470d0a1a0a', `${path} format`);
   assertEqual(png.toString('ascii', 12, 16), 'IHDR', `${path} first chunk`);
-  assertEqual(png.readUInt32BE(16), width, `${path} width`);
-  assertEqual(png.readUInt32BE(20), height, `${path} height`);
+  assertEqual(png.readUInt32BE(16), expected.width, `${path} width`);
+  assertEqual(png.readUInt32BE(20), expected.height, `${path} height`);
   assertEqual(png[24], 8, `${path} bit depth`);
-  assertEqual(png[25], 0, `${path} color type`);
+  assertEqual(png[25], expected.colorType, `${path} color type`);
 
   let offset = 8;
   let normalizedTime = false;
+  let backgroundChunk = false;
   while (offset < png.length) {
     const length = png.readUInt32BE(offset);
     const type = png.toString('ascii', offset + 4, offset + 8);
     const dataOffset = offset + 8;
     if (type === 'bKGD') {
-      assertEqual(
-        png.subarray(dataOffset, dataOffset + length).toString('hex'),
-        '00ff',
-        `${path} PNG background chunk`,
-      );
+      backgroundChunk = true;
+      if (!expected.alpha) {
+        assertEqual(
+          png.subarray(dataOffset, dataOffset + length).toString('hex'),
+          '00ff',
+          `${path} PNG background chunk`,
+        );
+      }
     }
     if (type === 'tIME') {
       normalizedTime = png
@@ -196,6 +232,9 @@ function assertPngMetadata(path, width, height, expectNormalizedTime) {
     offset = dataOffset + length + 4;
   }
 
+  if (expected.alpha) {
+    assertEqual(backgroundChunk, false, `${path} matte/background chunk`);
+  }
   assertEqual(
     normalizedTime,
     expectNormalizedTime,
@@ -259,6 +298,12 @@ function buildDerivatives(workRoot) {
     ]);
     normalizePngTime(path);
   }
+
+  run('python3', [
+    transparentGeneratorPath,
+    ui1024,
+    join(workRoot, transparentUiOutput.name),
+  ]);
 }
 
 function verifyManifest() {
@@ -284,19 +329,30 @@ function verifyManifest() {
     );
     assertEqual(record.width, output.width, `${output.name} manifest width`);
     assertEqual(record.height, output.height, `${output.name} manifest height`);
+    assertEqual(record.alpha, output.alpha, `${output.name} manifest alpha`);
   }
+  assertEqual(
+    manifest.flutter_integration.source_derivative,
+    `assets/brand/pandoras-box/product-mark/derived/${transparentUiOutput.name}`,
+    'manifest Flutter transparent source derivative',
+  );
+  assertEqual(
+    manifest.flutter_integration.sha256,
+    transparentUiOutput.sha256,
+    'manifest Flutter transparent SHA-256',
+  );
+  assertEqual(
+    manifest.flutter_integration.git_blob_sha1,
+    transparentUiOutput.gitBlobSha1,
+    'manifest Flutter transparent Git blob',
+  );
 }
 
 function verifyFile(path, expected, expectNormalizedTime) {
   const bytes = readFileSync(path);
   assertEqual(digest('sha256', bytes), expected.sha256, `${path} SHA-256`);
   assertEqual(gitBlobDigest(bytes), expected.gitBlobSha1, `${path} Git blob`);
-  assertPngMetadata(
-    path,
-    expected.width,
-    expected.height,
-    expectNormalizedTime,
-  );
+  assertPngMetadata(path, expected, expectNormalizedTime);
 }
 
 verifyManifest();
@@ -305,16 +361,15 @@ const master = readFileSync(masterPath);
 assertEqual(digest('sha256', master), source.sha256, 'provenance master SHA-256');
 assertEqual(gitBlobDigest(master), source.gitBlobSha1, 'provenance master Git blob');
 
-const ui1024 = outputs.find((item) => item.name === 'ui-mark-1024.png');
 if (!shouldWrite) {
   for (const output of outputs) {
     verifyFile(
       join(derivedRoot, output.name),
       output,
-      !output.name.endsWith('-1024.png'),
+      !output.alpha && !output.name.endsWith('-1024.png'),
     );
   }
-  verifyFile(appAssetPath, ui1024, false);
+  verifyFile(appAssetPath, transparentUiOutput, false);
 }
 
 if (shouldReproduce) {
@@ -332,7 +387,7 @@ if (shouldReproduce) {
     for (const output of outputs) {
       const generated = join(workRoot, output.name);
       const checkedIn = join(derivedRoot, output.name);
-      const normalizedTime = !output.name.endsWith('-1024.png');
+      const normalizedTime = !output.alpha && !output.name.endsWith('-1024.png');
       verifyFile(generated, output, normalizedTime);
       if (!shouldWrite) {
         assertEqual(
@@ -349,16 +404,16 @@ if (shouldReproduce) {
         copyFileSync(join(workRoot, output.name), join(derivedRoot, output.name));
       }
       mkdirSync(dirname(appAssetPath), { recursive: true });
-      copyFileSync(join(workRoot, 'ui-mark-1024.png'), appAssetPath);
+      copyFileSync(join(workRoot, transparentUiOutput.name), appAssetPath);
 
       for (const output of outputs) {
         verifyFile(
           join(derivedRoot, output.name),
           output,
-          !output.name.endsWith('-1024.png'),
+          !output.alpha && !output.name.endsWith('-1024.png'),
         );
       }
-      verifyFile(appAssetPath, ui1024, false);
+      verifyFile(appAssetPath, transparentUiOutput, false);
     }
   } finally {
     rmSync(workRoot, { recursive: true, force: true });
@@ -366,7 +421,7 @@ if (shouldReproduce) {
 }
 
 console.log(
-  `Pandora brand assets verified: source + ${outputs.length} content-addressed derivatives + Flutter UI copy${
+  `Pandora brand assets verified: source + ${outputs.length} content-addressed derivatives + transparent Flutter UI copy${
     shouldReproduce ? ' + exact derivative reproduction' : ''
   }${shouldWrite ? ' (written)' : ''}.`,
 );
