@@ -27,7 +27,52 @@ jobs:
           fetch-depth: 0
 
       - name: Apply exact reviewed reliability corrections
-        run: python .github/scripts/worker1_apply_review_round2.py
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/worker1_apply_review_round2.py
+          python <<'PY'
+          from pathlib import Path
+
+          def repair_once(path: str, old: str, new: str, label: str) -> None:
+              target = Path(path)
+              text = target.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one generated marker defect, found {count}")
+              target.write_text(text.replace(old, new, 1))
+
+          repair_once(
+              "src/tools/memory-evidence-intake.js",
+              "function safeCorrelationId]);\n\nfunction safeCorrelationId",
+              "function safeCorrelationId",
+              "safe-correlation marker",
+          )
+          repair_once(
+              "src/tools/memory-evidence-intake.js",
+              "function safeBackendFailurefunction safeBackendFailure",
+              "function safeBackendFailure",
+              "safe-backend marker",
+          )
+          repair_once(
+              "src/tools/memory-evidence-intake.js",
+              "function submissionFailurefunction submissionFailure",
+              "function submissionFailure",
+              "submission-failure marker",
+          )
+          repair_once(
+              "src/projectos-mcp-handler.js",
+              "function rpcResultfunction rpcResult",
+              "function rpcResult",
+              "rpc-result marker",
+          )
+          repair_once(
+              "test/projectos-memory-supabase-contract-regression.test.js",
+              'test("array-valued provider readstest("array-valued provider reads',
+              'test("array-valued provider reads',
+              "array-test marker",
+          )
+          PY
 
       - name: Remove temporary branch-only automation
         run: |
