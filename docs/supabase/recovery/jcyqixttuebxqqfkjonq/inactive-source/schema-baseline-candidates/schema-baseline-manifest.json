@@ -158,9 +158,18 @@
     {
       "checkpoint": "after_20260731122011",
       "path": "docs/supabase/recovery/jcyqixttuebxqqfkjonq/inactive-source/schema-baseline-candidates/replay-fixtures/after-20260731122011.sql",
-      "sha256": "5409eb95d389be6622ce6bb2f879a6dc5e1043148c012518c0e4e452f8f935b9",
-      "bytes": 464,
-      "purpose": "Supply the FXPass registry row assumed by the later growth-contract migration."
+      "sha256": "3d71aa98bc48c5ce522b97a3bdecf9b06802723a2c2c89a4603119b5fb5017da",
+      "bytes": 3397,
+      "purpose": "Supply the FXPass registry row plus inert hosted Vault, GitHub installation, and pg_net delete-function prerequisites required to replay the already-applied Vercel adapter migrations without provider calls or credentials.",
+      "previous_sha256": "5409eb95d389be6622ce6bb2f879a6dc5e1043148c012518c0e4e452f8f935b9",
+      "previous_bytes": 464,
+      "previous_content_commit": "33445e126456af732b420a4c5e47047596ad70ed",
+      "change_classification": "append_only_replay_fixture_evolution",
+      "production_mutation_performed": false,
+      "provider_schema_read_plans": [
+        "8da64095-4bf7-4874-b24e-4c038e99882a",
+        "0eba6192-5178-4267-b706-975d4036bebf"
+      ]
     }
   ],
   "validation": {

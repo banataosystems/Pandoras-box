@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const { existsSync, readFileSync, readdirSync } = require('node:fs');
-const { join } = require('node:path');
+const { basename, join } = require('node:path');
 const test = require('node:test');
 
 const repositoryRoot = join(__dirname, '..');
@@ -16,8 +16,14 @@ const evidenceRoot = join(
 const manifest = JSON.parse(
   readFileSync(join(evidenceRoot, 'migration-parity-manifest.json'), 'utf8'),
 );
-const replayResult = JSON.parse(
+const recoveryReplayResult = JSON.parse(
   readFileSync(join(evidenceRoot, 'pglite-replay-result.json'), 'utf8'),
+);
+const currentReplayResult = JSON.parse(
+  readFileSync(
+    join(evidenceRoot, 'pglite-replay-result-20260817145929.json'),
+    'utf8',
+  ),
 );
 
 function sha256(value) {
@@ -30,20 +36,49 @@ function migrationSource(version) {
   return readFileSync(join(repositoryRoot, entry.active.path), 'utf8');
 }
 
-test('active Supabase history maps 50 recovered identities plus two applied changes', () => {
+function chainSha256(filenames) {
+  const chain = filenames
+    .map((filename) => {
+      const source = readFileSync(join(migrationRoot, filename));
+      return `${filename}:${sha256(source)}`;
+    })
+    .join('\n') + '\n';
+  return sha256(Buffer.from(chain));
+}
+
+test('active Supabase history preserves the captured 52-file recovery chain and appends governed changes', () => {
   const files = readdirSync(migrationRoot)
     .filter((name) => /^\d{14}_.+\.sql$/.test(name))
     .sort();
+  const capturedFiles = [
+    ...manifest.history.map((entry) => basename(entry.active.path)),
+    basename(manifest.pending_change.path),
+    basename(manifest.source_authority_change.path),
+  ].sort();
+  const capturedSet = new Set(capturedFiles);
+  const appendedFiles = files.filter((filename) => !capturedSet.has(filename));
 
   assert.equal(manifest.invariants.historical_identity_count, 50);
   assert.equal(manifest.invariants.active_file_count, 52);
   assert.equal(manifest.invariants.applied_change_count, 2);
-  assert.equal(files.length, 52);
   assert.equal(manifest.history.length, 50);
   assert.equal(new Set(manifest.history.map((entry) => entry.version)).size, 50);
   assert.deepEqual(
     manifest.history.map((entry) => entry.version),
     [...manifest.history.map((entry) => entry.version)].sort(),
+  );
+  assert.equal(new Set(capturedFiles).size, manifest.invariants.active_file_count);
+  assert.ok(capturedFiles.every((filename) => files.includes(filename)));
+  assert.deepEqual(appendedFiles, [
+    '20260817130000_projectos_memory_full_capacity_context_gate.sql',
+    '20260817145550_add_vercel_control_adapter.sql',
+    '20260817145659_add_vercel_git_binding_clear.sql',
+    '20260817145929_add_vercel_async_git_link_queue.sql',
+  ]);
+  assert.equal(files.length, currentReplayResult.migration_count);
+  assert.equal(
+    currentReplayResult.migration_count,
+    recoveryReplayResult.migration_count + appendedFiles.length,
   );
   assert.equal(manifest.live_chain.first, '20260724010000');
   assert.equal(manifest.live_chain.last, '20260813105011');
@@ -85,24 +120,19 @@ test('active Supabase history maps 50 recovered identities plus two applied chan
     manifest.source_authority_change.provider_sha256,
   );
 
-  const chain = files
-    .map((filename) => {
-      const source = readFileSync(join(migrationRoot, filename));
-      return `${filename}:${sha256(source)}`;
-    })
-    .join('\n') + '\n';
-  assert.equal(sha256(Buffer.from(chain)), replayResult.chain_sha256);
-  assert.equal(replayResult.migration_count, 52);
-  assert.equal(replayResult.provider_equivalence, false);
+  assert.equal(recoveryReplayResult.migration_count, manifest.invariants.active_file_count);
+  assert.equal(chainSha256(capturedFiles), recoveryReplayResult.chain_sha256);
+  assert.equal(chainSha256(files), currentReplayResult.chain_sha256);
+  assert.equal(currentReplayResult.provider_equivalence, false);
   assert.equal(manifest.validation.authorization_smoke, 'pass');
-  assert.deepEqual(replayResult.assertions.authorization_smoke, {
+  assert.deepEqual(currentReplayResult.assertions.authorization_smoke, {
     aal1_owner_without_session: 'approved',
     operator: 'denied',
     anonymous_owner: 'denied',
     high_risk_requester_as_approver: 'denied',
     audit_event_appended: true,
   });
-  assert.deepEqual(replayResult.assertions.source_authority, {
+  assert.deepEqual(currentReplayResult.assertions.source_authority, {
     owner_wildcard: 'mbanatao/*',
     historical_binding_count: 14,
     canonical_fxpass_binding: 'active',
@@ -219,7 +249,7 @@ test('database rollback restores the exact prior AAL2 executable body', () => {
   assert.match(rollbackBody, /auth\.sessions/);
   assert.match(rollbackBody, /current_session_id/);
   assert.match(rollbackBody, /'aal2'/i);
-  assert.deepEqual(replayResult.assertions.database_rollback_smoke, {
+  assert.deepEqual(currentReplayResult.assertions.database_rollback_smoke, {
     restore_previous_aal2_definition: 'pass',
     reapply_aal1_definition: 'pass',
   });
