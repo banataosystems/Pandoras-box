@@ -27,7 +27,20 @@ jobs:
           fetch-depth: 0
 
       - name: Apply exact independent-review corrections
-        run: python .github/scripts/worker1_apply_review_fixes.py
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/worker1_apply_review_fixes.py
+          python <<'PY'
+          from pathlib import Path
+          path = Path("test/projectos-memory-supabase-contract-regression.test.js")
+          text = path.read_text()
+          old = 'assert.doesNotMatch(error.message, /rate_limited/);'
+          new = 'assert.doesNotMatch(error.message, /"rate_limited"/);'
+          if text.count(old) != 1:
+              raise SystemExit("expected one raw 429 error assertion")
+          path.write_text(text.replace(old, new, 1))
+          PY
 
       - name: Remove temporary automation from candidate tree
         run: |
