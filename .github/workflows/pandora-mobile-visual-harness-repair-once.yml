@@ -1,0 +1,75 @@
+name: Pandora mobile visual harness one-shot repair
+
+on:
+  push:
+    branches:
+      - integration/pandora-mobile-p1-current-main-20260819
+    paths:
+      - '.github/workflows/pandora-mobile-visual-harness-repair-once.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pandora-mobile-visual-harness-repair-once
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    name: repair bounded production-screen capture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact trigger head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Verify exact source checkout
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Remove async image-cache deadlock and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          test_path = Path('apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart')
+          workflow_path = Path('.github/workflows/pandora-mobile-visual-harness-repair-once.yml')
+          text = test_path.read_text()
+          old = """  await tester.runAsync(
+            () => precacheImage(
+              const AssetImage(PandoraMark.assetPath),
+              tester.element(find.byKey(_surfaceKey)),
+            ),
+          );
+          """
+          replacement = """  // Advance local asset decoding and repository microtasks through the same
+            // finite render sequence used for screenshot determinism. `runAsync` plus
+            // `precacheImage` can wait outside the widget-test clock and conceal every
+            // later CI stage, so production-screen evidence must remain bounded.
+          """
+          if text.count(old) != 1:
+              raise SystemExit('Expected exactly one async precache block; refusing an ambiguous edit.')
+          text = text.replace(old, replacement)
+          mark_import = "import 'package:pandora_mobile/core/widgets/pandora_mark.dart';\n"
+          if text.count(mark_import) != 1:
+              raise SystemExit('Expected exactly one now-unused PandoraMark import.')
+          text = text.replace(mark_import, '')
+          test_path.write_text(text)
+          workflow_path.unlink()
+          PY
+          git diff --check
+          ! grep -q 'tester.runAsync' apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart
+          ! grep -q 'precacheImage' apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart
+      - name: Commit exact repair without force
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Pandora Mobile Worker 5'
+          git config user.email 'lawbatalla@gmail.com'
+          git add apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart \
+            .github/workflows/pandora-mobile-visual-harness-repair-once.yml
+          git commit -m 'test(mobile): keep visual evidence inside widget-test clock'
+          git push origin "HEAD:${GITHUB_REF}"
