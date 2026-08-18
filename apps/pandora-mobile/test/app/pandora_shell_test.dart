@@ -596,6 +596,10 @@ void main() {
     );
 
     await tester.enterText(find.byType(TextField), 'Prepare a safe plan');
+    // Objective starters now sit above the submit control, which puts it below
+    // the fold on a 800pt-tall surface.
+    await tester.ensureVisible(find.text('Prepare the request'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Prepare the request'));
     await tester.pumpAndSettle();
     expect(find.text('Retry same request safely'), findsOneWidget);
@@ -665,6 +669,10 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        // The approval card now carries target, consequence, risk, expiry and
+        // rollback above the controls, so the decision sits below the fold.
+        await tester.ensureVisible(find.text('Approve'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Approve'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Approve this plan'));
@@ -686,7 +694,7 @@ void main() {
           expect(reject.onPressed, isNull);
           expect(find.text('Queue refresh failed.'), findsOneWidget);
         } else {
-          expect(find.text('Nothing needs approval'), findsOneWidget);
+          expect(find.text('Nothing needs your decision'), findsOneWidget);
         }
       },
     );
@@ -712,6 +720,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // The approval card now carries target, consequence, risk, expiry and
+      // rollback above the controls, so the decision sits below the fold.
+      await tester.ensureVisible(find.text('Approve'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Approve'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Approve this plan'));
@@ -755,12 +767,32 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Owner decision state is not verified.'), findsOneWidget);
+    // The briefing hero states this as a heading, so it carries no full stop.
+    // The paired negative below must track the current verified-state heading,
+    // otherwise it would pass against copy the screen can no longer render.
+    expect(find.text('Owner decision state is not verified'), findsOneWidget);
     expect(
-      find.text('Nothing is waiting for an owner decision.'),
+      find.text('Nothing requires your decision'),
       findsNothing,
     );
-    expect(find.text('Not verified'), findsNWidgets(3));
+    // Every unverified counter reads as an em dash rather than a number, and
+    // never as zero.
+    expect(find.text('—'), findsNWidgets(3));
+    expect(find.text('0'), findsNothing);
+    // The dash alone means nothing to a screen reader. The counter cells
+    // announce as one merged node, so assert that node names every counter as
+    // not verified rather than letting a dash stand in for a value.
+    expect(
+      find.bySemanticsLabel(
+        RegExp(
+          r'Approvals: not verified\s+'
+          r'Active projects: not verified\s+'
+          r'Needs attention: not verified',
+        ),
+      ),
+      findsAtLeastNWidgets(1),
+      reason: 'Every unverified counter must announce its unverified state.',
+    );
   });
 
   testWidgets('diagnostics owner authorization expires and rechecks', (
