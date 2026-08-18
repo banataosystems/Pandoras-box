@@ -1,0 +1,79 @@
+name: Worker 1 apply second-round reliability fixes
+
+on:
+  pull_request:
+    types: [synchronize]
+    branches: [main]
+    paths:
+      - '.github/workflows/worker1-apply-review-round2.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: worker1-round2-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.ref == 'fix/projectos-memory-supabase-contracts-20260819'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the exact isolated lane head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Apply exact reviewed reliability corrections
+        run: python .github/scripts/worker1_apply_review_round2.py
+
+      - name: Remove temporary branch-only automation
+        run: |
+          rm .github/workflows/worker1-apply-review-round2.yml
+          rm .github/scripts/worker1_apply_review_round2.py
+
+      - name: Verify bounded candidate diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          changed="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' \
+            '.github/scripts/worker1_apply_review_round2.py' \
+            '.github/workflows/worker1-apply-review-round2.yml' \
+            'src/projectos-mcp-handler.js' \
+            'src/runtime/execution-ledger-client.js' \
+            'src/tools/memory-evidence-intake.js' \
+            'test/execution-ledger-finalization-contract.test.js' \
+            'test/projectos-memory-supabase-contract-regression.test.js' | sort)"
+          test "$changed" = "$expected"
+          git diff --stat
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run complete source checks
+        run: npm run check
+
+      - name: Run complete test suite
+        run: npm test
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Commit verified corrections to the isolated lane
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(projectos): close reliability review gaps"
+          git push origin "HEAD:refs/heads/fix/projectos-memory-supabase-contracts-20260819"
