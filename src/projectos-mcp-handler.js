@@ -147,10 +147,16 @@ async function jsonBody(request) {
     }
 }
 
+function structuredToolContent(value) {
+    if (value && typeof value === "object" && !Array.isArray(value)) return value;
+    if (Array.isArray(value)) return { items: value };
+    return { value: value ?? null };
+}
+
 function toolResult(value) {
     return {
         content: [{ type: "text", text: JSON.stringify(value) }],
-        structuredContent: value,
+        structuredContent: structuredToolContent(value),
     };
 }
 
@@ -356,10 +362,6 @@ function assertToolScope(name, actor) {
     }
     const projectScopes = [...granted].filter((scope) => scope.startsWith("projectos:"));
     if (projectScopes.length === 0) {
-        // Existing ChatGPT installations were consented before ProjectOS action
-        // scopes existed. Keep only that exact identity grant compatible until
-        // staged connector re-consent is complete; any broader or malformed
-        // non-ProjectOS grant remains fail closed.
         const isBoundedLegacyGrant = IDENTITY_SCOPES.every((scope) => granted.has(scope))
             && [...granted].every((scope) => LEGACY_IDENTITY_SCOPES.has(scope));
         if (isBoundedLegacyGrant) return;
