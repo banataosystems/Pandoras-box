@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0.0",
+  "observed_at": "2026-08-19T07:20:25+08:00",
+  "lane": "Pandora Worker 3 — GitHub Governance / Protected Main / Merge Safety",
+  "repository": {
+    "full_name": "banataosystems/Pandoras-box",
+    "repository_id": 1326729533,
+    "default_branch": "main",
+    "main_sha": "c2cc635383b78d457d1731294a6f5b306d85f6be"
+  },
+  "source_candidate": {
+    "branch": "governance/protected-main-enforcement",
+    "pull_request": 57,
+    "tested_head_sha": "2484cfafd357af865c666621869df7cf2c50f752",
+    "tested_tree_sha": "31c8ef22f85b4d0db0581846386e3756a4767109",
+    "merged": false
+  },
+  "exact_head_ci": [
+    {
+      "workflow": "ProjectOS security regression",
+      "run_id": 32196397652,
+      "job": "node24",
+      "job_id": 95901201990,
+      "conclusion": "success"
+    },
+    {
+      "workflow": "Protected main governance candidate",
+      "run_id": 32196397553,
+      "conclusion": "success",
+      "jobs": {
+        "Governance source contract": 95901201566,
+        "Core source proof": 95901201587,
+        "Mobile source proof": 95901202288,
+        "Informational production dependency audit": 95901201564
+      }
+    }
+  ],
+  "provider_before": {
+    "main_protected": false,
+    "required_checks": [],
+    "merge_methods": {
+      "allow_merge_commit": true,
+      "allow_squash_merge": true,
+      "allow_rebase_merge": true,
+      "allow_auto_merge": false,
+      "allow_update_branch": false
+    }
+  },
+  "mutation_attempt": {
+    "tool": "github.write-repository-api",
+    "method": "PUT",
+    "path": "banataosystems/Pandoras-box/branches/main/protection",
+    "plan_id": "0d27982e-e2d0-4ad0-952b-93c297046f4a",
+    "request_id": "a2238544-4abf-4bfb-8645-d8c317a2a5ff",
+    "payload_hash": "d051b31e28e6fd6bd2262f333b6ffd5dc803fc5ef5970e1b0b02d3da5ce671d3",
+    "approved": true,
+    "status": "failed",
+    "intake_status": "blocked",
+    "duration_ms": 1,
+    "provider_dispatch_occurred": false,
+    "sanitized_error": "GitHub mutations are disabled for account github-primary"
+  },
+  "projectos_audit": {
+    "failure_event_sequence": 4863,
+    "failure_event_hash": "36d4e70b6303c08a0d8fced2496cff48c4e9b88fdc9af18c7dbf442dbf0041bd",
+    "hash_chain_valid": true,
+    "verified_event_count": 4868,
+    "verified_last_hash": "39de811499a76706fb488c6cf5248e5473c264027510146a54ba2efcd45b00bb"
+  },
+  "provider_after": {
+    "main_protected": false,
+    "main_sha": "c2cc635383b78d457d1731294a6f5b306d85f6be",
+    "github_received_write": false
+  },
+  "capability_reconciliation": {
+    "direct_github_plugin_permission": "allow_all_actions",
+    "direct_github_admin_mutation_action_exposed": false,
+    "projectos_admin_mutation_action_exposed": true,
+    "projectos_account_mutation_enabled": false,
+    "bounded_repository_mutation_currently_possible": false
+  },
+  "proof_state": {
+    "documented": true,
+    "implemented_on_isolated_branch": true,
+    "exact_head_tested": true,
+    "provider_applied": false,
+    "valid_path_production_verified": false
+  },
+  "blocker": "Enable a bounded repository-administration mutation path for github-primary, or expose an equivalent GitHub branch-protection/settings action, without granting a broad bypass. Then create a fresh one-time plan, execute the exact reviewed payload, and read GitHub back before claiming provider application.",
+  "authorization_limits": {
+    "merge_authorized": false,
+    "production_release_authorized": false,
+    "normal_bypass_allowed": false
+  }
+}
