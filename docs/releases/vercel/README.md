@@ -32,7 +32,8 @@ Each JSON manifest has a sibling `.sha256` file. The verifier:
 - requires staging and production to carry the manifest source SHA;
 - rejects any qualified rollback missing source, build, runtime, database, recovery, or rehearsal gates;
 - rejects credential-shaped material;
-- rejects a release workflow that deploys, promotes, mutates aliases, or triggers on `push`.
+- rejects a release workflow that deploys, promotes, mutates aliases, or triggers on `push`;
+- requires every third-party action to be allowlisted and pinned to a full immutable commit SHA.
 
 Run:
 

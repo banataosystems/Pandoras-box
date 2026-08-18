@@ -365,6 +365,33 @@ export function validateWorkflowText(workflowText) {
   if (!/persist-credentials:\s*false/m.test(workflowText)) {
     errors.push("workflow: checkout credentials must not persist");
   }
+
+  const expectedActionRefs = new Set([
+    "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+    "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+  ]);
+  const actionRefs = [
+    ...workflowText.matchAll(/^\s*uses:\s*([^#\s]+)(?:\s+#.*)?$/gm),
+  ].map((match) => match[1]);
+  if (actionRefs.length !== expectedActionRefs.size) {
+    errors.push(
+      `workflow: expected exactly ${expectedActionRefs.size} approved immutable action references`,
+    );
+  }
+  for (const actionRef of actionRefs) {
+    if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-f]{40}$/.test(actionRef)) {
+      errors.push(`workflow: action reference must use a full immutable commit SHA (${actionRef})`);
+    }
+    if (!expectedActionRefs.has(actionRef)) {
+      errors.push(`workflow: unapproved action reference (${actionRef})`);
+    }
+  }
+  for (const expectedActionRef of expectedActionRefs) {
+    if (!actionRefs.includes(expectedActionRef)) {
+      errors.push(`workflow: missing approved action reference (${expectedActionRef})`);
+    }
+  }
+
   if (!/github\.event\.pull_request\.head\.sha\s*\|\|\s*github\.sha/.test(workflowText)) {
     errors.push("workflow: checkout must bind to exact PR head or workflow SHA");
   }

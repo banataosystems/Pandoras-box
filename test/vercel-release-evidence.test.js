@@ -81,3 +81,19 @@ test("workflow push triggers and production commands fail closed", () => {
   assert.ok(errors.some((error) => error.includes("push trigger is forbidden")));
   assert.ok(errors.some((error) => error.includes("mutation command is forbidden")));
 });
+
+test("workflow action dependencies must use approved full commit SHAs", () => {
+  const workflow = readFileSync(workflowPath, "utf8").replace(
+    "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+    "actions/checkout@v4",
+  );
+  const errors = validateWorkflowText(workflow);
+  assert.ok(
+    errors.some((error) =>
+      error.includes("action reference must use a full immutable commit SHA"),
+    ),
+  );
+  assert.ok(
+    errors.some((error) => error.includes("missing approved action reference")),
+  );
+});
