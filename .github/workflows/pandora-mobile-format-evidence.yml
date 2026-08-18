@@ -1,0 +1,65 @@
+name: Pandora mobile formatter evidence
+
+on:
+  pull_request:
+    paths:
+      - 'apps/pandora-mobile/**'
+      - '.github/workflows/pandora-mobile-format-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - name: Verify exact source checkout
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+      - name: Resolve the mobile package
+        working-directory: apps/pandora-mobile
+        run: flutter pub get --enforce-lockfile
+      - name: Capture exact formatter output
+        working-directory: apps/pandora-mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence=build/formatter-evidence
+          mkdir -p "$evidence/before" "$evidence/formatted"
+          cp lib/features/home/home_screen.dart "$evidence/before/home_screen.dart"
+          dart format lib test
+          cp lib/features/home/home_screen.dart "$evidence/formatted/home_screen.dart"
+          diff -u \
+            "$evidence/before/home_screen.dart" \
+            "$evidence/formatted/home_screen.dart" \
+            > "$evidence/home_screen.patch" || true
+          {
+            echo "source_sha=${SOURCE_SHA}"
+            echo "flutter_version=$(flutter --version --machine | python3 -c 'import json,sys; print(json.load(sys.stdin)["frameworkVersion"])')"
+            echo "dart_version=$(dart --version 2>&1 | awk '{print $4}')"
+            echo "changed=$([[ -s "$evidence/home_screen.patch" ]] && echo true || echo false)"
+            sha256sum "$evidence/before/home_screen.dart"
+            sha256sum "$evidence/formatted/home_screen.dart"
+          } > "$evidence/manifest.txt"
+      - name: Upload formatter evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pandora-mobile-formatter-evidence
+          path: apps/pandora-mobile/build/formatter-evidence
+          if-no-files-found: error
+          include-hidden-files: true
+      - name: Preserve formatting gate
+        working-directory: apps/pandora-mobile
+        run: test ! -s build/formatter-evidence/home_screen.patch
