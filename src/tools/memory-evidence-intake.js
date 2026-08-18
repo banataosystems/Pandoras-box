@@ -4,6 +4,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.EvidenceCandidateArgsSchema = void 0;
 exports.submitEvidenceCandidate = submitEvidenceCandidate;
 
+const { randomUUID } = require("node:crypto");
 const { z } = require("zod");
 
 const MAX_RESPONSE_BYTES = 100_000;
@@ -11,24 +12,91 @@ const DEFAULT_TIMEOUT_MS = 8_000;
 const CANONICAL_PROJECT_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CANONICAL_PROJECT_KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{1,95}$/;
+const CORRELATION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const IDEMPOTENCY_CONFLICT_CODE = "idempotency_conflict";
-const SAFE_BACKEND_ERROR_CODES = new Set([
-  "unexpected_field",
-  "project_identity_invalid",
-  "evidence_candidate_invalid",
-  "sensitive_candidate_rejected",
+const FAILURE_SCHEMA_VERSION = "1.0.0";
+const FAILURE_PROVIDER = "pandora-memory";
+const FAILURE_OPERATION = "memory.submitEvidenceCandidate";
+
+const SAFE_BACKEND_FAILURES = new Map([
+  ["unsupported_action", { validationCategory: "capability_contract", retryable: false }],
+  ["unexpected_field", { validationCategory: "request_validation", retryable: false }],
+  ["project_identity_invalid", { validationCategory: "project_identity", retryable: false }],
+  ["evidence_candidate_invalid", { validationCategory: "candidate_validation", retryable: false }],
+  ["sensitive_candidate_rejected", { validationCategory: "privacy_policy", retryable: false }],
+  ["namespace_not_allowed", { validationCategory: "namespace_authorization", retryable: false }],
+  ["scope_not_allowed", { validationCategory: "scope_authorization", retryable: false }],
+  ["project_not_allowed", { validationCategory: "project_authorization", retryable: false }],
+  [IDEMPOTENCY_CONFLICT_CODE, { validationCategory: "idempotency", retryable: false }],
 ]);
 
-class MemoryEvidenceIdempotencyConflictError extends Error {
-  constructor() {
-    super("Pandora Memory candidate idempotency conflict: the same idempotency key was reused with different content");
+function safeCorrelationId(value, fallback) {
+  return typeof value === "string" && CORRELATION_ID_PATTERN.test(value)
+    ? value
+    : fallback;
+}
+
+function responseCorrelationId(response, fallback) {
+  const candidates = [
+    response?.headers?.get?.("x-request-id"),
+    response?.headers?.get?.("x-vercel-id"),
+    response?.headers?.get?.("cf-ray"),
+    response?.headers?.get?.("sb-request-id"),
+  ];
+  return candidates.reduce(
+    (resolved, value) => resolved || safeCorrelationId(value, ""),
+    "",
+  ) || fallback;
+}
+
+function failureEnvelope(input) {
+  return Object.freeze({
+    schemaVersion: FAILURE_SCHEMA_VERSION,
+    provider: FAILURE_PROVIDER,
+    operation: FAILURE_OPERATION,
+    httpStatus: Number.isInteger(input.httpStatus) ? input.httpStatus : null,
+    safeErrorCode: input.safeErrorCode,
+    validationCategory: input.validationCategory,
+    retryable: input.retryable === true,
+    correlationId: input.correlationId,
+    timestamp: input.timestamp,
+  });
+}
+
+class MemoryEvidenceSubmissionError extends Error {
+  constructor(input) {
+    const failure = failureEnvelope(input);
+    // The JSON message is deliberate: ProjectOS currently stores a bounded
+    // error string in its hash-linked audit ledger. Serializing this fixed,
+    // allowlisted envelope keeps both the caller and audit structurally useful
+    // without accepting arbitrary provider text or confidential response data.
+    super(JSON.stringify(failure));
+    this.name = "MemoryEvidenceSubmissionError";
+    this.code = failure.safeErrorCode;
+    this.status = input.outerStatus;
+    this.failure = failure;
+  }
+}
+exports.MemoryEvidenceSubmissionError = MemoryEvidenceSubmissionError;
+
+class MemoryEvidenceIdempotencyConflictError extends MemoryEvidenceSubmissionError {
+  constructor(input) {
+    super({
+      httpStatus: 409,
+      safeErrorCode: IDEMPOTENCY_CONFLICT_CODE,
+      validationCategory: "idempotency",
+      retryable: false,
+      correlationId: input.correlationId,
+      timestamp: input.timestamp,
+      outerStatus: 409,
+    });
     this.name = "MemoryEvidenceIdempotencyConflictError";
-    this.code = IDEMPOTENCY_CONFLICT_CODE;
   }
 }
 
 exports.MemoryEvidenceIdempotencyConflictError = MemoryEvidenceIdempotencyConflictError;
 exports.IDEMPOTENCY_CONFLICT_CODE = IDEMPOTENCY_CONFLICT_CODE;
+
 const NamespaceSchema = z.enum(["real_life", "au"]);
 const ProofStageSchema = z.enum([
   "documented",
@@ -89,7 +157,6 @@ function normalizeOrigin(value) {
   return url.origin;
 }
 
-const EVIDENCE_PRIVACY_SCAN_VERSION = "evidence_privacy_v2";
 const EVIDENCE_PRIVACY_TEXT_LIMIT = 20_000;
 const EVIDENCE_SECRET_FIELD_PATTERN = /^(?:password|passwd|passphrase|pwd|pin|secret|client_secret|secret_key|secret_access_key|aws_secret_access_key|aws_access_key_id|access_key_id|api_key|access_token|refresh_token|service_role|private_key|accountkey|sharedaccesssignature)$/i;
 const EVIDENCE_DIRECT_IDENTIFIER_FIELD_PATTERN = /^(?:phone|phone_number|mobile|mobile_number|telephone|address|street_address|home_address|mailing_address|full_name|first_name|last_name|given_name|family_name|ssn|social_security_number|passport|passport_number|tax_id|bank_account|iban|card_number)$/i;
@@ -262,9 +329,42 @@ function assertBoundResponse(body, input) {
   return { canonicalProjectId, canonicalProjectKey };
 }
 
-function safeBackendErrorCode(body) {
-  const code = body?.error;
-  return typeof code === "string" && SAFE_BACKEND_ERROR_CODES.has(code) ? code : null;
+function safeBackendFailure(status, body) {
+  const candidateCode = body?.error;
+  const known = typeof candidateCode === "string"
+    ? SAFE_BACKEND_FAILURES.get(candidateCode)
+    : undefined;
+  if (known) {
+    return {
+      safeErrorCode: candidateCode,
+      validationCategory: known.validationCategory,
+      retryable: known.retryable,
+    };
+  }
+  if (status >= 500) {
+    return {
+      safeErrorCode: "provider_server_error",
+      validationCategory: "provider_server",
+      retryable: true,
+    };
+  }
+  return {
+    safeErrorCode: "memory_submission_failed",
+    validationCategory: "unknown_downstream",
+    retryable: false,
+  };
+}
+
+function submissionFailure(input) {
+  return new MemoryEvidenceSubmissionError({
+    httpStatus: input.httpStatus,
+    safeErrorCode: input.safeErrorCode,
+    validationCategory: input.validationCategory,
+    retryable: input.retryable,
+    correlationId: input.correlationId,
+    timestamp: new Date().toISOString(),
+    outerStatus: input.outerStatus,
+  });
 }
 
 async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis.fetch) {
@@ -284,6 +384,7 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
   }
 
   const origin = normalizeOrigin(configuration.baseUrl);
+  const correlationId = randomUUID();
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
@@ -304,41 +405,107 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
   };
 
   try {
-    const response = await fetchFn(`${origin}/api/projectos/memory/evidence-candidates`, {
-      method: "POST",
-      redirect: "error",
-      cache: "no-store",
-      headers: {
-        "content-type": "application/json",
-        "accept": "application/json",
-        "x-pandora-vercel-oidc": configuration.oidcToken,
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
+    let response;
+    try {
+      response = await fetchFn(`${origin}/api/projectos/memory/evidence-candidates`, {
+        method: "POST",
+        redirect: "error",
+        cache: "no-store",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json",
+          "x-pandora-vercel-oidc": configuration.oidcToken,
+          "x-request-id": correlationId,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof MemoryEvidenceSubmissionError) throw error;
+      throw submissionFailure({
+        httpStatus: null,
+        safeErrorCode: error instanceof Error && error.name === "AbortError"
+          ? "provider_timeout"
+          : "provider_transport_error",
+        validationCategory: "transport",
+        retryable: true,
+        correlationId,
+        outerStatus: 502,
+      });
+    }
 
-    const text = await readBounded(
-      response,
-      Math.min(Number(configuration.maxResponseBytes || MAX_RESPONSE_BYTES), MAX_RESPONSE_BYTES),
-    );
+    const resolvedCorrelationId = responseCorrelationId(response, correlationId);
+    let text;
+    try {
+      text = await readBounded(
+        response,
+        Math.min(Number(configuration.maxResponseBytes || MAX_RESPONSE_BYTES), MAX_RESPONSE_BYTES),
+      );
+    } catch {
+      throw submissionFailure({
+        httpStatus: Number.isInteger(response.status) ? response.status : null,
+        safeErrorCode: "response_contract_error",
+        validationCategory: "response_contract",
+        retryable: response.status >= 500,
+        correlationId: resolvedCorrelationId,
+        outerStatus: 502,
+      });
+    }
+
     let body = {};
     try {
       body = text ? JSON.parse(text) : {};
     } catch {
-      throw new Error("Pandora Memory candidate response was not valid JSON");
+      throw submissionFailure({
+        httpStatus: Number.isInteger(response.status) ? response.status : null,
+        safeErrorCode: "response_contract_error",
+        validationCategory: "response_contract",
+        retryable: response.status >= 500,
+        correlationId: resolvedCorrelationId,
+        outerStatus: 502,
+      });
     }
+
     if (response.status === 409) {
-      throw new MemoryEvidenceIdempotencyConflictError();
+      throw new MemoryEvidenceIdempotencyConflictError({
+        correlationId: resolvedCorrelationId,
+        timestamp: new Date().toISOString(),
+      });
     }
     if (!response.ok || body?.ok === false) {
-      const downstreamCode = safeBackendErrorCode(body);
-      const suffix = downstreamCode ? `: ${downstreamCode}` : "";
-      throw new Error(`Pandora Memory candidate submission failed (${response.status})${suffix}`);
+      const classified = safeBackendFailure(response.status, body);
+      throw submissionFailure({
+        httpStatus: response.status,
+        ...classified,
+        correlationId: resolvedCorrelationId,
+        outerStatus: response.status >= 500 ? 502 : response.status,
+      });
     }
     if (body?.status !== "pending_review") {
-      throw new Error("Pandora Memory candidate did not remain pending review");
+      throw submissionFailure({
+        httpStatus: response.status,
+        safeErrorCode: "response_contract_error",
+        validationCategory: "response_contract",
+        retryable: false,
+        correlationId: resolvedCorrelationId,
+        outerStatus: 502,
+      });
     }
-    const { canonicalProjectId, canonicalProjectKey } = assertBoundResponse(body, input);
+
+    let binding;
+    try {
+      binding = assertBoundResponse(body, input);
+    } catch {
+      throw submissionFailure({
+        httpStatus: response.status,
+        safeErrorCode: "response_contract_error",
+        validationCategory: "response_contract",
+        retryable: false,
+        correlationId: resolvedCorrelationId,
+        outerStatus: 502,
+      });
+    }
+    const { canonicalProjectId, canonicalProjectKey } = binding;
 
     return {
       ok: true,
