@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       update_goldens:
-        description: Generate review candidates instead of comparing baselines
+        description: Generate reviewed foundation candidates instead of only comparing baselines
         required: false
         type: boolean
         default: false
@@ -31,9 +31,12 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     env:
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      GOLDENS_UPDATED: ${{ github.event_name == 'workflow_dispatch' && inputs.update_goldens == true && 'true' || 'false' }}
+      OWNER_TEST_FILENAME: pandora-mobile-0.3.0-rc.1-owner-test.apk
+      EXPECTED_APP_VERSION: 0.3.0-rc.1+4
     steps:
       - name: Check out exact source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -72,7 +75,8 @@ jobs:
           path: .pandora-mobile-brand-candidate
           if-no-files-found: error
           include-hidden-files: true
-      - name: Scan exact mobile source for private keys
+      - name: Scan exact Pandora Mobile source for private keys
+        shell: bash
         run: >-
           bash apps/pandora-mobile/tool/check_private_key_literals.sh
           apps/pandora-mobile
@@ -93,67 +97,83 @@ jobs:
           mkdir .pandora-mobile-build
           cd .pandora-mobile-build
           flutter create --platforms=android,web --org com.banataosystems --project-name pandora_mobile .
-          # The generated Android theme uses a platform-default window
-          # background that appears black behind translucent Flutter regions.
-          # Overlay the deterministic Porcelain/Graphite window underlay.
           cp -R ../apps/pandora-mobile/platform/android/. ./android/
           rm -rf lib test assets pubspec.yaml pubspec.lock analysis_options.yaml
           cp -R ../apps/pandora-mobile/lib ./lib
           cp -R ../apps/pandora-mobile/test ./test
           cp -R ../apps/pandora-mobile/assets ./assets
-          # Kept alongside the tests so the canvas parity guard can compare the
-          # Android window underlay against the Dart tokens.
           cp -R ../apps/pandora-mobile/platform ./platform
           cp ../apps/pandora-mobile/pubspec.yaml ./pubspec.yaml
           cp ../apps/pandora-mobile/analysis_options.yaml ./analysis_options.yaml
-          if [[ -f ../apps/pandora-mobile/pubspec.lock ]]; then
-            cp ../apps/pandora-mobile/pubspec.lock ./pubspec.lock
-          fi
-      - name: Resolve dependencies
+          test -f ../apps/pandora-mobile/pubspec.lock
+          cp ../apps/pandora-mobile/pubspec.lock ./pubspec.lock
+          python3 ../apps/pandora-mobile/tool/configure_owner_test_android.py \
+            android/app/src/main/AndroidManifest.xml
+      - name: Resolve dependencies without lock drift
         working-directory: .pandora-mobile-build
+        shell: bash
         run: |
           set -euo pipefail
-          test -f pubspec.lock
           cp pubspec.lock pubspec.lock.expected
           flutter pub get --enforce-lockfile
           cmp pubspec.lock.expected pubspec.lock
+          rm pubspec.lock.expected
       - name: Check formatting
         working-directory: .pandora-mobile-build
         run: dart format --output=none --set-exit-if-changed lib test
       - name: Analyze
         working-directory: .pandora-mobile-build
         run: flutter analyze
-      - name: Test and compare goldens
+      - name: Test and compare committed goldens
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.update_goldens != true }}
         working-directory: .pandora-mobile-build
         run: flutter test --reporter expanded
-      - name: Generate golden review candidates
+      - name: Generate foundation golden review candidates
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.update_goldens == true }}
         working-directory: .pandora-mobile-build
         run: |
           flutter test --update-goldens test/goldens/foundation_catalog_golden_test.dart
           flutter test --reporter expanded
-      - name: Verify owner-screen visual evidence
+      - name: Verify production-widget visual evidence
         shell: bash
         run: |
           set -euo pipefail
           evidence=.pandora-mobile-build/build/owner-screen-evidence
+          baselines=.pandora-mobile-build/test/goldens/owner_screens
           manifest=.pandora-mobile-build/pandora-mobile-owner-screen-evidence-manifest.txt
           test -d "$evidence"
           mapfile -d '' files < <(
             find "$evidence" -type f -name '*.png' -print0 | sort -z
           )
           test "${#files[@]}" -eq 15
+          if [[ -d "$baselines" ]]; then
+            baseline_count=$(find "$baselines" -type f -name '*.png' | wc -l | tr -d ' ')
+          else
+            baseline_count=0
+          fi
+          if [[ "$GOLDENS_UPDATED" == "false" && "$baseline_count" -eq 15 ]]; then
+            comparison=exact_committed_baseline_compare
+          elif [[ "$GOLDENS_UPDATED" == "true" ]]; then
+            comparison=golden_update_dispatch
+          else
+            comparison=capture_only_baselines_pending
+          fi
           {
             echo "source_sha=${SOURCE_SHA}"
-            echo "evidence_class=synthetic_fixture_production_screens"
+            echo "evidence_class=fixture_backed_production_widget_render"
+            echo "runner_class=headless_flutter_test"
+            echo "physical_device=false"
+            echo "authenticated_live_backend=false"
             echo "contains_credentials=false"
+            echo "goldens_updated=${GOLDENS_UPDATED}"
+            echo "baseline_comparison=${comparison}"
+            echo "baseline_count=${baseline_count}"
             echo "screen_count=${#files[@]}"
             for file in "${files[@]}"; do
               sha256sum "$file"
             done
           } > "$manifest"
-      - name: Upload owner-screen visual evidence
+      - name: Upload production-widget visual evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
           name: pandora-mobile-owner-screen-evidence
@@ -162,57 +182,76 @@ jobs:
             .pandora-mobile-build/pandora-mobile-owner-screen-evidence-manifest.txt
           if-no-files-found: error
           include-hidden-files: true
-      - name: Build web
+      - name: Build maintained web candidate
         working-directory: .pandora-mobile-build
         run: flutter build web --release --dart-define=PANDORA_SOURCE_REVISION=${{ env.SOURCE_SHA }}
-      - name: Build Android debug APK
+      - name: Build Android Owner Test APK
         working-directory: .pandora-mobile-build
-        run: flutter build apk --debug --dart-define=PANDORA_SOURCE_REVISION=${{ env.SOURCE_SHA }}
-      - name: Inspect Android package and permissions
         shell: bash
         run: |
           set -euo pipefail
-          apk=.pandora-mobile-build/build/app/outputs/flutter-apk/app-debug.apk
+          test "$(awk '/^version:/{print $2; exit}' pubspec.yaml)" = "$EXPECTED_APP_VERSION"
+          flutter build apk --release \
+            --dart-define=PANDORA_SOURCE_REVISION=${SOURCE_SHA}
+          cp build/app/outputs/flutter-apk/app-release.apk \
+            "build/app/outputs/flutter-apk/${OWNER_TEST_FILENAME}"
+      - name: Inspect Android identity and permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=".pandora-mobile-build/build/app/outputs/flutter-apk/${OWNER_TEST_FILENAME}"
           evidence=.pandora-mobile-build/android-package-evidence
           mkdir -p "$evidence"
           aapt="$(find "${ANDROID_HOME:?}/build-tools" -type f -name aapt | sort -V | tail -1)"
           test -x "$aapt"
           "$aapt" dump badging "$apk" > "$evidence/badging.txt"
           "$aapt" dump permissions "$apk" > "$evidence/permissions.txt"
+          grep -Fq "package: name='com.banataosystems.pandora_mobile'" "$evidence/badging.txt"
+          grep -Fq "versionCode='4'" "$evidence/badging.txt"
+          grep -Fq "versionName='0.3.0-rc.1'" "$evidence/badging.txt"
+          grep -Fq "application-label:'Pandora'" "$evidence/badging.txt"
           if grep -Eiq \
-            'ACCESS_(FINE|COARSE|BACKGROUND)_LOCATION|READ_CONTACTS|WRITE_CONTACTS|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|CAMERA|RECORD_AUDIO|BLUETOOTH_(SCAN|CONNECT|ADVERTISE)' \
+            'ACCESS_(FINE|COARSE|BACKGROUND)_LOCATION|READ_CONTACTS|WRITE_CONTACTS|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|READ_MEDIA_|CAMERA|RECORD_AUDIO|BLUETOOTH_(SCAN|CONNECT|ADVERTISE)|QUERY_ALL_PACKAGES|REQUEST_INSTALL_PACKAGES|SYSTEM_ALERT_WINDOW' \
             "$evidence/permissions.txt"; then
             echo "Unexpected sensitive Android permission detected." >&2
             exit 1
           fi
-      - name: Write test-only artifact manifest
+      - name: Write Owner Test artifact manifest
         shell: bash
         run: |
           set -euo pipefail
-          apk=.pandora-mobile-build/build/app/outputs/flutter-apk/app-debug.apk
+          apk=".pandora-mobile-build/build/app/outputs/flutter-apk/${OWNER_TEST_FILENAME}"
           web=.pandora-mobile-build/build/web
           visual=.pandora-mobile-build/pandora-mobile-owner-screen-evidence-manifest.txt
           android_evidence=.pandora-mobile-build/android-package-evidence
           {
             echo "source_sha=${SOURCE_SHA}"
-            echo "flutter_version=3.47.0"
+            echo "flutter_version=$(flutter --version --machine | python3 -c 'import json,sys; print(json.load(sys.stdin)["frameworkVersion"])')"
             echo "dart_version=$(dart --version 2>&1 | awk '{print $4}')"
             echo "app_version=$(awk '/^version:/{print $2; exit}' .pandora-mobile-build/pubspec.yaml)"
             echo "lock_sha256=$(sha256sum .pandora-mobile-build/pubspec.lock | cut -d ' ' -f1)"
-            echo "artifact_class=test-only"
+            echo "artifact_class=owner-test-pre-release"
+            echo "release_channel=github-prerelease"
             echo "production_release=false"
-            echo "signing_class=android-debug"
+            echo "build_mode=release"
+            echo "signing_class=android-debug-key"
             echo "store_release_eligible=false"
+            echo "physical_device_verified=false"
+            echo "authenticated_owner_journey_verified=false"
+            echo "independent_review_status=pending"
+            echo "apk_filename=${OWNER_TEST_FILENAME}"
             echo "apk_sha256=$(sha256sum "$apk" | cut -d ' ' -f1)"
             echo "apk_size_bytes=$(stat -c '%s' "$apk")"
             echo "web_tree_sha256=$(find "$web" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d ' ' -f1)"
             echo "web_files=$(find "$web" -type f | wc -l | tr -d ' ')"
             echo "visual_evidence_manifest_sha256=$(sha256sum "$visual" | cut -d ' ' -f1)"
             echo "visual_screen_count=$(awk -F= '$1 == "screen_count" {print $2}' "$visual")"
+            echo "visual_baseline_count=$(awk -F= '$1 == "baseline_count" {print $2}' "$visual")"
+            echo "goldens_updated=${GOLDENS_UPDATED}"
             echo "android_badging_sha256=$(sha256sum "$android_evidence/badging.txt" | cut -d ' ' -f1)"
             echo "android_permissions_sha256=$(sha256sum "$android_evidence/permissions.txt" | cut -d ' ' -f1)"
           } > .pandora-mobile-build/pandora-mobile-artifact-manifest.txt
-      - name: Upload golden review candidates
+      - name: Upload foundation golden review candidates
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.update_goldens == true }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
@@ -232,21 +271,22 @@ jobs:
             .pandora-mobile-build/test/goldens/**/*.png
           if-no-files-found: ignore
           include-hidden-files: true
-      - name: Upload web artifact
+      - name: Upload web Owner Test artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
-          name: pandora-mobile-web
+          name: pandora-mobile-web-owner-test
           path: |
             .pandora-mobile-build/build/web
             .pandora-mobile-build/pandora-mobile-artifact-manifest.txt
             .pandora-mobile-build/android-package-evidence
           include-hidden-files: true
-      - name: Upload Android artifact
+      - name: Upload Android Owner Test artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
-          name: pandora-mobile-android-debug
+          name: pandora-mobile-android-owner-test
           path: |
-            .pandora-mobile-build/build/app/outputs/flutter-apk/app-debug.apk
+            .pandora-mobile-build/build/app/outputs/flutter-apk/${{ env.OWNER_TEST_FILENAME }}
             .pandora-mobile-build/pandora-mobile-artifact-manifest.txt
             .pandora-mobile-build/android-package-evidence
+          if-no-files-found: error
           include-hidden-files: true
