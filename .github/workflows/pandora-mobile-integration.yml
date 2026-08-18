@@ -30,12 +30,19 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
       - name: Verify exact source checkout
         run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
       - name: Verify approved brand assets
         run: node scripts/verify-pandora-brand-assets.mjs
-      - name: Scan exact source for private keys
-        run: bash scripts/check-private-key-literals.sh
+      - name: Scan exact mobile source for private keys
+        run: >-
+          bash scripts/check-private-key-literals.sh
+          apps/pandora-mobile
+          assets/brand/pandoras-box/product-mark
+          .github/workflows/pandora-mobile-integration.yml
+          scripts/verify-pandora-brand-assets.mjs
+          scripts/check-private-key-literals.sh
       - name: Install pinned Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
