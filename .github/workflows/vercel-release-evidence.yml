@@ -1,0 +1,50 @@
+name: Vercel release evidence
+
+on:
+  pull_request:
+    paths:
+      - "docs/releases/vercel/**"
+      - "scripts/verify-vercel-release-evidence.mjs"
+      - "test/vercel-release-evidence.test.js"
+      - ".github/workflows/vercel-release-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-release-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-release-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prove exact-head checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+          printf 'exact_head=%s\n' "$ACTUAL_SHA"
+
+      - name: Use pinned Node major
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          check-latest: false
+
+      - name: Validate content-addressed release evidence
+        run: node scripts/verify-vercel-release-evidence.mjs
+
+      - name: Run release-policy regressions
+        run: node --test test/vercel-release-evidence.test.js
