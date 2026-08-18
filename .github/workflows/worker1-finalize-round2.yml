@@ -1,27 +1,28 @@
-# One-shot retrigger after workflow registration on the isolated successor branch.
+# Temporary draft-PR trigger; this file self-deletes before reviewable source exists.
 name: Worker 1 finalize reliability round two
 
 on:
-  push:
-    branches:
-      - fix/projectos-memory-reliability-round2-20260819
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
 
 permissions:
   contents: write
 
 concurrency:
-  group: worker1-finalize-round2-${{ github.ref }}
+  group: worker1-finalize-round2-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   finalize:
+    if: github.event.pull_request.head.ref == 'fix/projectos-memory-reliability-round2-20260819'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Check out the exact isolated successor head
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Apply the reviewed source and contract corrections
