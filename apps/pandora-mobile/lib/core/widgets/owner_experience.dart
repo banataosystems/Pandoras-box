@@ -234,29 +234,38 @@ class _MetricCell extends StatelessWidget {
           borderRadius: PandoraRadius.controlBorder,
           border: Border.all(color: palette.outlineSoft),
         ),
+        // The grid hosts these cells in a Wrap, so the incoming height is
+        // unbounded. A flex child (Spacer) cannot resolve against that, so the
+        // icon is separated from the readout by spaceBetween instead: the
+        // minHeight above still supplies the slack that anchors the readout to
+        // the bottom, and the cell simply grows when text scaling needs it.
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Icon(metric.icon, size: 19, color: accent),
-            const Spacer(),
-            Text(
-              metric.value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.4),
-            ),
-            const SizedBox(height: PandoraSpacing.xxs),
-            Text(
-              metric.label,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  metric.value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700, letterSpacing: -0.4),
+                ),
+                const SizedBox(height: PandoraSpacing.xxs),
+                Text(
+                  metric.label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
             ),
           ],
         ),
