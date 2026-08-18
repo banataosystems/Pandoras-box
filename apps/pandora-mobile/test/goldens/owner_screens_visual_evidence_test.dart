@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -16,6 +17,7 @@ import 'package:pandora_mobile/features/approvals/approvals_screen.dart';
 import 'package:pandora_mobile/features/command/command_screen.dart';
 import 'package:pandora_mobile/features/connections/connections_screen.dart';
 import 'package:pandora_mobile/features/home/home_screen.dart';
+import 'package:pandora_mobile/features/intelligence/owner_intelligence_screen.dart';
 import 'package:pandora_mobile/features/projects/project_detail_screen.dart';
 import 'package:pandora_mobile/features/projects/projects_screen.dart';
 import 'package:pandora_mobile/features/safety/safety_screen.dart';
@@ -36,6 +38,7 @@ class _VisualCase {
     this.logicalSize = _phoneSize,
     this.textScaler = TextScaler.noScaling,
     this.failing = false,
+    this.pending = false,
   });
 
   final String name;
@@ -44,12 +47,14 @@ class _VisualCase {
   final Size logicalSize;
   final TextScaler textScaler;
   final bool failing;
+  final bool pending;
 }
 
 class _FixtureRepository implements PandoraRepository {
-  _FixtureRepository({this.failing = false});
+  _FixtureRepository({this.failing = false, this.pending = false});
 
   final bool failing;
+  final bool pending;
   static final DateTime _verifiedAt = DateTime.utc(2026, 8, 14, 1);
   static final DateTime _staleAfter = DateTime.utc(2030, 8, 14, 1);
 
@@ -68,6 +73,10 @@ class _FixtureRepository implements PandoraRepository {
     }
   }
 
+  Future<RepositorySnapshot<T>> _pending<T>() {
+    return Completer<RepositorySnapshot<T>>().future;
+  }
+
   RepositorySnapshot<T> _snapshot<T>(T data) => RepositorySnapshot<T>(
         data: data,
         source: RepositorySource.network,
@@ -82,6 +91,7 @@ class _FixtureRepository implements PandoraRepository {
 
   @override
   Future<RepositorySnapshot<HomeSummary>> home() async {
+    if (pending) return _pending<HomeSummary>();
     _guard();
     return _snapshot(
       HomeSummary.fromJson(asJsonMap(_read('home.json'))),
@@ -189,7 +199,10 @@ Future<void> _captureScreen(
   _VisualCase visual,
 ) async {
   await setTestSurface(tester, logicalSize: visual.logicalSize);
-  final repository = _FixtureRepository(failing: visual.failing);
+  final repository = _FixtureRepository(
+    failing: visual.failing,
+    pending: visual.pending,
+  );
   await tester.pumpWidget(
     PandoraDependencies(
       auth: const FakeAuth(),
@@ -211,7 +224,11 @@ Future<void> _captureScreen(
       tester.element(find.byKey(_surfaceKey)),
     ),
   );
-  await tester.pumpAndSettle();
+  if (visual.pending) {
+    await tester.pump();
+  } else {
+    await tester.pumpAndSettle();
+  }
   expect(
     tester.takeException(),
     isNull,
@@ -232,6 +249,14 @@ Future<void> _captureScreen(
   );
   image.dispose();
   expect(output.lengthSync(), greaterThan(0));
+
+  final baseline = File('test/goldens/owner_screens/${visual.name}.png');
+  if (baseline.existsSync()) {
+    await expectLater(
+      find.byKey(_surfaceKey),
+      matchesGoldenFile(baseline.path),
+    );
+  }
 }
 
 void main() {
@@ -245,6 +270,11 @@ void main() {
       build: () => const HomeScreen(),
       themeMode: ThemeMode.dark,
       failing: true,
+    ),
+    _VisualCase(
+      name: 'home_loading_porcelain_390x844',
+      build: () => const HomeScreen(),
+      pending: true,
     ),
     _VisualCase(
       name: 'home_attention_porcelain_320x800',
@@ -279,6 +309,18 @@ void main() {
     _VisualCase(
       name: 'connections_healthy_porcelain_390x844',
       build: () => const ConnectionsScreen(),
+    ),
+    _VisualCase(
+      name: 'connections_degraded_graphite_390x844',
+      build: () => const ConnectionsScreen(),
+      themeMode: ThemeMode.dark,
+      failing: true,
+    ),
+    _VisualCase(
+      name: 'memory_approved_porcelain_390x844',
+      build: () => const OwnerIntelligenceScreen(
+        initialSection: OwnerIntelligenceSection.memory,
+      ),
     ),
     _VisualCase(
       name: 'safety_protected_porcelain_390x844',
