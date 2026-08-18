@@ -1,3 +1,4 @@
+# One-shot retrigger after workflow registration on the isolated successor branch.
 name: Worker 1 finalize reliability round two
 
 on:
