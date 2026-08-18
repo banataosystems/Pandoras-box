@@ -1,0 +1,132 @@
+name: Worker 1 apply reliability review round 3
+
+on:
+  push:
+    branches:
+      - fix/projectos-memory-supabase-contracts-20260819
+    paths:
+      - .github/scripts/worker1_apply_review_round3.py
+      - .github/workflows/worker1-apply-review-round3.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: worker1-memory-projectos-review-round3
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    name: Apply, verify, and self-clean
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact lane branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/projectos-memory-supabase-contracts-20260819
+          fetch-depth: 0
+
+      - name: Record immutable input
+        id: input
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          test "$(git branch --show-current)" = "fix/projectos-memory-supabase-contracts-20260819"
+          test -f .github/scripts/worker1_apply_review_round3.py
+          test -f .github/workflows/worker1-apply-review-round3.yml
+
+      - name: Apply exact fail-closed transformation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile .github/scripts/worker1_apply_review_round3.py
+          python .github/scripts/worker1_apply_review_round3.py
+          rm .github/scripts/worker1_apply_review_round3.py
+          rm .github/workflows/worker1-apply-review-round3.yml
+
+      - name: Enforce exact changed-path boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            git diff --name-only
+            git ls-files --others --exclude-standard
+          } | sort -u > /tmp/actual-paths.txt
+          cat > /tmp/expected-paths.txt <<'EOF'
+          .github/scripts/worker1_apply_review_round3.py
+          .github/workflows/worker1-apply-review-round3.yml
+          src/projectos-mcp-handler.js
+          src/runtime/execution-ledger-client.js
+          src/tools/memory-evidence-intake.js
+          test/execution-ledger-finalization-contract.test.js
+          test/projectos-memory-supabase-contract-regression.test.js
+          EOF
+          sort -o /tmp/expected-paths.txt /tmp/expected-paths.txt
+          echo "Changed paths:"
+          cat /tmp/actual-paths.txt
+          diff -u /tmp/expected-paths.txt /tmp/actual-paths.txt
+          ! grep -R --line-number --fixed-strings 'worker1_apply_review_round3' src test
+          ! grep -R --line-number --fixed-strings 'worker1-apply-review-round3' src test
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Source and migration integrity
+        shell: bash
+        run: npm run check:source
+
+      - name: Targeted contract regressions
+        shell: bash
+        run: |
+          node --test test/projectos-memory-supabase-contract-regression.test.js
+          node --test test/execution-ledger-finalization-contract.test.js
+
+      - name: Complete repository test suite
+        shell: bash
+        run: npm test
+
+      - name: Production dependency security audit
+        shell: bash
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Commit only verified final source and tests
+        id: commit
+        shell: bash
+        env:
+          INPUT_SHA: ${{ steps.input.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A -- \
+            .github/scripts/worker1_apply_review_round3.py \
+            .github/workflows/worker1-apply-review-round3.yml \
+            src/projectos-mcp-handler.js \
+            src/runtime/execution-ledger-client.js \
+            src/tools/memory-evidence-intake.js \
+            test/execution-ledger-finalization-contract.test.js \
+            test/projectos-memory-supabase-contract-regression.test.js
+          git diff --cached --check
+          git commit -m 'fix(projectos): close reliability review gaps'
+          FINAL_SHA="$(git rev-parse HEAD)"
+          echo "sha=$FINAL_SHA" >> "$GITHUB_OUTPUT"
+          git push origin HEAD:fix/projectos-memory-supabase-contracts-20260819
+          {
+            echo '## Worker 1 reliability review round 3'
+            echo
+            echo "- Input SHA: \`$INPUT_SHA\`"
+            echo "- Final SHA: \`$FINAL_SHA\`"
+            echo '- Temporary automation removed from final tree.'
+            echo '- Source integrity, targeted regressions, full tests, and production dependency audit passed before push.'
+            echo '- No merge, deployment, or production mutation performed.'
+          } >> "$GITHUB_STEP_SUMMARY"
