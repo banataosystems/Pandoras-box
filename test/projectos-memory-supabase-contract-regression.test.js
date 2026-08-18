@@ -112,6 +112,7 @@ function failureFrom(error) {
     "operation",
     "provider",
     "retryable",
+    "summary",
     "safeErrorCode",
     "schemaVersion",
     "timestamp",
@@ -120,6 +121,7 @@ function failureFrom(error) {
   assert.equal(parsed.schemaVersion, "1.0.0");
   assert.equal(parsed.provider, "pandora-memory");
   assert.equal(parsed.operation, "memory.submitEvidenceCandidate");
+  assert.equal(typeof parsed.summary, "string");
   assert.match(parsed.correlationId, /^[A-Za-z0-9._:-]{1,128}$/);
   assert.ok(Number.isFinite(Date.parse(parsed.timestamp)));
   return parsed;
@@ -323,6 +325,7 @@ test("conflicting idempotency reuse fails closed with a distinct structured 409"
       assert.equal(failure.safeErrorCode, "idempotency_conflict");
       assert.equal(failure.validationCategory, "idempotency");
       assert.equal(failure.retryable, false);
+      assert.match(failure.summary, /idempotency conflict/i);
       return true;
     },
   );
