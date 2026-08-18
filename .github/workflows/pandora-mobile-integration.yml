@@ -36,23 +36,31 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
       - name: Verify approved brand assets
         run: node scripts/verify-pandora-brand-assets.mjs
-      - name: Generate transparent mobile-mark review candidate
+      - name: Reproduce and verify transparent mobile mark
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p .pandora-mobile-brand-candidate
+          source=assets/brand/pandoras-box/product-mark/derived/ui-mark-1024.png
+          canonical=assets/brand/pandoras-box/product-mark/derived/ui-mark-transparent-1024.png
+          app_asset=apps/pandora-mobile/assets/brand/pandora-product-mark-ui-1024.png
+          output=.pandora-mobile-brand-candidate/pandora-product-mark-transparent-1024.png
+          mkdir -p "$(dirname "$output")"
           python3 scripts/create-transparent-pandora-mark.py \
-            apps/pandora-mobile/assets/brand/pandora-product-mark-ui-1024.png \
-            .pandora-mobile-brand-candidate/pandora-product-mark-transparent-1024.png \
+            "$source" \
+            "$output" \
             --manifest .pandora-mobile-brand-candidate/manifest.json
+          cmp "$output" "$canonical"
+          cmp "$canonical" "$app_asset"
           {
             echo "source_sha=${SOURCE_SHA}"
-            echo "review_status=unapproved_candidate"
+            echo "candidate_sha256=$(sha256sum "$output" | cut -d ' ' -f1)"
+            echo "canonical_sha256=$(sha256sum "$canonical" | cut -d ' ' -f1)"
+            echo "review_status=verified_exact_canonical"
           } > .pandora-mobile-brand-candidate/source.txt
-      - name: Upload transparent mobile-mark review candidate
+      - name: Upload transparent mobile-mark verification evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
-          name: pandora-mobile-transparent-mark-candidate
+          name: pandora-mobile-transparent-mark-evidence
           path: .pandora-mobile-brand-candidate
           if-no-files-found: error
           include-hidden-files: true
