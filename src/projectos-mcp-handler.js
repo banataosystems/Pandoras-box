@@ -26,6 +26,12 @@ const {
 
 const PLAN_TTL_MS = 10 * 60 * 1000;
 const MAX_BODY_BYTES = 256 * 1024;
+const MAX_TOOL_RESULT_BYTES = 512 * 1024;
+const MAX_TOOL_RESULT_ARRAY_ITEMS = 500;
+const MAX_TOOL_RESULT_OBJECT_KEYS = 500;
+const MAX_TOOL_RESULT_DEPTH = 20;
+const MAX_TOOL_RESULT_NODES = 20_000;
+const MAX_TOOL_RESULT_STRING_CHARS = 256 * 1024;
 const DEFAULT_RESOURCE_ORIGIN = "https://mcpmaster.vercel.app";
 const AUTHORIZATION_SERVER = "https://jcyqixttuebxqqfkjonq.supabase.co/auth/v1";
 const IDENTITY_SCOPES = Object.freeze(["openid", "email", "profile"]);
@@ -147,6 +153,59 @@ async function jsonBody(request) {
     }
 }
 
+function providerResponseContractError() {
+    return Object.assign(new Error("Provider response contract is invalid or exceeds bounded MCP limits"), {
+        status: 502,
+        code: "provider_response_contract_error",
+    });
+}
+
+function assertBoundedToolResult(root) {
+    const stack = [{ value: root, depth: 0, exit: false }];
+    const active = new Set();
+    let nodes = 0;
+    while (stack.length > 0) {
+        const entry = stack.pop();
+        if (entry.exit) {
+            active.delete(entry.value);
+            continue;
+        }
+        if (entry.depth > MAX_TOOL_RESULT_DEPTH) throw providerResponseContractError();
+        nodes += 1;
+        if (nodes > MAX_TOOL_RESULT_NODES) throw providerResponseContractError();
+        const value = entry.value;
+        if (value === null || typeof value === "boolean") continue;
+        if (typeof value === "string") {
+            if (value.length > MAX_TOOL_RESULT_STRING_CHARS) throw providerResponseContractError();
+            continue;
+        }
+        if (typeof value === "number") {
+            if (!Number.isFinite(value)) throw providerResponseContractError();
+            continue;
+        }
+        if (!value || typeof value !== "object") throw providerResponseContractError();
+        if (active.has(value)) throw providerResponseContractError();
+        active.add(value);
+        stack.push({ value, depth: entry.depth, exit: true });
+        if (Array.isArray(value)) {
+            if (value.length > MAX_TOOL_RESULT_ARRAY_ITEMS) throw providerResponseContractError();
+            for (let index = value.length - 1; index >= 0; index -= 1) {
+                stack.push({ value: value[index], depth: entry.depth + 1, exit: false });
+            }
+            continue;
+        }
+        const prototype = Object.getPrototypeOf(value);
+        if (prototype !== Object.prototype && prototype !== null) throw providerResponseContractError();
+        const keys = Object.keys(value);
+        if (keys.length > MAX_TOOL_RESULT_OBJECT_KEYS || Reflect.ownKeys(value).length !== keys.length) {
+            throw providerResponseContractError();
+        }
+        for (let index = keys.length - 1; index >= 0; index -= 1) {
+            stack.push({ value: value[keys[index]], depth: entry.depth + 1, exit: false });
+        }
+    }
+}
+
 function structuredToolContent(value) {
     if (value && typeof value === "object" && !Array.isArray(value)) return value;
     if (Array.isArray(value)) return { items: value };
@@ -154,10 +213,27 @@ function structuredToolContent(value) {
 }
 
 function toolResult(value) {
-    return {
-        content: [{ type: "text", text: JSON.stringify(value) }],
-        structuredContent: structuredToolContent(value),
-    };
+    try {
+        assertBoundedToolResult(value);
+        const text = JSON.stringify(value);
+        if (typeof text !== "string" || Buffer.byteLength(text, "utf8") > MAX_TOOL_RESULT_BYTES) {
+            throw providerResponseContractError();
+        }
+        const structuredContent = structuredToolContent(value);
+        const structuredText = JSON.stringify(structuredContent);
+        if (
+            typeof structuredText !== "string" ||
+            Buffer.byteLength(structuredText, "utf8") > MAX_TOOL_RESULT_BYTES
+        ) {
+            throw providerResponseContractError();
+        }
+        return {
+            content: [{ type: "text", text }],
+            structuredContent,
+        };
+    } catch {
+        throw providerResponseContractError();
+    }
 }
 
 function rpcResult(response, id, result) {
@@ -392,6 +468,52 @@ async function createDurablePlan(tool, toolArgs, dependencies) {
     });
 }
 
+function executionResultSummary(tool, result) {
+    if (tool === "memory.submitEvidenceCandidate" && result && typeof result === "object") {
+        return {
+            type: "memory_evidence_candidate",
+            candidateId: result.candidateId,
+            reviewItemId: result.reviewItemId,
+            status: result.status,
+            deduplicated: result.deduplicated === true,
+            idempotencyKey: result.idempotencyKey,
+            namespace: result.namespace,
+            projectId: result.projectId,
+            projectKey: result.projectKey,
+            proofStage: result.proofStage,
+            canonicalPromoted: result.canonicalPromoted === true,
+            privacyScanVersion: result.privacyScanVersion,
+        };
+    }
+    return {
+        type: result === null ? "null" : Array.isArray(result) ? "array" : typeof result,
+    };
+}
+
+function safeExecutionAuditError(error) {
+    if (error instanceof Error && error.failure && typeof error.failure === "object") {
+        const serialized = JSON.stringify(error.failure);
+        if (serialized === error.message && Buffer.byteLength(serialized, "utf8") <= 1000) {
+            return serialized;
+        }
+    }
+    return JSON.stringify({
+        schemaVersion: "1.0.0",
+        safeErrorCode: "provider_execution_failed",
+        summary: "ProjectOS provider execution failed",
+    });
+}
+
+function assertFinalizedPlan(plan, claimed, expectedStatus) {
+    if (!plan || plan.planId !== claimed.planId || plan.status !== expectedStatus) {
+        throw Object.assign(new Error("execution_finalization_ambiguous"), {
+            status: 503,
+            code: "execution_finalization_ambiguous",
+        });
+    }
+    return plan;
+}
+
 async function callTool(name, args, actor, dependencies) {
     assertToolScope(name, actor);
     const plannedTool = legacyPlannedTool(name);
@@ -470,28 +592,50 @@ async function callTool(name, args, actor, dependencies) {
             }
             if (!toolRegistry[claimed.tool]) throw Object.assign(new Error(`Unknown tool: ${claimed.tool}`), { status: 400 });
             const startedAt = dependencies.now();
+            let result;
+            let executionError;
+            let preparedResult;
             try {
-                const result = await dependencies.execute(
+                result = await dependencies.execute(
                     claimed.tool,
                     claimed.args,
                     dependencies.toolConfiguration(claimed.tool, { vercelOidcToken: token }),
                 );
-                await dependencies.ledger.finishPlan(token, {
+                // Validate and bound the caller response before declaring the plan
+                // completed. A malformed provider result therefore cannot become a
+                // durable false success.
+                preparedResult = toolResult({
                     planId: claimed.planId,
-                    status: "completed",
-                    durationMs: Math.max(0, dependencies.now() - startedAt),
-                    resultSummary: { type: typeof result },
+                    planStatus: "completed",
+                    result,
                 });
-                return toolResult({ planId: claimed.planId, result });
             } catch (error) {
-                await dependencies.ledger.finishPlan(token, {
-                    planId: claimed.planId,
-                    status: "failed",
-                    durationMs: Math.max(0, dependencies.now() - startedAt),
-                    error: error instanceof Error ? error.message.slice(0, 1000) : "Unknown execution error",
-                });
-                throw error;
+                executionError = error;
             }
+            const finalStatus = executionError ? "failed" : "completed";
+            const finalizationInput = executionError
+                ? {
+                    planId: claimed.planId,
+                    status: finalStatus,
+                    durationMs: Math.max(0, dependencies.now() - startedAt),
+                    error: safeExecutionAuditError(executionError),
+                }
+                : {
+                    planId: claimed.planId,
+                    status: finalStatus,
+                    durationMs: Math.max(0, dependencies.now() - startedAt),
+                    resultSummary: executionResultSummary(claimed.tool, result),
+                };
+            const finalized = assertFinalizedPlan(
+                await dependencies.ledger.finishPlan(token, finalizationInput),
+                claimed,
+                finalStatus,
+            );
+            if (executionError) throw executionError;
+            if (!preparedResult || finalized.status !== "completed") {
+                throw Object.assign(new Error("execution_finalization_ambiguous"), { status: 503 });
+            }
+            return preparedResult;
         }
         default:
             throw Object.assign(new Error(`Unknown ProjectOS MCP tool: ${name}`), { status: 400 });

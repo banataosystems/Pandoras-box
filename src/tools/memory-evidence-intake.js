@@ -9,6 +9,7 @@ const { z } = require("zod");
 
 const MAX_RESPONSE_BYTES = 100_000;
 const DEFAULT_TIMEOUT_MS = 8_000;
+const MAX_TIMEOUT_MS = 30_000;
 const CANONICAL_PROJECT_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CANONICAL_PROJECT_KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{1,95}$/;
@@ -21,15 +22,15 @@ const EVIDENCE_PRIVACY_SCAN_VERSION = "evidence_privacy_v2";
 const MAX_RETRY_AFTER_MS = 86_400_000;
 
 const SAFE_BACKEND_FAILURES = new Map([
-  ["unsupported_action", { validationCategory: "capability_contract", retryable: false }],
-  ["unexpected_field", { validationCategory: "request_validation", retryable: false }],
-  ["project_identity_invalid", { validationCategory: "project_identity", retryable: false }],
-  ["evidence_candidate_invalid", { validationCategory: "candidate_validation", retryable: false }],
-  ["sensitive_candidate_rejected", { validationCategory: "privacy_policy", retryable: false }],
-  ["namespace_not_allowed", { validationCategory: "namespace_authorization", retryable: false }],
-  ["scope_not_allowed", { validationCategory: "scope_authorization", retryable: false }],
-  ["project_not_allowed", { validationCategory: "project_authorization", retryable: false }],
-  [IDEMPOTENCY_CONFLICT_CODE, { validationCategory: "idempotency", retryable: false }],
+  ["unsupported_action", { httpStatuses: [400], validationCategory: "capability_contract", retryable: false }],
+  ["unexpected_field", { httpStatuses: [400], validationCategory: "request_validation", retryable: false }],
+  ["project_identity_invalid", { httpStatuses: [400], validationCategory: "project_identity", retryable: false }],
+  ["evidence_candidate_invalid", { httpStatuses: [400], validationCategory: "candidate_validation", retryable: false }],
+  ["sensitive_candidate_rejected", { httpStatuses: [400], validationCategory: "privacy_policy", retryable: false }],
+  ["namespace_not_allowed", { httpStatuses: [403], validationCategory: "namespace_authorization", retryable: false }],
+  ["scope_not_allowed", { httpStatuses: [403], validationCategory: "scope_authorization", retryable: false }],
+  ["project_not_allowed", { httpStatuses: [403], validationCategory: "project_authorization", retryable: false }],
+  [IDEMPOTENCY_CONFLICT_CODE, { httpStatuses: [409], validationCategory: "idempotency", retryable: false }],
 ]);
 
 function safeCorrelationId(value, fallback) {
@@ -144,6 +145,22 @@ const ProofStageSchema = z.enum([
   "production_verified",
 ]);
 
+const EvidenceCandidateSuccessResponseSchema = z.object({
+  ok: z.literal(true),
+  candidate_id: z.string().regex(CANONICAL_PROJECT_ID_PATTERN),
+  review_item_id: z.string().regex(CANONICAL_PROJECT_ID_PATTERN),
+  status: z.literal("pending_review"),
+  idempotency_key: z.string().trim().regex(/^[A-Za-z0-9._:-]{16,160}$/),
+  namespace: NamespaceSchema,
+  project_id: z.string().regex(CANONICAL_PROJECT_ID_PATTERN),
+  project_key: z.string().regex(CANONICAL_PROJECT_KEY_PATTERN),
+  proof_stage: ProofStageSchema,
+  deduplicated: z.boolean(),
+  created_at: z.string().datetime({ offset: true }).nullable(),
+  canonical_memory_written: z.literal(false),
+  privacy_policy: z.literal("metadata_only_v1"),
+}).strict();
+
 const EvidenceRefSchema = z.object({
   type: z.string().trim().min(1).max(64),
   ref: z.string().trim().min(1).max(512),
@@ -193,6 +210,13 @@ function normalizeOrigin(value) {
     throw new Error("Pandora Memory origin must be a clean HTTPS origin");
   }
   return url.origin;
+}
+
+function boundedPositiveInteger(value, fallback, maximum) {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0
+    ? Math.min(parsed, maximum)
+    : fallback;
 }
 
 const EVIDENCE_PRIVACY_TEXT_LIMIT = 20_000;
@@ -333,38 +357,27 @@ async function readBounded(response, maxBytes) {
   return text;
 }
 
-function assertBoundResponse(body, input) {
-  if (body?.idempotency_key !== input.idempotencyKey) {
-    throw new Error("Pandora Memory candidate response idempotency mismatch");
-  }
-  if (body?.namespace !== input.namespace) {
-    throw new Error("Pandora Memory candidate response namespace mismatch");
-  }
-  if (body?.proof_stage !== input.proofStage) {
-    throw new Error("Pandora Memory candidate response proof-stage mismatch");
-  }
-  if (input.projectId && body?.project_id !== input.projectId) {
-    throw new Error("Pandora Memory candidate response project-id mismatch");
-  }
-  if (input.projectKey && body?.project_key !== input.projectKey) {
-    throw new Error("Pandora Memory candidate response project-key mismatch");
-  }
-
-  const canonicalProjectId = body?.project_id;
-  const canonicalProjectKey = body?.project_key;
+function parseBoundSuccessResponse(status, body, input) {
+  if (status !== 200 && status !== 202) return null;
+  const parsed = EvidenceCandidateSuccessResponseSchema.safeParse(body);
+  if (!parsed.success) return null;
+  const value = parsed.data;
   if (
-    typeof canonicalProjectId !== "string" ||
-    !CANONICAL_PROJECT_ID_PATTERN.test(canonicalProjectId)
+    value.idempotency_key !== input.idempotencyKey ||
+    value.namespace !== input.namespace ||
+    value.proof_stage !== input.proofStage ||
+    (input.projectId && value.project_id !== input.projectId) ||
+    (input.projectKey && value.project_key !== input.projectKey)
   ) {
-    throw new Error("Pandora Memory candidate response canonical project id is invalid");
+    return null;
   }
-  if (
-    typeof canonicalProjectKey !== "string" ||
-    !CANONICAL_PROJECT_KEY_PATTERN.test(canonicalProjectKey)
-  ) {
-    throw new Error("Pandora Memory candidate response canonical project key is invalid");
+  if (status === 202 && (value.deduplicated || value.created_at === null)) {
+    return null;
   }
-  return { canonicalProjectId, canonicalProjectKey };
+  if (status === 200 && (!value.deduplicated || value.created_at !== null)) {
+    return null;
+  }
+  return value;
 }
 
 function safeBackendFailure(status, body) {
@@ -383,17 +396,17 @@ function safeBackendFailure(status, body) {
       retryable: true,
     };
   }
-  if (status === 409) {
-    if (candidateCode === IDEMPOTENCY_CONFLICT_CODE) {
-      return {
-        safeErrorCode: IDEMPOTENCY_CONFLICT_CODE,
-        validationCategory: "idempotency",
-        retryable: false,
-      };
-    }
+  if (status >= 500) {
     return {
-      safeErrorCode: "provider_conflict",
-      validationCategory: "downstream_conflict",
+      safeErrorCode: "provider_server_error",
+      validationCategory: "provider_server",
+      retryable: true,
+    };
+  }
+  if (status >= 200 && status < 300) {
+    return {
+      safeErrorCode: "response_contract_error",
+      validationCategory: "response_contract",
       retryable: false,
     };
   }
@@ -401,17 +414,24 @@ function safeBackendFailure(status, body) {
     ? SAFE_BACKEND_FAILURES.get(candidateCode)
     : undefined;
   if (known) {
+    if (!known.httpStatuses.includes(status)) {
+      return {
+        safeErrorCode: "response_contract_error",
+        validationCategory: "response_contract",
+        retryable: false,
+      };
+    }
     return {
       safeErrorCode: candidateCode,
       validationCategory: known.validationCategory,
       retryable: known.retryable,
     };
   }
-  if (status >= 500) {
+  if (status === 409) {
     return {
-      safeErrorCode: "provider_server_error",
-      validationCategory: "provider_server",
-      retryable: true,
+      safeErrorCode: "provider_conflict",
+      validationCategory: "downstream_conflict",
+      retryable: false,
     };
   }
   return {
@@ -453,11 +473,18 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
 
   const origin = normalizeOrigin(configuration.baseUrl);
   const correlationId = randomUUID();
-  const controller = new AbortController();
-  const timeout = setTimeout(
-    () => controller.abort(),
-    Math.min(Number(configuration.timeoutMs || DEFAULT_TIMEOUT_MS), 30_000),
+  const timeoutMs = boundedPositiveInteger(
+    configuration.timeoutMs,
+    DEFAULT_TIMEOUT_MS,
+    MAX_TIMEOUT_MS,
   );
+  const maxResponseBytes = boundedPositiveInteger(
+    configuration.maxResponseBytes,
+    MAX_RESPONSE_BYTES,
+    MAX_RESPONSE_BYTES,
+  );
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   const payload = {
     namespace: input.namespace,
@@ -508,10 +535,7 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
     const resolvedCorrelationId = responseCorrelationId(response, correlationId);
     let text;
     try {
-      text = await readBounded(
-        response,
-        Math.min(Number(configuration.maxResponseBytes || MAX_RESPONSE_BYTES), MAX_RESPONSE_BYTES),
-      );
+      text = await readBounded(response, maxResponseBytes);
     } catch {
       throw submissionFailure({
         httpStatus: Number.isInteger(response.status) ? response.status : null,
@@ -553,28 +577,38 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
         ...classified,
         retryAfterMs: responseRetryAfterMs(response),
         correlationId: resolvedCorrelationId,
-        outerStatus: normalizeOuterFailureStatus(response.status),
+        outerStatus: classified.safeErrorCode === "response_contract_error"
+          ? 502
+          : normalizeOuterFailureStatus(response.status),
       });
     }
-    if (body?.status !== "pending_review") {
-      throw new Error("Pandora Memory candidate did not remain pending review");
+    const success = parseBoundSuccessResponse(response.status, body, input);
+    if (!success) {
+      throw submissionFailure({
+        httpStatus: Number.isInteger(response.status) ? response.status : null,
+        safeErrorCode: "response_contract_error",
+        validationCategory: "response_contract",
+        retryable: false,
+        correlationId: resolvedCorrelationId,
+        outerStatus: 502,
+      });
     }
-
-    const { canonicalProjectId, canonicalProjectKey } = assertBoundResponse(body, input);
 
     return {
       ok: true,
-      candidateId: body.candidate_id ?? null,
-      status: "pending_review",
-      deduplicated: body.deduplicated === true,
-      idempotencyKey: input.idempotencyKey,
-      namespace: input.namespace,
-      projectId: canonicalProjectId,
-      projectKey: canonicalProjectKey,
-      proofStage: input.proofStage,
-      createdAt: body.created_at ?? null,
+      candidateId: success.candidate_id,
+      reviewItemId: success.review_item_id,
+      status: success.status,
+      deduplicated: success.deduplicated,
+      idempotencyKey: success.idempotency_key,
+      namespace: success.namespace,
+      projectId: success.project_id,
+      projectKey: success.project_key,
+      proofStage: success.proof_stage,
+      createdAt: success.created_at,
+      privacyPolicy: success.privacy_policy,
       privacyScanVersion: EVIDENCE_PRIVACY_SCAN_VERSION,
-      canonicalPromoted: false,
+      canonicalPromoted: success.canonical_memory_written,
     };
   } finally {
     clearTimeout(timeout);

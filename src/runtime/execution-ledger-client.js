@@ -1,12 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ExecutionLedgerClient = exports.ExecutionLedgerError = void 0;
+exports.ExecutionLedgerClient = exports.ExecutionLedgerFinalizationError = exports.ExecutionLedgerError = void 0;
 const zod_1 = require("zod");
 const mandatory_intake_js_1 = require("./mandatory-intake.js");
 const plan_memory_context_js_1 = require("./plan-memory-context.js");
 const plan_context_ledger_client_js_1 = require("./plan-context-ledger-client.js");
 const DEFAULT_CONTROL_URL = 'https://jcyqixttuebxqqfkjonq.supabase.co/functions/v1/mcpmaster-supabase-control';
 const DEFAULT_TIMEOUT_MS = 10000;
+const MAX_TIMEOUT_MS = 30000;
 const DEFAULT_MAX_RESPONSE_BYTES = 512000;
 const FINALIZATION_RETRY_ATTEMPTS = 3;
 const RiskSchema = zod_1.z.enum(['read', 'write', 'destructive']);
@@ -18,6 +19,7 @@ const PlanStatusSchema = zod_1.z.enum([
     'failed',
     'expired',
 ]);
+const FinalPlanStatusSchema = zod_1.z.enum(['completed', 'failed']);
 const IntakeLifecycleStatusSchema = zod_1.z.enum([
     'accepted',
     'analyzing',
@@ -53,7 +55,7 @@ const PlanSchema = zod_1.z.object({
 const PlanResponseSchema = zod_1.z.object({ ok: zod_1.z.literal(true), plan: PlanSchema });
 const PlanListResponseSchema = zod_1.z.object({
     ok: zod_1.z.literal(true),
-    plans: zod_1.z.array(PlanSchema),
+    plans: zod_1.z.array(PlanSchema).max(500),
 });
 const AuditEventSchema = zod_1.z.object({
     sequence: zod_1.z.number().int().positive(),
@@ -91,6 +93,28 @@ class ExecutionLedgerError extends Error {
     }
 }
 exports.ExecutionLedgerError = ExecutionLedgerError;
+class ExecutionLedgerFinalizationError extends ExecutionLedgerError {
+    constructor(input) {
+        const failure = Object.freeze({
+            schemaVersion: '1.0.0',
+            safeErrorCode: 'execution_finalization_ambiguous',
+            summary: 'ProjectOS execution outcome requires durable ledger reconciliation',
+            planId: input.planId,
+            expectedStatus: input.expectedStatus,
+            observedStatus: input.observedStatus ?? null,
+            retryable: false,
+            reconciliationRequired: true,
+            timestamp: new Date().toISOString(),
+        });
+        super(JSON.stringify(failure), 503);
+        this.name = 'ExecutionLedgerFinalizationError';
+        this.code = failure.safeErrorCode;
+        this.retryable = false;
+        this.reconciliationRequired = true;
+        this.failure = failure;
+    }
+}
+exports.ExecutionLedgerFinalizationError = ExecutionLedgerFinalizationError;
 function validatedEndpoint(raw) {
     const endpoint = new URL(raw);
     if (endpoint.protocol !== 'https:'
@@ -107,11 +131,52 @@ function validatedEndpoint(raw) {
 function delay(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
+function boundedPositiveInteger(value, fallback, maximum) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) && parsed > 0
+        ? Math.min(parsed, maximum)
+        : fallback;
+}
+async function readBoundedResponse(response, maxBytes) {
+    const declaredLength = Number(response.headers?.get('content-length') || '0');
+    if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+        throw new ExecutionLedgerError('Execution ledger response is too large');
+    }
+    if (response.body && typeof response.body.getReader === 'function') {
+        const reader = response.body.getReader();
+        const chunks = [];
+        let total = 0;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done)
+                    break;
+                if (!value)
+                    continue;
+                total += value.byteLength;
+                if (total > maxBytes) {
+                    await reader.cancel().catch(() => undefined);
+                    throw new ExecutionLedgerError('Execution ledger response is too large');
+                }
+                chunks.push(Buffer.from(value));
+            }
+        }
+        finally {
+            reader.releaseLock?.();
+        }
+        return Buffer.concat(chunks).toString('utf8');
+    }
+    const body = await response.text();
+    if (Buffer.byteLength(body, 'utf8') > maxBytes) {
+        throw new ExecutionLedgerError('Execution ledger response is too large');
+    }
+    return body;
+}
 class ExecutionLedgerClient {
     constructor(options = {}) {
         this.endpoint = validatedEndpoint(options.endpoint || DEFAULT_CONTROL_URL);
-        this.timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
-        this.maxResponseBytes = options.maxResponseBytes || DEFAULT_MAX_RESPONSE_BYTES;
+        this.timeoutMs = boundedPositiveInteger(options.timeoutMs, DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS);
+        this.maxResponseBytes = boundedPositiveInteger(options.maxResponseBytes, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_MAX_RESPONSE_BYTES);
         this.fetchFn = options.fetchFn || globalThis.fetch;
         this.enforceMandatoryIntake = (0, mandatory_intake_js_1.shouldEnforceMandatoryIntake)();
         this.intakeProvider = options.intakeProvider === undefined
@@ -216,14 +281,23 @@ class ExecutionLedgerClient {
         return PlanResponseSchema.parse(parsed).plan;
     }
     async finishPlan(vercelOidcToken, input) {
+        const finalStatus = FinalPlanStatusSchema.safeParse(input.status);
+        if (!finalStatus.success) {
+            throw new ExecutionLedgerError('Execution plan final status is invalid', 400);
+        }
         let lastError;
         for (let attempt = 1; attempt <= FINALIZATION_RETRY_ATTEMPTS; attempt += 1) {
             try {
                 const parsed = await this.request(vercelOidcToken, {
                     action: 'execution_plan_finish',
                     ...input,
+                    status: finalStatus.data,
                 });
-                return PlanResponseSchema.parse(parsed).plan;
+                const plan = PlanResponseSchema.parse(parsed).plan;
+                if (plan.planId !== input.planId || plan.status !== finalStatus.data) {
+                    throw new ExecutionLedgerError('Execution ledger returned a mismatched finalization response', 502);
+                }
+                return plan;
             }
             catch (error) {
                 lastError = error;
@@ -232,16 +306,31 @@ class ExecutionLedgerClient {
                 }
             }
         }
+        let observedStatus = null;
+        try {
+            const plans = await this.listPlans(vercelOidcToken, 500);
+            const observed = plans.find((plan) => plan.planId === input.planId);
+            observedStatus = observed?.status ?? null;
+            if (observed && observed.status === finalStatus.data) {
+                return observed;
+            }
+        }
+        catch (error) {
+            lastError = error;
+        }
         console.error(JSON.stringify({
             event: 'execution_audit_reconciliation_required',
             planId: input.planId,
-            finalStatus: input.status,
+            finalStatus: finalStatus.data,
+            observedStatus,
             attempts: FINALIZATION_RETRY_ATTEMPTS,
             errorType: lastError instanceof Error ? lastError.name : 'unknown',
         }));
-        // The provider operation may already have completed. Do not convert a real
-        // provider success into a false failure that could encourage a duplicate retry.
-        return undefined;
+        throw new ExecutionLedgerFinalizationError({
+            planId: input.planId,
+            expectedStatus: finalStatus.data,
+            observedStatus,
+        });
     }
     async listAudit(vercelOidcToken, limit) {
         const parsed = await this.request(vercelOidcToken, {
@@ -289,14 +378,7 @@ class ExecutionLedgerClient {
                 signal: controller.signal,
                 redirect: 'error',
             });
-            const declaredLength = Number(response.headers?.get('content-length') || '0');
-            if (Number.isFinite(declaredLength) && declaredLength > this.maxResponseBytes) {
-                throw new ExecutionLedgerError('Execution ledger response is too large');
-            }
-            const body = await response.text();
-            if (Buffer.byteLength(body, 'utf8') > this.maxResponseBytes) {
-                throw new ExecutionLedgerError('Execution ledger response is too large');
-            }
+            const body = await readBoundedResponse(response, this.maxResponseBytes);
             if (!response.ok) {
                 let code = 'request_failed';
                 try {

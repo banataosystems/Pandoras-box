@@ -11,6 +11,9 @@ const {
   MemoryEvidenceSubmissionError,
   submitEvidenceCandidate,
 } = require("../src/tools/memory-evidence-intake.js");
+const {
+  ExecutionLedgerFinalizationError,
+} = require("../src/runtime/execution-ledger-client.js");
 
 const TOKEN = "verified-contract-regression-token-material-long-enough";
 const ORGANIZATION_ID = "2270b266-59da-4c39-bfd9-9f8d08352af0";
@@ -133,14 +136,37 @@ function pendingReviewResponse(args, overrides = {}) {
   return {
     ok: true,
     candidate_id: "22222222-2222-4222-8222-222222222222",
+    review_item_id: "66666666-6666-4666-8666-666666666666",
     status: "pending_review",
-    deduplicated: false,
     idempotency_key: args.idempotencyKey,
     namespace: args.namespace,
-    project_id: "33333333-3333-4333-8333-333333333333",
+    project_id: args.projectId ?? "33333333-3333-4333-8333-333333333333",
     project_key: args.projectKey,
     proof_stage: args.proofStage,
+    deduplicated: false,
     created_at: "2026-08-19T05:15:10.000Z",
+    canonical_memory_written: false,
+    privacy_policy: "metadata_only_v1",
+    ...overrides,
+  };
+}
+
+function successfulCandidateResult(args, overrides = {}) {
+  return {
+    ok: true,
+    candidateId: "22222222-2222-4222-8222-222222222222",
+    reviewItemId: "66666666-6666-4666-8666-666666666666",
+    status: "pending_review",
+    deduplicated: false,
+    idempotencyKey: args.idempotencyKey,
+    namespace: args.namespace,
+    projectId: args.projectId ?? "33333333-3333-4333-8333-333333333333",
+    projectKey: args.projectKey,
+    proofStage: args.proofStage,
+    createdAt: "2026-08-19T05:15:10.000Z",
+    privacyPolicy: "metadata_only_v1",
+    privacyScanVersion: "evidence_privacy_v2",
+    canonicalPromoted: false,
     ...overrides,
   };
 }
@@ -190,7 +216,7 @@ test("published client translates every candidate field exactly and keeps succes
   const result = await submitEvidenceCandidate(args, memoryConfig, async (url, init) => {
     outbound = { url, init, body: JSON.parse(init.body) };
     return new Response(JSON.stringify(pendingReviewResponse(args)), {
-      status: 201,
+      status: 202,
       headers: { "x-request-id": "memory-contract-success-1" },
     });
   });
@@ -213,6 +239,7 @@ test("published client translates every candidate field exactly and keeps succes
   assert.deepEqual(result, {
     ok: true,
     candidateId: "22222222-2222-4222-8222-222222222222",
+    reviewItemId: "66666666-6666-4666-8666-666666666666",
     status: "pending_review",
     deduplicated: false,
     idempotencyKey: args.idempotencyKey,
@@ -221,6 +248,7 @@ test("published client translates every candidate field exactly and keeps succes
     projectKey: args.projectKey,
     proofStage: args.proofStage,
     createdAt: "2026-08-19T05:15:10.000Z",
+    privacyPolicy: "metadata_only_v1",
     privacyScanVersion: "evidence_privacy_v2",
     canonicalPromoted: false,
   });
@@ -229,7 +257,10 @@ test("published client translates every candidate field exactly and keeps succes
 test("an identical idempotent replay is reported as deduplicated and does not promote canon", async () => {
   const args = evidenceArgs();
   const result = await submitEvidenceCandidate(args, memoryConfig, async () =>
-    new Response(JSON.stringify(pendingReviewResponse(args, { deduplicated: true })), { status: 200 }));
+    new Response(JSON.stringify(pendingReviewResponse(args, {
+      deduplicated: true,
+      created_at: null,
+    })), { status: 200 }));
   assert.equal(result.deduplicated, true);
   assert.equal(result.status, "pending_review");
   assert.equal(result.canonicalPromoted, false);
@@ -539,7 +570,8 @@ test("body-level Memory failure can never surface as HTTP 2xx", async () => {
   const auditFailure = JSON.parse(finishInput.error);
   assert.deepEqual(auditFailure, callerFailure);
   assert.equal(callerFailure.httpStatus, 200);
-  assert.equal(callerFailure.safeErrorCode, "evidence_candidate_invalid");
+  assert.equal(callerFailure.safeErrorCode, "response_contract_error");
+  assert.equal(callerFailure.validationCategory, "response_contract");
   assert.equal(callerFailure.retryable, false);
   assert.equal(callerFailure.privacyScanVersion, "evidence_privacy_v2");
 });
@@ -619,8 +651,283 @@ test("privacy preflight version is attested without widening the strict body con
   let privacyVersion;
   const result = await submitEvidenceCandidate(args, memoryConfig, async (_url, init) => {
     privacyVersion = init.headers["x-pandora-privacy-scan-version"];
-    return new Response(JSON.stringify(pendingReviewResponse(args)), { status: 201 });
+    return new Response(JSON.stringify(pendingReviewResponse(args)), { status: 202 });
   });
   assert.equal(privacyVersion, "evidence_privacy_v2");
   assert.equal(result.privacyScanVersion, "evidence_privacy_v2");
+});
+
+
+test("strict Memory success schema rejects every ambiguous or malformed 2xx response", async () => {
+  const args = evidenceArgs();
+  const base = pendingReviewResponse(args);
+  const without = (key) => {
+    const value = { ...base };
+    delete value[key];
+    return value;
+  };
+  const cases = [
+    [202, without("ok")],
+    [202, without("candidate_id")],
+    [202, without("review_item_id")],
+    [202, { ...base, candidate_id: "not-a-uuid" }],
+    [202, { ...base, review_item_id: "not-a-uuid" }],
+    [202, { ...base, deduplicated: "false" }],
+    [202, { ...base, created_at: "not-a-timestamp" }],
+    [202, { ...base, canonical_memory_written: true }],
+    [202, { ...base, privacy_policy: "unversioned" }],
+    [202, { ...base, unexpected_trust_field: "must-reject" }],
+    [201, base],
+    [200, base],
+    [202, { ...base, deduplicated: true, created_at: null }],
+    [202, { ...base, project_id: "not-a-project-uuid" }],
+    [202, { ...base, proof_stage: "implemented" }],
+  ];
+  for (const [status, body] of cases) {
+    await assert.rejects(
+      () => submitEvidenceCandidate(args, memoryConfig, async () =>
+        new Response(JSON.stringify(body), { status })),
+      (error) => {
+        const failure = failureFrom(error);
+        assert.equal(error.status, 502);
+        assert.equal(failure.httpStatus, status);
+        assert.equal(failure.safeErrorCode, "response_contract_error");
+        assert.equal(failure.validationCategory, "response_contract");
+        assert.equal(failure.retryable, false);
+        assert.doesNotMatch(error.message, /unexpected_trust_field|must-reject|not-a-uuid|unversioned/);
+        return true;
+      },
+    );
+  }
+});
+
+test("safe Memory codes are accepted only with their exact HTTP status", async () => {
+  await assert.rejects(
+    () => submitEvidenceCandidate(evidenceArgs(), memoryConfig, async () =>
+      new Response(JSON.stringify({ ok: false, error: "namespace_not_allowed" }), { status: 400 })),
+    (error) => {
+      const failure = failureFrom(error);
+      assert.equal(error.status, 502);
+      assert.equal(failure.httpStatus, 400);
+      assert.equal(failure.safeErrorCode, "response_contract_error");
+      assert.equal(failure.validationCategory, "response_contract");
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () => submitEvidenceCandidate(evidenceArgs(), memoryConfig, async () =>
+      new Response(JSON.stringify({ ok: false, error: "namespace_not_allowed" }), { status: 503 })),
+    (error) => {
+      const failure = failureFrom(error);
+      assert.equal(error.status, 502);
+      assert.equal(failure.httpStatus, 503);
+      assert.equal(failure.safeErrorCode, "provider_server_error");
+      assert.equal(failure.validationCategory, "provider_server");
+      assert.equal(failure.retryable, true);
+      return true;
+    },
+  );
+});
+
+test("malformed runtime limits fall back to bounded safe defaults", async () => {
+  const args = evidenceArgs();
+  for (const timeoutMs of [Number.NaN, Number.POSITIVE_INFINITY, -1, 0, "invalid"]) {
+    const result = await submitEvidenceCandidate(args, {
+      ...memoryConfig,
+      timeoutMs,
+    }, async (_url, init) => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      if (init.signal.aborted) {
+        const error = new Error("aborted");
+        error.name = "AbortError";
+        throw error;
+      }
+      return new Response(JSON.stringify(pendingReviewResponse(args)), { status: 202 });
+    });
+    assert.equal(result.candidateId, "22222222-2222-4222-8222-222222222222");
+  }
+
+  await assert.rejects(
+    () => submitEvidenceCandidate(args, {
+      ...memoryConfig,
+      maxResponseBytes: Number.NaN,
+    }, async () => new Response(JSON.stringify(pendingReviewResponse(args)), {
+      status: 202,
+      headers: { "content-length": "100001" },
+    })),
+    (error) => {
+      const failure = failureFrom(error);
+      assert.equal(error.status, 502);
+      assert.equal(failure.safeErrorCode, "response_contract_error");
+      return true;
+    },
+  );
+});
+
+test("shared MCP provider result normalization is item, depth, node, and byte bounded", async () => {
+  const cases = [];
+  cases.push(Array.from({ length: 501 }, (_, index) => ({ index })));
+  let deep = "leaf";
+  for (let depth = 0; depth < 22; depth += 1) deep = [deep];
+  cases.push(deep);
+  cases.push({ payload: "x".repeat((512 * 1024) + 1) });
+
+  for (const raw of cases) {
+    const handler = createProjectOsMcpHandler(handlerDependencies({
+      async execute() { return raw; },
+    }));
+    const response = responseRecorder();
+    await handler(request("supabase.list-accounts"), response);
+    assert.equal(response.statusCode, 502);
+    assert.match(response.body.error.message, /Provider response contract/);
+    assert.equal(response.body.result, undefined);
+  }
+});
+
+test("the bounded shared array contract still accepts the advertised 500-item maximum", async () => {
+  const raw = Array.from({ length: 500 }, (_, index) => ({ index }));
+  const handler = createProjectOsMcpHandler(handlerDependencies({
+    async execute() { return raw; },
+  }));
+  const response = responseRecorder();
+  await handler(request("supabase.list-accounts"), response);
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.result.structuredContent.items.length, 500);
+});
+
+test("completed Memory execution is candidate/review-bound in the durable finalization summary", async () => {
+  const args = evidenceArgs();
+  let finishInput;
+  const ledger = {
+    async claimPlan(_token, planId) {
+      return {
+        planId,
+        requestId: "88888888-8888-4888-8888-888888888888",
+        tool: "memory.submitEvidenceCandidate",
+        risk: "write",
+        args,
+        payloadHash: executionPayloadHash("memory.submitEvidenceCandidate", args),
+        status: "executing",
+      };
+    },
+    async finishPlan(_token, input) {
+      finishInput = input;
+      return { planId: input.planId, status: input.status };
+    },
+  };
+  const handler = createProjectOsMcpHandler(handlerDependencies({
+    ledger,
+    async execute() { return successfulCandidateResult(args); },
+  }));
+  const response = responseRecorder();
+  await handler(request("projectos_execute_plan", { planId: PLAN_ID }), response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.result.structuredContent.planStatus, "completed");
+  assert.equal(finishInput.status, "completed");
+  assert.deepEqual(finishInput.resultSummary, {
+    type: "memory_evidence_candidate",
+    candidateId: "22222222-2222-4222-8222-222222222222",
+    reviewItemId: "66666666-6666-4666-8666-666666666666",
+    status: "pending_review",
+    deduplicated: false,
+    idempotencyKey: args.idempotencyKey,
+    namespace: args.namespace,
+    projectId: "33333333-3333-4333-8333-333333333333",
+    projectKey: args.projectKey,
+    proofStage: args.proofStage,
+    canonicalPromoted: false,
+    privacyScanVersion: "evidence_privacy_v2",
+  });
+});
+
+test("provider success plus ambiguous finalization never returns ordinary success or re-executes on retry", async () => {
+  const args = evidenceArgs();
+  let claims = 0;
+  let executions = 0;
+  let finishes = 0;
+  const ledger = {
+    async claimPlan(_token, planId) {
+      claims += 1;
+      if (claims > 1) {
+        throw Object.assign(new Error("Execution plan is already claimed"), { status: 409 });
+      }
+      return {
+        planId,
+        requestId: "99999999-9999-4999-8999-999999999999",
+        tool: "memory.submitEvidenceCandidate",
+        risk: "write",
+        args,
+        payloadHash: executionPayloadHash("memory.submitEvidenceCandidate", args),
+        status: "executing",
+      };
+    },
+    async finishPlan(_token, input) {
+      finishes += 1;
+      throw new ExecutionLedgerFinalizationError({
+        planId: input.planId,
+        expectedStatus: input.status,
+        observedStatus: "executing",
+      });
+    },
+  };
+  const handler = createProjectOsMcpHandler(handlerDependencies({
+    ledger,
+    async execute() {
+      executions += 1;
+      return successfulCandidateResult(args);
+    },
+  }));
+
+  const first = responseRecorder();
+  await handler(request("projectos_execute_plan", { planId: PLAN_ID }), first);
+  const retry = responseRecorder();
+  await handler(request("projectos_execute_plan", { planId: PLAN_ID }), retry);
+
+  assert.equal(first.statusCode, 503);
+  assert.match(first.body.error.message, /execution_finalization_ambiguous/);
+  assert.equal(retry.statusCode, 409);
+  assert.equal(executions, 1);
+  assert.equal(finishes, 1);
+});
+
+test("provider failure plus ambiguous finalization returns reconciliation-required without leaking provider detail", async () => {
+  const args = evidenceArgs();
+  let finishInput;
+  const ledger = {
+    async claimPlan(_token, planId) {
+      return {
+        planId,
+        requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        tool: "memory.submitEvidenceCandidate",
+        risk: "write",
+        args,
+        payloadHash: executionPayloadHash("memory.submitEvidenceCandidate", args),
+        status: "executing",
+      };
+    },
+    async finishPlan(_token, input) {
+      finishInput = input;
+      throw new ExecutionLedgerFinalizationError({
+        planId: input.planId,
+        expectedStatus: input.status,
+        observedStatus: "executing",
+      });
+    },
+  };
+  const handler = createProjectOsMcpHandler(handlerDependencies({
+    ledger,
+    async execute() {
+      throw Object.assign(new Error("private provider detail credential=must-not-leak"), { status: 400 });
+    },
+  }));
+  const response = responseRecorder();
+  await handler(request("projectos_execute_plan", { planId: PLAN_ID }), response);
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(finishInput.status, "failed");
+  assert.doesNotMatch(finishInput.error, /private provider detail|must-not-leak|credential=/);
+  assert.doesNotMatch(response.body.error.message, /private provider detail|must-not-leak|credential=/);
+  assert.match(response.body.error.message, /execution_finalization_ambiguous/);
 });

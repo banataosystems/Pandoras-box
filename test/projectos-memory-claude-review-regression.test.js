@@ -53,6 +53,7 @@ function pendingReviewResponse(args) {
   return {
     ok: true,
     candidate_id: "22222222-2222-4222-8222-222222222222",
+    review_item_id: "44444444-4444-4444-8444-444444444444",
     status: "pending_review",
     deduplicated: false,
     idempotency_key: args.idempotencyKey,
@@ -61,6 +62,8 @@ function pendingReviewResponse(args) {
     project_key: args.projectKey,
     proof_stage: args.proofStage,
     created_at: "2026-08-19T06:40:00.000Z",
+    canonical_memory_written: false,
+    privacy_policy: "metadata_only_v1",
   };
 }
 
@@ -140,7 +143,8 @@ test("a downstream HTTP-200 body failure cannot complete as HTTP success", async
       const failure = parsedFailure(error);
       assert.equal(error.status, 502);
       assert.equal(failure.httpStatus, 200);
-      assert.equal(failure.safeErrorCode, "evidence_candidate_invalid");
+      assert.equal(failure.safeErrorCode, "response_contract_error");
+      assert.equal(failure.validationCategory, "response_contract");
       assert.equal(failure.retryable, false);
       return true;
     },
@@ -224,7 +228,7 @@ test("privacy-scan provenance is exported, transmitted, and returned", async () 
   let header;
   const result = await submitEvidenceCandidate(args, memoryConfig, async (_url, init) => {
     header = init.headers["x-pandora-privacy-scan-version"];
-    return new Response(JSON.stringify(pendingReviewResponse(args)), { status: 201 });
+    return new Response(JSON.stringify(pendingReviewResponse(args)), { status: 202 });
   });
 
   assert.equal(EVIDENCE_PRIVACY_SCAN_VERSION, "evidence_privacy_v2");
