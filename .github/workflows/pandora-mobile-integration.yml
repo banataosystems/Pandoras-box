@@ -35,6 +35,43 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
       - name: Verify approved brand assets
         run: node scripts/verify-pandora-brand-assets.mjs
+      - name: Generate transparent mobile-mark review candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=apps/pandora-mobile/assets/brand/pandora-product-mark-ui-1024.png
+          output=.pandora-mobile-brand-candidate/pandora-product-mark-transparent-1024.png
+          mkdir -p "$(dirname "$output")"
+          convert "$source" \
+            -colorspace Gray \
+            \( +clone -negate \) \
+            -alpha off -compose CopyOpacity -composite \
+            -fill white -colorize 100 \
+            "$output"
+          dimensions="$(identify -format '%wx%h' "$output")"
+          channels="$(identify -format '%[channels]' "$output")"
+          corner_alpha="$(convert "$output" -format '%[fx:a.p{0,0}]' info:)"
+          test "$dimensions" = '1024x1024'
+          case "$channels" in
+            *a*) ;;
+            *) echo "Transparent mark candidate has no alpha channel: $channels" >&2; exit 1 ;;
+          esac
+          awk -v alpha="$corner_alpha" 'BEGIN { exit !(alpha <= 0.001) }'
+          {
+            echo "source_sha=${SOURCE_SHA}"
+            echo "candidate_sha256=$(sha256sum "$output" | cut -d ' ' -f1)"
+            echo "dimensions=${dimensions}"
+            echo "channels=${channels}"
+            echo "corner_alpha=${corner_alpha}"
+            echo "review_status=unapproved_candidate"
+          } > .pandora-mobile-brand-candidate/manifest.txt
+      - name: Upload transparent mobile-mark review candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pandora-mobile-transparent-mark-candidate
+          path: .pandora-mobile-brand-candidate
+          if-no-files-found: error
+          include-hidden-files: true
       - name: Scan exact mobile source for private keys
         run: >-
           bash scripts/check-private-key-literals.sh
@@ -106,7 +143,7 @@ jobs:
           mapfile -d '' files < <(
             find "$evidence" -type f -name '*.png' -print0 | sort -z
           )
-          test "${#files[@]}" -eq 12
+          test "${#files[@]}" -eq 15
           {
             echo "source_sha=${SOURCE_SHA}"
             echo "evidence_class=synthetic_fixture_production_screens"
