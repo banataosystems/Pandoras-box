@@ -7,6 +7,7 @@ on:
       - '.github/workflows/pandora-mobile-integration.yml'
       - 'assets/brand/pandoras-box/product-mark/**'
       - 'scripts/verify-pandora-brand-assets.mjs'
+      - 'scripts/check-private-key-literals.sh'
   workflow_dispatch:
     inputs:
       update_goldens:
@@ -33,6 +34,8 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
       - name: Verify approved brand assets
         run: node scripts/verify-pandora-brand-assets.mjs
+      - name: Scan exact source for private keys
+        run: bash scripts/check-private-key-literals.sh
       - name: Install pinned Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -86,21 +89,70 @@ jobs:
         run: |
           flutter test --update-goldens test/goldens/foundation_catalog_golden_test.dart
           flutter test --reporter expanded
+      - name: Verify owner-screen visual evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence=.pandora-mobile-build/build/owner-screen-evidence
+          manifest=.pandora-mobile-build/pandora-mobile-owner-screen-evidence-manifest.txt
+          test -d "$evidence"
+          mapfile -d '' files < <(
+            find "$evidence" -type f -name '*.png' -print0 | sort -z
+          )
+          test "${#files[@]}" -eq 12
+          {
+            echo "source_sha=${SOURCE_SHA}"
+            echo "evidence_class=synthetic_fixture_production_screens"
+            echo "contains_credentials=false"
+            echo "screen_count=${#files[@]}"
+            for file in "${files[@]}"; do
+              sha256sum "$file"
+            done
+          } > "$manifest"
+      - name: Upload owner-screen visual evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pandora-mobile-owner-screen-evidence
+          path: |
+            .pandora-mobile-build/build/owner-screen-evidence
+            .pandora-mobile-build/pandora-mobile-owner-screen-evidence-manifest.txt
+          if-no-files-found: error
+          include-hidden-files: true
       - name: Build web
         working-directory: .pandora-mobile-build
         run: flutter build web --release --dart-define=PANDORA_SOURCE_REVISION=${{ env.SOURCE_SHA }}
       - name: Build Android debug APK
         working-directory: .pandora-mobile-build
         run: flutter build apk --debug --dart-define=PANDORA_SOURCE_REVISION=${{ env.SOURCE_SHA }}
+      - name: Inspect Android package and permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=.pandora-mobile-build/build/app/outputs/flutter-apk/app-debug.apk
+          evidence=.pandora-mobile-build/android-package-evidence
+          mkdir -p "$evidence"
+          aapt="$(find "${ANDROID_HOME:?}/build-tools" -type f -name aapt | sort -V | tail -1)"
+          test -x "$aapt"
+          "$aapt" dump badging "$apk" > "$evidence/badging.txt"
+          "$aapt" dump permissions "$apk" > "$evidence/permissions.txt"
+          if grep -Eiq \
+            'ACCESS_(FINE|COARSE|BACKGROUND)_LOCATION|READ_CONTACTS|WRITE_CONTACTS|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|CAMERA|RECORD_AUDIO|BLUETOOTH_(SCAN|CONNECT|ADVERTISE)' \
+            "$evidence/permissions.txt"; then
+            echo "Unexpected sensitive Android permission detected." >&2
+            exit 1
+          fi
       - name: Write test-only artifact manifest
         shell: bash
         run: |
           set -euo pipefail
           apk=.pandora-mobile-build/build/app/outputs/flutter-apk/app-debug.apk
           web=.pandora-mobile-build/build/web
+          visual=.pandora-mobile-build/pandora-mobile-owner-screen-evidence-manifest.txt
+          android_evidence=.pandora-mobile-build/android-package-evidence
           {
             echo "source_sha=${SOURCE_SHA}"
             echo "flutter_version=3.47.0"
+            echo "dart_version=$(dart --version 2>&1 | awk '{print $4}')"
             echo "app_version=$(awk '/^version:/{print $2; exit}' .pandora-mobile-build/pubspec.yaml)"
             echo "lock_sha256=$(sha256sum .pandora-mobile-build/pubspec.lock | cut -d ' ' -f1)"
             echo "artifact_class=test-only"
@@ -108,8 +160,13 @@ jobs:
             echo "signing_class=android-debug"
             echo "store_release_eligible=false"
             echo "apk_sha256=$(sha256sum "$apk" | cut -d ' ' -f1)"
+            echo "apk_size_bytes=$(stat -c '%s' "$apk")"
             echo "web_tree_sha256=$(find "$web" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d ' ' -f1)"
             echo "web_files=$(find "$web" -type f | wc -l | tr -d ' ')"
+            echo "visual_evidence_manifest_sha256=$(sha256sum "$visual" | cut -d ' ' -f1)"
+            echo "visual_screen_count=$(awk -F= '$1 == "screen_count" {print $2}' "$visual")"
+            echo "android_badging_sha256=$(sha256sum "$android_evidence/badging.txt" | cut -d ' ' -f1)"
+            echo "android_permissions_sha256=$(sha256sum "$android_evidence/permissions.txt" | cut -d ' ' -f1)"
           } > .pandora-mobile-build/pandora-mobile-artifact-manifest.txt
       - name: Upload golden review candidates
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.update_goldens == true }}
@@ -138,6 +195,7 @@ jobs:
           path: |
             .pandora-mobile-build/build/web
             .pandora-mobile-build/pandora-mobile-artifact-manifest.txt
+            .pandora-mobile-build/android-package-evidence
           include-hidden-files: true
       - name: Upload Android artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
@@ -146,4 +204,5 @@ jobs:
           path: |
             .pandora-mobile-build/build/app/outputs/flutter-apk/app-debug.apk
             .pandora-mobile-build/pandora-mobile-artifact-manifest.txt
+            .pandora-mobile-build/android-package-evidence
           include-hidden-files: true
