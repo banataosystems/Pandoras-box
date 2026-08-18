@@ -7,7 +7,7 @@ on:
       - 'apps/pandora-mobile/**'
       - 'assets/brand/pandoras-box/product-mark/**'
       - 'scripts/verify-pandora-brand-assets.mjs'
-      - 'scripts/verify-pandora-transparent-ui-mark.mjs'
+      - 'scripts/create-transparent-pandora-mark.py'
       - '.github/workflows/pandora-mobile-integration.yml'
       - '.github/workflows/pandora-mobile-exact-head-gate.yml'
 
@@ -15,7 +15,6 @@ permissions:
   actions: read
   contents: read
   issues: write
-  pull-requests: write
 
 concurrency:
   group: pandora-mobile-exact-head-gate-${{ github.event.pull_request.number }}
@@ -36,9 +35,10 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
       - name: Verify exact source checkout
         run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
-      - name: Wait for exact-head verification workflows
+      - name: Wait for exact-head verification workflows and artifacts
         id: gate
         shell: bash
         run: |
@@ -56,7 +56,18 @@ jobs:
           source_sha = os.environ['SOURCE_SHA']
           current_run_id = int(os.environ['CURRENT_RUN_ID'])
           token = os.environ['GH_TOKEN']
-          required = ('Pandora mobile integration', 'ProjectOS Security Regression')
+          required_workflows = {
+              'Pandora mobile integration':
+                  '.github/workflows/pandora-mobile-integration.yml',
+              'ProjectOS security regression':
+                  '.github/workflows/projectos-security.yml',
+          }
+          required_artifacts = (
+              'pandora-mobile-transparent-mark-evidence',
+              'pandora-mobile-owner-screen-evidence',
+              'pandora-mobile-web-owner-test',
+              'pandora-mobile-android-owner-test',
+          )
           api = f'https://api.github.com/repos/{repository}'
           headers = {
               'Accept': 'application/vnd.github+json',
@@ -70,6 +81,24 @@ jobs:
               with urllib.request.urlopen(request, timeout=30) as response:
                   return json.load(response)
 
+          def workflow_path(run):
+              return str(run.get('path') or '').split('@', 1)[0]
+
+          def compact_run(run):
+              return {
+                  'id': run['id'],
+                  'workflow_id': run['workflow_id'],
+                  'workflow_path': workflow_path(run),
+                  'run_attempt': run['run_attempt'],
+                  'event': run['event'],
+                  'status': run['status'],
+                  'conclusion': run['conclusion'],
+                  'html_url': run['html_url'],
+                  'head_sha': run['head_sha'],
+                  'created_at': run['created_at'],
+                  'updated_at': run['updated_at'],
+              }
+
           deadline = time.time() + 1800
           selected = {}
           while time.time() < deadline:
@@ -80,59 +109,139 @@ jobs:
               })
               runs = get_json(f'{api}/actions/runs?{query}')['workflow_runs']
               selected = {}
-              for name in required:
+              for label, path in required_workflows.items():
                   candidates = [
                       run for run in runs
-                      if run['name'] == name and run['id'] != current_run_id
+                      if workflow_path(run) == path
+                      and run['id'] != current_run_id
+                      and run['head_sha'] == source_sha
+                      and run['event'] == 'pull_request'
                   ]
                   if candidates:
-                      selected[name] = max(candidates, key=lambda run: run['id'])
-              if len(selected) == len(required) and all(
+                      selected[label] = max(
+                          candidates,
+                          key=lambda run: (run['id'], run['run_attempt']),
+                      )
+              if len(selected) == len(required_workflows) and all(
                   run['status'] == 'completed' for run in selected.values()
               ):
                   break
               time.sleep(15)
           else:
               result = {
-                  'schema_version': '1.0.0',
+                  'schema_version': '1.1.0',
                   'source_sha': source_sha,
                   'proof_stage': 'implemented',
                   'gate': 'timeout',
-                  'required_workflows': required,
-                  'observed_runs': selected,
+                  'required_workflows': required_workflows,
+                  'required_artifacts': required_artifacts,
+                  'observed_runs': {
+                      label: compact_run(run)
+                      for label, run in selected.items()
+                  },
+                  'artifact_class': 'test-only',
                   'deployed': False,
                   'production_verified': False,
               }
               pathlib.Path('build/exact-head-gate/gate.json').write_text(
                   json.dumps(result, indent=2, sort_keys=True) + '\n'
               )
-              raise SystemExit('Exact-head verification workflows did not complete before timeout.')
+              raise SystemExit(
+                  'Exact-head verification workflows did not complete before timeout.'
+              )
 
           compact = {
-              name: {
-                  'id': run['id'],
-                  'run_attempt': run['run_attempt'],
-                  'status': run['status'],
-                  'conclusion': run['conclusion'],
-                  'html_url': run['html_url'],
-                  'head_sha': run['head_sha'],
-                  'created_at': run['created_at'],
-                  'updated_at': run['updated_at'],
-              }
-              for name, run in selected.items()
+              label: compact_run(run)
+              for label, run in selected.items()
           }
-          all_green = all(run['conclusion'] == 'success' for run in selected.values())
+          source_bound = all(
+              run['head_sha'] == source_sha
+              and run['event'] == 'pull_request'
+              and workflow_path(run) == required_workflows[label]
+              for label, run in selected.items()
+          )
+          all_green = all(
+              run['conclusion'] == 'success' for run in selected.values()
+          )
+
+          mobile_run = selected['Pandora mobile integration']
+          artifacts_payload = get_json(
+              f'{api}/actions/runs/{mobile_run["id"]}/artifacts?per_page=100'
+          )
+          artifacts_by_name = {}
+          for artifact in artifacts_payload.get('artifacts', []):
+              name = artifact.get('name')
+              if name not in required_artifacts:
+                  continue
+              existing = artifacts_by_name.get(name)
+              if existing is None or artifact['id'] > existing['id']:
+                  artifacts_by_name[name] = artifact
+
+          artifacts = {
+              name: {
+                  'id': artifact['id'],
+                  'name': artifact['name'],
+                  'size_in_bytes': artifact['size_in_bytes'],
+                  'expired': artifact['expired'],
+                  'created_at': artifact['created_at'],
+                  'expires_at': artifact['expires_at'],
+                  'workflow_run_id': mobile_run['id'],
+                  'source_sha': source_sha,
+              }
+              for name, artifact in sorted(artifacts_by_name.items())
+          }
+          missing_artifacts = sorted(
+              set(required_artifacts) - set(artifacts_by_name)
+          )
+          expired_artifacts = sorted(
+              name for name, artifact in artifacts_by_name.items()
+              if artifact.get('expired') is True
+          )
+          empty_artifacts = sorted(
+              name for name, artifact in artifacts_by_name.items()
+              if int(artifact.get('size_in_bytes') or 0) <= 0
+          )
+          artifacts_ready = not (
+              missing_artifacts or expired_artifacts or empty_artifacts
+          )
+          gate_pass = source_bound and all_green and artifacts_ready
+
+          failures = []
+          if not source_bound:
+              failures.append('workflow source binding failed')
+          if not all_green:
+              failures.append(
+                  'workflow conclusions: ' + ', '.join(
+                      f'{label}={run["conclusion"]}'
+                      for label, run in selected.items()
+                  )
+              )
+          if missing_artifacts:
+              failures.append(
+                  'missing artifacts: ' + ', '.join(missing_artifacts)
+              )
+          if expired_artifacts:
+              failures.append(
+                  'expired artifacts: ' + ', '.join(expired_artifacts)
+              )
+          if empty_artifacts:
+              failures.append(
+                  'empty artifacts: ' + ', '.join(empty_artifacts)
+              )
+
           result = {
-              'schema_version': '1.0.0',
+              'schema_version': '1.1.0',
               'source_sha': source_sha,
-              'proof_stage': 'tested' if all_green else 'implemented',
-              'gate': 'pass' if all_green else 'blocked',
+              'proof_stage': 'tested' if gate_pass else 'implemented',
+              'gate': 'pass' if gate_pass else 'blocked',
+              'source_bound': source_bound,
               'workflows': compact,
-              'expected_test_artifacts': [
-                  'pandora-mobile-route-visual-evidence',
-                  'pandora-mobile-web',
-                  'pandora-mobile-android-debug',
-              ],
+              'required_artifacts': required_artifacts,
+              'artifacts': artifacts,
+              'artifacts_ready': artifacts_ready,
+              'missing_artifacts': missing_artifacts,
+              'expired_artifacts': expired_artifacts,
+              'empty_artifacts': empty_artifacts,
               'artifact_class': 'test-only',
               'deployed': False,
               'production_verified': False,
@@ -146,11 +255,8 @@ jobs:
           pathlib.Path('build/exact-head-gate/gate.json').write_text(
               json.dumps(result, indent=2, sort_keys=True) + '\n'
           )
-          if not all_green:
-              failed = ', '.join(
-                  f"{name}={run['conclusion']}" for name, run in selected.items()
-              )
-              raise SystemExit(f'Exact-head gate blocked: {failed}')
+          if not gate_pass:
+              raise SystemExit('Exact-head gate blocked: ' + '; '.join(failures))
           PY
       - name: Upload immutable exact-head gate evidence
         if: ${{ always() }}
@@ -170,11 +276,15 @@ jobs:
           proof=implemented
           mobile=not_observed
           security=not_observed
+          artifacts=not_observed
+          missing=unknown
           if [[ -f build/exact-head-gate/gate.json ]]; then
             gate="$(jq -r '.gate // "unknown"' build/exact-head-gate/gate.json)"
             proof="$(jq -r '.proof_stage // "implemented"' build/exact-head-gate/gate.json)"
             mobile="$(jq -r '.workflows["Pandora mobile integration"].conclusion // "not_observed"' build/exact-head-gate/gate.json)"
-            security="$(jq -r '.workflows["ProjectOS Security Regression"].conclusion // "not_observed"' build/exact-head-gate/gate.json)"
+            security="$(jq -r '.workflows["ProjectOS security regression"].conclusion // "not_observed"' build/exact-head-gate/gate.json)"
+            artifacts="$(jq -r 'if .artifacts_ready == true then "verified" elif .artifacts_ready == false then "blocked" else "not_observed" end' build/exact-head-gate/gate.json)"
+            missing="$(jq -r '(.missing_artifacts // []) | if length == 0 then "none" else join(", ") end' build/exact-head-gate/gate.json)"
           fi
           body=$(cat <<EOF
           $marker
@@ -184,12 +294,14 @@ jobs:
           - Gate: **$gate**
           - Proof stage: **$proof**
           - Pandora mobile integration: **$mobile**
-          - ProjectOS Security Regression: **$security**
+          - ProjectOS security regression: **$security**
+          - Required test artifacts: **$artifacts**
+          - Missing artifacts: **$missing**
           - Artifact class: **test-only**
           - Deployed: **no claim**
           - Production verified: **no claim**
 
-          A passing gate proves only exact-head CI. Independent different-vendor review, reviewed visual evidence, physical Android verification, authorized promotion, and post-promotion verification remain separate requirements.
+          A passing gate proves only exact-head CI and the presence of non-empty, unexpired test artifacts from the exact mobile workflow run. Independent different-vendor review, reviewed visual evidence, physical Android verification, authorized promotion, and post-promotion verification remain separate requirements.
           EOF
           )
           existing="$(gh api --paginate "repos/$REPOSITORY/issues/$PR_NUMBER/comments" --jq ".[] | select(.body | contains(\"$marker\")) | .id" | tail -n 1)"
@@ -210,7 +322,7 @@ jobs:
 
           Review Pandora Mobile RC1 only at exact head \`$SOURCE_SHA\` on PR #$PR_NUMBER.
 
-          Exact-head mobile integration and ProjectOS Security Regression are green. Independently inspect the complete diff, transparent-mark provenance and verifier, admin control-plane behavior, fail-closed data semantics, authorization boundaries, screenshot evidence, artifact manifests, and rollback path. Record PASS, PASS WITH NON-BLOCKING FINDINGS, or FAIL against this immutable SHA. Any later commit invalidates the review.
+          Exact-head mobile integration and ProjectOS security regression are green, and the four required non-empty, unexpired test artifacts are bound to the exact mobile workflow run. Independently inspect the complete diff, transparent-mark provenance and verifier, admin control-plane behavior, fail-closed data semantics, authorization boundaries, screenshot evidence, artifact manifests, and rollback path. Record PASS, PASS WITH NON-BLOCKING FINDINGS, or FAIL against this immutable SHA. Any later commit invalidates the review.
 
           Do not merge or production-release. Physical Android installation, authenticated owner journey, owner-authorized promotion, and production verification remain separate gates.
           EOF
