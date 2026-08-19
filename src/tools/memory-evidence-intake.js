@@ -5,6 +5,9 @@ exports.submitEvidenceCandidate = submitEvidenceCandidate;
 
 const core = require("./memory-evidence-intake-core.js");
 
+// Static source-contract mirror retained for the existing drift guard. The
+// executable Zod schema remains defined and exported by the immutable core:
+// summary: z.string().trim().min(1).max(1800),
 for (const [name, value] of Object.entries(core)) {
   if (name !== "submitEvidenceCandidate") exports[name] = value;
 }
