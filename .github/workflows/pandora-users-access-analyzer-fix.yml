@@ -1,0 +1,88 @@
+name: Pandora Users access analyzer fix
+
+on:
+  push:
+    branches:
+      - 'feat/pandora-users-access-v1-20260820'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: true
+      - name: Apply exact analyzer fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          app = Path('apps/pandora-mobile/lib/app/pandora_app.dart')
+          text = app.read_text()
+          replacements = [
+              (
+                  "import '../core/data/pandora_repository.dart';\n",
+                  "import '../core/data/pandora_repository.dart';\nimport '../core/data/user_access_repository.dart';\n",
+              ),
+              (
+                  "    required this.diagnostics,\n  });",
+                  "    required this.diagnostics,\n    required this.userAccessRepository,\n  });",
+              ),
+              (
+                  "  final DiagnosticsStore diagnostics;\n",
+                  "  final DiagnosticsStore diagnostics;\n  final UserAccessRepository userAccessRepository;\n",
+              ),
+              (
+                  "    widget.repository.dispose();\n    super.dispose();",
+                  "    widget.userAccessRepository.dispose();\n    widget.repository.dispose();\n    super.dispose();",
+              ),
+              (
+                  "        diagnostics: widget.diagnostics,\n        child: MaterialApp(",
+                  "        diagnostics: widget.diagnostics,\n        userAccessRepository: widget.userAccessRepository,\n        child: MaterialApp(",
+              ),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'pandora_app.dart expected one match, found {count}: {old!r}')
+              text = text.replace(old, new, 1)
+          app.write_text(text)
+
+          screen = Path('apps/pandora-mobile/lib/features/users_access/users_access_screen.dart')
+          text = screen.read_text()
+          replacements = [
+              (
+                  "DropdownButtonFormField<PandoraMemberRole>(\n            value: _role,",
+                  "DropdownButtonFormField<PandoraMemberRole>(\n            initialValue: _role,",
+              ),
+              (
+                  "DropdownButtonFormField<MembershipAccessStatus>(\n              value: _status,",
+                  "DropdownButtonFormField<MembershipAccessStatus>(\n              initialValue: _status,",
+              ),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'users_access_screen.dart expected one match, found {count}: {old!r}')
+              text = text.replace(old, new, 1)
+          screen.write_text(text)
+          PY
+          git diff --check
+          git diff -- \
+            apps/pandora-mobile/lib/app/pandora_app.dart \
+            apps/pandora-mobile/lib/features/users_access/users_access_screen.dart
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            apps/pandora-mobile/lib/app/pandora_app.dart \
+            apps/pandora-mobile/lib/features/users_access/users_access_screen.dart
+          git commit -m 'fix(mobile): wire Users access repository'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
