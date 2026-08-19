@@ -488,7 +488,7 @@ class _UserAccessEditorScreenState extends State<UserAccessEditorScreen> {
           ),
           const SizedBox(height: PandoraSpacing.md),
           DropdownButtonFormField<PandoraMemberRole>(
-            value: _role,
+            initialValue: _role,
             decoration: const InputDecoration(labelText: 'Role template'),
             items: PandoraMemberRole.values
                 .map(
@@ -501,7 +501,7 @@ class _UserAccessEditorScreenState extends State<UserAccessEditorScreen> {
           if (!_isNew) ...[
             const SizedBox(height: PandoraSpacing.md),
             DropdownButtonFormField<MembershipAccessStatus>(
-              value: _status,
+              initialValue: _status,
               decoration: const InputDecoration(labelText: 'Access state'),
               items: MembershipAccessStatus.values
                   .where((status) => status != MembershipAccessStatus.invited)
