@@ -1,0 +1,1 @@
+Worker 1 bounded source-only remediation retry trigger. No deployment or production mutation. 2026-08-19.
