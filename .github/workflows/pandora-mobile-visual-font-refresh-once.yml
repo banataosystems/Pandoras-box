@@ -1,0 +1,176 @@
+name: Pandora mobile visual font refresh once
+
+on:
+  push:
+    branches:
+      - integration/pandora-mobile-p1-current-main-20260819
+    paths:
+      - '.github/pandora-mobile-visual-font-refresh-trigger'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pandora-mobile-visual-font-refresh-once
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: load real Material text in production-screen evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact trigger head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Patch the exact production-screen harness and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart')
+          workflow = Path('.github/workflows/pandora-mobile-visual-font-refresh-once.yml')
+          trigger = Path('.github/pandora-mobile-visual-font-refresh-trigger')
+          text = path.read_text()
+
+          old_imports = """import 'dart:io';
+          import 'dart:ui' as ui;
+
+          import 'package:flutter/material.dart';
+          import 'package:flutter/rendering.dart';
+          import 'package:flutter_test/flutter_test.dart';
+          """
+          new_imports = """import 'dart:io';
+          import 'dart:typed_data';
+          import 'dart:ui' as ui;
+
+          import 'package:flutter/material.dart';
+          import 'package:flutter/rendering.dart';
+          import 'package:flutter/services.dart';
+          import 'package:flutter_test/flutter_test.dart';
+          """
+          if text.count(old_imports) != 1:
+              raise SystemExit('Expected one visual-harness import block.')
+          text = text.replace(old_imports, new_imports)
+
+          anchor = """const _renderFrames = <Duration>[
+            Duration.zero,
+            Duration(milliseconds: 50),
+            Duration(milliseconds: 200),
+            Duration(milliseconds: 500),
+          ];
+          """
+          addition = anchor + """
+
+          const _visualFontFamily = 'Roboto';
+          bool _visualFontLoaded = false;
+
+          Future<void> _loadVisualFont() async {
+            if (_visualFontLoaded) return;
+            final separator = Platform.pathSeparator;
+            final roots = <String>{};
+            final configuredRoot = Platform.environment['FLUTTER_ROOT'];
+            if (configuredRoot != null && configuredRoot.isNotEmpty) {
+              roots.add(configuredRoot);
+            }
+            var cursor = File(Platform.resolvedExecutable).parent;
+            for (var depth = 0; depth < 12; depth++) {
+              roots.add(cursor.path);
+              final parent = cursor.parent;
+              if (parent.path == cursor.path) break;
+              cursor = parent;
+            }
+            File? font;
+            for (final root in roots) {
+              final candidate = File(
+                '$root${separator}bin${separator}cache${separator}artifacts'
+                '${separator}material_fonts${separator}Roboto-Regular.ttf',
+              );
+              if (candidate.existsSync()) {
+                font = candidate;
+                break;
+              }
+            }
+            if (font == null) {
+              throw StateError(
+                'Pinned Flutter SDK Roboto-Regular.ttf was not found; readable '
+                'visual evidence cannot be generated.',
+              );
+            }
+            final bytes = await font.readAsBytes();
+            final loader = FontLoader(_visualFontFamily)
+              ..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
+            await loader.load();
+            _visualFontLoaded = true;
+          }
+
+          Widget _withVisualFont(Widget child) => Builder(
+                builder: (context) {
+                  final theme = Theme.of(context);
+                  return Theme(
+                    data: theme.copyWith(
+                      textTheme: theme.textTheme.apply(
+                        fontFamily: _visualFontFamily,
+                      ),
+                      primaryTextTheme: theme.primaryTextTheme.apply(
+                        fontFamily: _visualFontFamily,
+                      ),
+                    ),
+                    child: child,
+                  );
+                },
+              );
+          """
+          if text.count(anchor) != 1:
+              raise SystemExit('Expected one render-frame declaration.')
+          text = text.replace(anchor, addition)
+
+          start = """Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
+            await setTestSurface(tester, logicalSize: visual.logicalSize);
+          """
+          replacement_start = """Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
+            await _loadVisualFont();
+            await setTestSurface(tester, logicalSize: visual.logicalSize);
+          """
+          if text.count(start) != 1:
+              raise SystemExit('Expected one capture entry point.')
+          text = text.replace(start, replacement_start)
+
+          old_child = """          child: RepaintBoundary(key: _surfaceKey, child: visual.build()),
+          """
+          new_child = """          child: _withVisualFont(
+                    RepaintBoundary(key: _surfaceKey, child: visual.build()),
+                  ),
+          """
+          if text.count(old_child) != 1:
+              raise SystemExit('Expected one production-screen root.')
+          text = text.replace(old_child, new_child)
+
+          path.write_text(text)
+          workflow.unlink()
+          trigger.unlink()
+          PY
+          git diff --check
+          grep -q "Roboto-Regular.ttf" apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart
+          ! test -e .github/workflows/pandora-mobile-visual-font-refresh-once.yml
+          ! test -e .github/pandora-mobile-visual-font-refresh-trigger
+
+      - name: Commit exact harness repair and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Pandora Mobile Worker 5'
+          git config user.email 'lawbatalla@gmail.com'
+          git add \
+            apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart \
+            .github/workflows/pandora-mobile-visual-font-refresh-once.yml \
+            .github/pandora-mobile-visual-font-refresh-trigger
+          test "$(git diff --cached --name-only | wc -l)" -eq 3
+          git commit -m 'test(mobile): render owner evidence with real text'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
