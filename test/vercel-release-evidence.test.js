@@ -27,4 +27,357 @@ function receipt({ id, evidenceClass, origin, payload, subjectSha = SHA, issuer 
     evidence_class: evidenceClass,
     origin,
     trust_effect: origin === "SOURCE_CONTROLLED" ? "DESCRIBES_EXPECTATION_ONLY" : "SATISFIES_EXTERNAL_GATE",
-    issuer#¢²–FVçF—G“¢—77VW"ÂG&ç7÷'C¢'FW7B"ÒÀ¢7V&¦V7E÷6†¢7V&¦V7E6†À¢ö'6W'fVEöC¢ô%4U%dTBÀ¢W‡—&W5öC¢U…•$U2À¢&V6V—C¢²Æö6F÷#¢&÷f–FW#¢ò÷&V6V—BòG¶–GÖÂ6†#Sc¢„4‚ÒÀ¢–ÆöBÀ¢Ó°§Ð ¦gVæ7F–öâ&÷WFR‡7W&f6RÂÖWF†öBÂ&÷WFUF‚Â6öçG&7B’°¢6öç7B–ÆöBÒ°¢7W&f6RÀ¢ÖWF†öBÀ¢&÷WFS¢&÷WFUF‚À¢6VÖçF–5ö6öçG&7C¢6öçG&7BÀ¢6öçFVçE÷G—S¢&Æ–6F–öâö§6öâ"À¢ÖF6†VE÷Fƒ¢&÷WFUF‚À¢&Ww&—FUöÖ&–wV÷W3¢fÇ6RÀ¢WF†VçF–6FVEö66WFæ6S¢fÇ6RÀ¢Ó°¢–b†6öçG&7BÓÓÒ&†VÇF‡•ö§6öâ"’°¢ö&¦V7Bæ76–vâ‡–ÆöBÂ²7FGW3¢#Â'6VEö&öG“¢²7FGW3¢&†VÇF‡’"Â6W'f–6S¢&Ö7Ö7FW"×&ö¦V7F÷2"ÒÒ“°¢ÒVÇ6R–b†6öçG&7BÓÓÒ'VæWF†VçF–6FVEö&V&W%ö&÷VæF'’"’°¢ö&¦V7Bæ76–vâ‡–ÆöBÂ°¢7FGW3¢CÀ¢wwuöWF†VçF–6FS¢$&V&W"&W6÷W&6UöÖWFFFÕÂ&‡GG3¢òöÖ7Ö7FW"çfW&6VÂæòçvVÆÂÖ¶æ÷vâööWF‚×&÷FV7FVB×&W6÷W&6RöÖ7Â""À¢'6VEö&öG“¢²§6öç'3¢#"ã"Â–C¢çVÆÂÂW'&÷#¢²6öFS¢Ó3#ÂÖW76vS¢&&V&W"&WV—&VB"ÒÒÀ¢Ò“°¢ÒVÇ6R°¢ö&¦V7Bæ76–vâ‡–ÆöBÂ°¢7FGW3¢#À¢'6VEö&öG“¢°¢&W6÷W&6S¢&‡GG3¢òöÖ7Ö7FW"çfW&6VÂæöÖ7"À¢WF†÷&—¦F–öå÷6W'fW'3¢²&‡GG3¢òöW†×ÆRæ–çfÆ–BöWF‚%ÒÀ¢ÒÀ¢Ò“°¢Ð¢&WGW&â&V6V—B‡°¢–C¢&÷WFRÒG·7W&f6WÒÒG¶ÖWF†öGÒÒG·&÷WFUF‚ç&WÆ6TÆÂ‚"ò"Â"Ò"—ÖÀ¢Wf–FVæ6T6Æ73¢'&÷WFU÷&ö&R"À¢÷&–v–ã¢$t•D…T%õ$õd”DU""À¢–ÆöBÀ¢—77VW#¢&v—F‡V"Ö7F–öç2"À¢Ò“°§Ð ¦gVæ7F–öâfÆ–E6¶WB‡²–æ6ÇVFU&Wf–WrÒG'VRÂ–æ6ÇVFTWF†÷&—¦F–öâÒfÇ6RÒÒ·Ò’°¢6öç7BWf–FVæ6RÒ°¢&V6V—B‡°¢–C¢'&Wf–Wr"À¢Wf–FVæ6T6Æ73¢&6æF–FFU÷&Wf–WuöFWÆ÷–ÖVçB"À¢÷&–v–ã¢%dU$4TÅõ$õd”DU""À¢—77VW#¢'fW&6VÅ¶&÷EÒ"À¢–ÆöC¢°¢&ö¦V7Eö–C¢'&¥õ“W%¥f7‡„¥g¤…gCGWffÖs—ue„Ö²"À¢FWÆ÷–ÖVçEö–C¢&GÅó$sfWE§cv£GS6¶ç—te…vg¤6§fö²"À¢v—E÷6†¢4„À¢F&vWC¢çVÆÂÀ¢7FFS¢%$TE’"À¢6÷W&6S¢&v—B"À¢W&Ã¢&‡GG3¢òö6æF–FFRæW†×ÆRçfW&6VÂæ"À¢ÒÀ¢Ò’À¢&V6V—B‡°¢–C¢'&öBÖÖ7"À¢Wf–FVæ6T6Æ73¢'&öGV7F–öåö&–æF–æs¦Ö7Ö7FW""À¢÷&–v–ã¢%dU$4TÅõ$õd”DU""À¢–ÆöC¢°¢&ö¦V7Eö–C¢'&¥õ“W%¥f7‡„¥g¤…gCGWffÖs—ue„Ö²"À¢&W÷6—F÷'“¢&&æF÷7—7FV×2õæF÷&2Ö&÷‚"À¢'&æ6ƒ¢&Ö–â"À¢FWÆ÷–ÖVçEö–C¢&GÅô4Æs4Ã†”D§4…dÆe'G”æ¤Ôfõ6—35’"À¢v—E÷6†¢$4RÀ¢F&vWC¢'&öGV7F–öâ"À¢7FFS¢%$TE’"À¢6÷W&6S¢&v—B"À¢Æ–6W3¢²&‡GG3¢òöÖ7Ö7FW"çfW&6VÂæ%ÒÀ¢ÒÀ¢Ò’À¢&V6V—B‡°¢–C¢'&öBÖÖVÖ÷'’"À¢Wf–FVæ6T6Æ73¢'&öGV7F–öåö&–æF–æs¦ÖVÖ÷'’"À¢÷&–v–ã¢%dU$4TÅõ$õd”DU""À¢–ÆöC¢°¢&ö¦V7Eö–C¢'&¥ö'&s4$¤F4†e6gD„ƒƒDæ†ägDD¤äDò"À¢&W÷6—F÷'“¢&&æF÷7—7FV×2÷æF÷&2Ö&÷‚ÖÖVÖ÷'’"À¢'&æ6ƒ¢&Ö–â"À¢FWÆ÷–ÖVçEö–C¢&GÅôs‡G%fvõ6Vw„7GSV„SS¶´'d7F6…r"À¢v—E÷6†¢&R"ç&WVBƒC’À¢F&vWC¢'&öGV7F–öâ"À¢7FFS¢%$TE’"À¢6÷W&6S¢&v—B"À¢Æ–6W3¢²&‡GG3¢ò÷æF÷&6&÷‚ÖÖVÖ÷'’çfW&6VÂæ%ÒÀ¢ÒÀ¢Ò’À¢&V6V—B‡°¢–C¢'&öÆÆ&6²"À¢Wf–FVæ6T6Æ73¢'&öÆÆ&6µ÷F&vWB"À¢÷&–v–ã¢%dU$4TÅõ$õd”DU""À¢–ÆöC¢°¢FWÆ÷–ÖVçEö–C¢&GÅóU“5–Ôfu†VsVç$ƒs6s‡T'g&TÆÒ"À¢v—E÷6†¢$4RÀ¢7FFS¢%$TE’"À¢&WG&–Wf&ÆS¢G'VRÀ¢6÷W&6S¢&v—B"À¢F&vWC¢'7Fv–ær"À¢ÒÀ¢Ò’À¢&V6V—B‡°¢–C¢'7FFVgVÂ"À¢Wf–FVæ6T6Æ73¢'7FFVgVÅö6†ævUöÖG&—‚"À¢÷&–v–ã¢$t•D…T%õ$õd”DU""À¢–ÆöC¢°¢6†ævVEöf–ÆW3¢²'67&—G2÷fW&–g’×fW&6VÂ×&VÆV6RÖWf–FVæ6RæÖ§2%ÒÀ¢F—6ÆÆ÷vVC¢µÒÀ¢6Æ76–f–6F–öç3¢°¢FF&6S¢$äõôÄ”4$ÄR"À¢VFvUögVæ7F–öç3¢$äõEôÄ”4$ÄR"À¢WFƒ¢$äõEôÄ”4$ÄR"À¢6V7&WG5ö6öæf–s¢$äõEôÄ”4$ÄR"À¢¦ö'5÷VWVW3¢$äõôÄ”4$ÄR"À¢÷F†W%÷&÷f–FW%÷7FFS¢$äõEôÄ”4$ÄR"À¢ÒÀ¢ÒÀ¢Ò’À¢&÷WFR‚&6æF–FFR"Â$tUB"Â"ö†VÇF‚"Â&†VÇF‡•ö§6öâ"’À¢&÷WFR‚&6æF–FFR"Â$tUB"Â"öÖ7"Â'VæWF†VçF–6FVEö&V&W%ö&÷VæF'’"’À¢&÷WFR‚&6æF–FFR"Â%õ5B"Â"öÖ7"Â'VæWF†VçF–6FVEö&V&W%ö&÷VæF'’"’À¢&÷WFR‚&6æF–FFR"Â$tUB"Â"òçvVÆÂÖ¶æ÷vâööWF‚×&÷FV7FVB×&W6÷W&6RöÖ7"Â&öWF…÷&W6÷W&6UöÖWFFF"’À¢&÷WFR‚'&öÆÆ&6²"Â$tUB"Â"ö†VÇF‚"Â&†VÇF‡•ö§6öâ"’À¢&÷WFR‚'&öÆÆ&6²"Â$tUB"Â"öÖ7"Â'VæWF†VçF–6FVEö&V&W%ö&÷VæF'’"’À¢&÷WFR‚'&öÆÆ&6²"Â%õ5B"Â"öÖ7"Â'VæWF†VçF–6FVEö&÷VæF'’"’À¢&÷WFR‚'&öÆÆ&6²"Â$tUB"Â"òçvVÆÂÖ¶æ÷vâööWF‚×&÷FV7FVB×&W6÷W&6RöÖ7"Â&öWF…÷&W6÷W&6UöÖWFFF"’À¢&V6V—B‡°¢–C¢'&V†V'6Â"À¢Wf–FVæ6T6Æ73¢'&öÆÆ&6µ÷&V†V'6Â"À¢÷&–v–ã¢$t•D…T%õ$õd”DU""À¢—77VW#¢&v—F‡V"Ö7F–öç2"À¢–ÆöC¢°¢ÖöFS¢'&ÆÆVÅ÷&VEööæÇ•öæöå÷&öGV7F–öâ"À¢&W7VÇC¢%52"À¢6æF–FFU÷6†¢4„À¢&öÆÆ&6µöFWÆ÷–ÖVçEö–C¢&GÅóU“5–Ôfu†VsVç$ƒs6s‡T'g&TÆÒ"À¢&öGV7F–öåö×WFF–öã¢fÇ6RÀ¢ÒÀ¢Ò’À¢Ó°¢–b†–æ6ÇVFU&Wf–Wr’°¢Wf–FVæ6RçW6‚€¢&V6V—B‡°¢–C¢'&Wf–Wr"À¢Wf–FVæ6T6Æ73¢&–æFWVæFVçE÷&Wf–Wr"À¢÷&–v–ã¢$”äDUTäDTåEõ$Ud”UtU""À¢—77VW#¢'v÷&¶W#bÖ–æFWVæFVçB"À¢–ÆöC¢°¢7V&¦V7E÷6†¢4„À¢&Wf–WvW%ö–FVçF—G“¢'v÷&¶W#bÖ–æFWVæFVçB"À¢fW&F–7C¢%52"À¢ÒÀ¢Ò’À¢“°¢Ð¢–b†–æ6ÇVFTWF†÷&—¦F–öâ’°¢Wf–FVæ6RçW6‚€¢&V6V—B‡°¢–C¢&÷væW"ÖWF‚"À¢Wf–FVæ6T6Æ73¢&÷væW%öWF†÷&—¦F–öâ"À¢÷&–v–ã¢$õtäU%ôUD„õ$•¤D”ôâ"À¢—77VW#¢&÷væW"Ö6öçG&öÂ×F÷vW""À¢–ÆöC¢°¢7V&¦V7E÷6†¢4„À¢F&vWC¢'&öGV7F–öâ"À¢öæU÷F–ÖS¢G'VRÀ¢&Wfö¶VC¢fÇ6RÀ¢ÒÀ¢Ò’À¢“°¢Ð¢&WGW&â°¢6¶WE÷fW'6–öã¢#"ãã"À¢vVæW&FVEöC¢ô%4U%dTBÀ¢6æF–FFS¢°¢&W÷6—F÷'“¢&&æF÷7—7FV×2õæF÷&2Ö&÷‚"À¢VÆÅ÷&WVW7C¢S‚À¢'&æ6ƒ¢'&VÆV6R÷fW&6VÂ×&öÖ÷F–öâ×&V6÷fW'’Ó##cƒ’"À¢6†¢4„À¢G&VU÷6†¢E$TRÀ¢&6U÷6†¢$4RÀ¢WF†÷%ö–FVçF—G“¢'v÷&¶W#BÖWF†÷""À¢ö'6W'fVEöC¢ô%4U%dTBÀ¢ÒÀ¢Wf–FVæ6RÀ¢FW&—fVC¢·ÒÀ¢Ó°§Ð ¦gVæ7F–öâWfÇVFR‡6¶WBÂW‡V7FVE6†Ò4„’°¢&WGW&âWfÇVFTW‡FW&æÅ6¶WB‡6¶WBÂ²W‡V7FVE6†Âæ÷s¢äõrÒ“°§Ð ¦6öç7Bg&W6„6æF–FFRÒ‚’Óâ¥4ôâç'6R‡&VDf–ÆU7–æ2†6æF–FFUF‚Â'WFc‚"’“° §FW7B‚'&W÷6—F÷'’G'W7Bf–ÆW2fÆ–FFR"Â‚’Óâ°¢76W'BæFVWWVÂ‡fW&–g•&W÷6—F÷'”f–ÆW2‡²&ö÷BÒ’æW'&÷'2ÂµÒ“°§Ò“° §FW7B‚'6÷W&6RÖ6öçG&öÆÆVB6æF–FFR6ææ÷BÖçVf7GW&RWF†÷&—¦F–öâ"Â‚’Óâ°¢6öç7B6æF–FFRÒg&W6„6æF–FFR‚“°¢6æF–FFRç&öGV7F–öåöWF†÷&—¦F–öå÷&W6VçBÒG'VS°¢6æF–FFRæ÷væW%öWF†÷&—¦F–öâÒG'VS°¢6öç7BW'&÷'2ÒfÆ–FFU6÷W&6T6æF–FFR†6æF–FFR“°¢76W'Bæö²†W'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&Ö’æ÷B6Æ–ÒWF†÷&—¦F–öâ"’’“°¢76W'Bæö²†W'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'6÷W&6RÖ6öçG&öÆÆVB÷6—F—fRG'W7B6Æ–Ò"’’“°§Ò“° §FW7B‚'fÆ–BW‡FW&æÂ6¶WB—2&VÆV6R×&VG’'WBæ÷B÷væW"ÖWF†÷&—¦VB"Â‚’Óâ°¢6öç7B&W7VÇBÒWfÇVFR‡fÆ–E6¶WB‚’“°¢76W'BæFVWWVÂ‡&W7VÇBæW'&÷'2ÂµÒ“°¢76W'BæWVÂ‡&W7VÇBæFV6—6–öâÂ%$TÄT4Uõ$TE•ô%UEôäõEôUD„õ$•¤TB"“°§Ò“° §FW7B‚&÷væW"WF†÷&—¦F–öâ—266WFVBöæÇ’26W&FRW‡FW&æÂ&V6÷&B"Â‚’Óâ°¢6öç7B&W7VÇBÒWfÇVFR‡fÆ–E6¶WB‡²–æ6ÇVFTWF†÷&—¦F–öã¢G'VRÒ’“°¢76W'BæFVWWVÂ‡&W7VÇBæW'&÷'2ÂµÒ“°¢76W'BæWVÂ‡&W7VÇBæFV6—6–öâÂ$UD„õ$•¤TEôdõ%õ$ôET5D”ôâ"“°§Ò“° §FW7B‚'6VÆbÖWF†÷&VBWF†÷&—¦F–öâÖ&¶VB–æFWVæFVçBf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6öç7B&Wf–WrÒ6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ&–æFWVæFVçE÷&Wf–Wr"“°¢&Wf–Wræ÷&–v–âÒ%4õU$4Uô4ôåE$ôÄÄTB#°¢6öç7B&W7VÇBÒWfÇVFR‡6¶WB“°¢76W'Bæö²‡&W7VÇBæW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚%4õU$4Uô4ôåE$ôÄÄTBWf–FVæ6R6ææ÷B6F—6g’"’“°¢76W'BæWVÂ‡&W7VÇBæFV6—6–öâÂ$äõEõ$TE’"“°§Ò“° §FW7B‚'6÷W&6RÖ6öçG&öÆÆVBFWÆ÷–ÖVçB–FVçF—G’6ææ÷B6F—6g’&÷f–FW"&÷fVææ6R"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ&6æF–FFU÷&Wf–WuöFWÆ÷–ÖVçB"’æ÷&–v–âÒ%4õU$4Uô4ôåE$ôÄÄTB#°¢6öç7B&W7VÇBÒWfÇVFR‡6¶WB“°¢76W'Bæö²‡&W7VÇBæW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&÷&–v–â4õU$4Uô4ôåE$ôÄÄTB"’“°§Ò“° §FW7B‚'w&öærv—B4„&÷VæBFò6æF–FFRFWÆ÷–ÖVçBf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ&6æF–FFU÷&Wf–WuöFWÆ÷–ÖVçB"’ç–ÆöBæv—E÷6†Ò&b"ç&WVBƒC“°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚$v—B4„Ö—6ÖF6‚"’’“°§Ò“° §FW7B‚'7FÆR&÷f–FW"ö'6W'fF–öâf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6U³ÒæW‡—&W5öBÒ###bÓ‚Ó•C“£S“£S’ã¢#°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&W‡FW&æÂWf–FVæ6R—27FÆR"’’“°§Ò“° §FW7B‚'&Wf–WrÖ—6Æ&VÆVB&öGV7F–öâf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ&6æF–FFU÷&Wf–WuöFWÆ÷–ÖVçB"’ç–ÆöBçF&vWBÒ'&öGV7F–öâ#°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'&öGV7F–öâ÷7Fv–ærF&vWB—2f÷&&–FFVâ"’’“°§Ò“° §FW7B‚'&öGV7F–öâÖ—6Æ&VÆVB&Wf–Wrf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&öGV7F–öåö&–æF–æs¦Ö7Ö7FW""’ç–ÆöBçF&vWBÒ'&Wf–Wr#°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'F&vWB×W7B&R&öGV7F–öâ"’’“°§Ò“° §FW7B‚%$TE’FWÆ÷–ÖVçBv—F‚f–ÆVBÆ–6F–öâ&ö&Rf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6öç7B&ö&RÒ6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&÷WFU÷&ö&R"bb—FVÒç–ÆöBç7W&f6RÓÓÒ&6æF–FFR"bb—FVÒç–ÆöBç&÷WFRÓÓÒ"ö†VÇF‚"“°¢&ö&Rç–ÆöBç7FGW2ÒS°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&†æFÆW"6VÖçF–72vW&Ræ÷B&÷fVâ"’’“°§Ò“° §FW7B‚'&öÆÆ&6²F&vWBæòÆöævW"&WG&–Wf&ÆRf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&öÆÆ&6µ÷F&vWB"’ç–ÆöBç&WG&–Wf&ÆRÒfÇ6S°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'&WG&–Wf&–Æ—G’"’’“°§Ò“° §FW7B‚'&öÆÆ&6²F&vWB&÷VæBFòw&öærv—B4„f–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&öÆÆ&6µ÷F&vWB"’ç–ÆöBæv—E÷6†Ò&b"ç&WVBƒC“°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'&÷f–FW"Öö'6W'fVB"&6R4„"’’“°§Ò“° §FW7B‚&Ö—76–ær&öÆÆ&6²F&vWBf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6RÒ6¶WBæWf–FVæ6Ræf–ÇFW"‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÒ'&öÆÆ&6µ÷F&vWB"“°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'&öÆÆ&6²F&vWC¢&WV—&VBWf–FVæ6R—2'6VçB"’’“°§Ò“° §FW7B‚'&Ww&—FRfÆÆ&6²FöW2æ÷B&÷fR&÷WFR6VÖçF–72"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6öç7B&ö&RÒ6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&÷WFU÷&ö&R"bb—FVÒç–ÆöBç7W&f6RÓÓÒ&6æF–FFR"bb—FVÒç–ÆöBç&÷WFRÓÓÒ"ö†VÇF‚"“°¢&ö&Rç–ÆöBç&Ww&—FUöÖ&–wV÷W2ÒG'VS°¢&ö&Rç–ÆöBæ6öçFVçE÷G—RÒ'FW‡Bö‡FÖÂ#°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'&Ww&—FRÖ&–wV—G’"’’“°§Ò“° §FW7B‚$tUBCR6ææ÷B&RÖ—7F¶Vâf÷"gVæ7F–öæÂõ5B7V66W72"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6öç7B&ö&RÒ6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&÷WFU÷&ö&R"bb—FVÒç–ÆöBç7W&f6RÓÓÒ&6æF–FFR"bb—FVÒç–ÆöBæÖWF†öBÓÓÒ$tUB"bb—FVÒç–ÆöBç&÷WFRÓÓÒ"öÖ7"“°¢&ö&Rç–ÆöBç7FGW2ÒCS°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚$tUBCR"’’“°§Ò“° §FW7B‚'VæWF†VçF–6FVBC6ææ÷B&÷fRWF†VçF–6FVB66WFæ6R"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6öç7B&ö&RÒ6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&÷WFU÷&ö&R"bb—FVÒç–ÆöBç7W&f6RÓÓÒ&6æF–FFR"bb—FVÒç–ÆöBç&÷WFRÓÓÒ"öÖ7"“°¢&ö&Rç–ÆöBæWF†VçF–6FVEö66WFæ6RÒG'VS°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&6ææ÷B&÷fRWF†VçF–6FVB66WFæ6R"’’“°§Ò“° §FW7B‚%fW&6VÂÖöæÇ’&öÆÆ&6²f–Ç2v†VâFF&6R7FFR6†ævVB"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'7FFVgVÅö6†ævUöÖG&—‚"’ç–ÆöBæ6Æ76–f–6F–öç2æFF&6RÒ$Dô5TÔTåDTEôôäÅ’#°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&FF&6S¢&öÆÆ&6²Ö7&—F–6Â7FFR—2æ÷B6fVÇ’6Æ76–f–VB"’’“°§Ò“° §FW7B‚'&VÆV6R&÷fÂv—F†÷WB–æFWVæFVçBW†7BÖ†VB&Wf–Wrf–Ç2"Â‚’Óâ°¢6öç7B&W7VÇBÒWfÇVFR‡fÆ–E6¶WB‡²–æ6ÇVFU&Wf–Ws¢fÇ6RÂ–æ6ÇVFTWF†÷&—¦F–öã¢G'VRÒ’“°¢76W'Bæö²‡&W7VÇBæW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&–æFWVæFVçB&Wf–Wr"’’ÇÂ&W7VÇBævFW2æ–æFWVæFVçE÷&Wf–WrÓÓÒfÇ6R“°¢76W'BæWVÂ‡&W7VÇBæFV6—6–öâÂ$äõEõ$TE’"“°§Ò“° §FW7B‚'&öGV7F–öâ&VÖ–ç2æ÷BWF†÷&—¦VBv†Vâ÷væW"WF†÷&—¦F–öâ—2'6VçB"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæFW&—fVBç&VÆV6UöFV6—6–öâÒ$UD„õ$•¤TEôdõ%õ$ôET5D”ôâ#°¢6öç7B&W7VÇBÒWfÇVFR‡6¶WB“°¢76W'BæWVÂ‡&W7VÇBæFV6—6–öâÂ%$TÄT4Uõ$TE•ô%UEôäõEôUD„õ$•¤TB"“°§Ò“° §FW7B‚&6æF–FFR4„Ö÷fVÖVçB–çfÆ–FFW2F†R6¶WB"Â‚’Óâ°¢6öç7B&W7VÇBÒWfÇVFR‡fÆ–E6¶WB‚’Â&b"ç&WVBƒC’“°¢76W'Bæö²‡&W7VÇBæW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&6æF–FFRÖ÷fVB"’’“°¢76W'BæWVÂ‡&W7VÇBæFV6—6–öâÂ$äõEõ$TE’"“°§Ò“° §FW7B‚'v÷&¶fÆ÷r—2W†7BÖ†VBÂ–Ö×WF&ÆRÖ7F–öâÂ&VBÖöæÇ’æBæöâ×&öÖ÷F–ær"Â‚’Óâ°¢6öç7Bv÷&¶fÆ÷rÒ&VDf–ÆU7–æ2‡v÷&¶fÆ÷uF‚Â'WFc‚"“°¢76W'BæFVWWVÂ‡fÆ–FFUv÷&¶fÆ÷uFW‡B‡v÷&¶fÆ÷r’ÂµÒ“°§Ò“° §FW7B‚'v÷&¶fÆ÷rF‚f–ÇFW'2Â×WF&ÆR7F–öç2ÂæB&öÖ÷F–öâ6öÖÖæG2f–Â6Æ÷6VB"Â‚’Óâ°¢6öç7Bv÷&¶fÆ÷rÒ&VDf–ÆU7–æ2‡v÷&¶fÆ÷uF‚Â'WFc‚"¢ç&WÆ6R‚"VÆÅ÷&WVW7C¥Æâ"Â"VÆÅ÷&WVW7C¥ÆâF‡3¥ÆâÒFö72ò¢¥Æâ"¢ç&WÆ6R‚ö7F–öç5Âö6†V6¶÷WD³Ó–Öe×³CÒòÂ&7F–öç2ö6†V6¶÷WDcB"¢æ6öæ6B‚%Æâ2fW&6VÂ&öÖ÷FRÒ×&öEÆâ"“°¢6öç7BW'&÷'2ÒfÆ–FFUv÷&¶fÆ÷uFW‡B‡v÷&¶fÆ÷r“°¢76W'Bæö²†W'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'F‚f–ÇFW&–ær"’’“°¢76W'Bæö²†W'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&gVÆÂ–Ö×WF&ÆR6öÖÖ—B4„"’’“°¢76W'Bæö²†W'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'&÷f–FW"÷&öGV7F–öâ×WFF–öâ"’’“°§Ò“° 
+    issuer: { identity: issuer, transport: "test" },
+    subject_sha: subjectSha,
+    observed_at: OBSERVED,
+    expires_at: EXPIRES,
+    receipt: { locator: `provider://receipt/${id}`, sha256: HASH },
+    payload,
+  };
+}
+
+function route(surface, method, routePath, contract) {
+  const payload = {
+    surface,
+    method,
+    route: routePath,
+    semantic_contract: contract,
+    content_type: "application/json",
+    matched_path: routePath,
+    rewrite_ambiguous: false,
+    authenticated_acceptance: false,
+  };
+  if (contract === "healthy_json") {
+    Object.assign(payload, { status: 200, parsed_body: { status: "healthy", service: "mcpmaster-projectos" } });
+  } else if (contract === "unauthenticated_bearer_boundary") {
+    Object.assign(payload, {
+      status: 401,
+      www_authenticate: "Bearer resource_metadata=\"https://mcpmaster.vercel.app/.well-known/oauth-protected-resource/mcp\"",
+      parsed_body: { jsonrpc: "2.0", id: null, error: { code: -32001, message: "bearer required" } },
+    });
+  } else {
+    Object.assign(payload, {
+      status: 200,
+      parsed_body: {
+        resource: "https://mcpmaster.vercel.app/mcp",
+        authorization_servers: ["https://example.invalid/auth"],
+      },
+    });
+  }
+  return receipt({
+    id: `route-${surface}-${method}-${routePath.replaceAll("/", "-")}`,
+    evidenceClass: "route_probe",
+    origin: "GITHUB_PROVIDER",
+    payload,
+    issuer: "github-actions",
+  });
+}
+
+function validPacket({ includeReview = true, includeAuthorization = false } = {}) {
+  const evidence = [
+    receipt({
+      id: "preview",
+      evidenceClass: "candidate_preview_deployment",
+      origin: "VERCEL_PROVIDER",
+      issuer: "vercel[bot]",
+      payload: {
+        project_id: "prj_Y5rZVcq8xJVzHVt4uvfmg9wPvXMk",
+        deployment_id: "dpl_2G6a5tZv7j4u1cknywFXWfzCjvok",
+        git_sha: SHA,
+        target: null,
+        state: "READY",
+        source: "git",
+        url: "https://candidate.example.vercel.app",
+      },
+    }),
+    receipt({
+      id: "prod-mcp",
+      evidenceClass: "production_binding:mcpmaster",
+      origin: "VERCEL_PROVIDER",
+      payload: {
+        project_id: "prj_Y5rZVcq8xJVzHVt4uvfmg9wPvXMk",
+        repository: "banataosystems/Pandoras-box",
+        branch: "main",
+        deployment_id: "dpl_CLg3L8iDJpCHVLfRtyNjMFoSis3Y",
+        git_sha: BASE,
+        target: "production",
+        state: "READY",
+        source: "git",
+        aliases: ["https://mcpmaster.vercel.app"],
+      },
+    }),
+    receipt({
+      id: "prod-memory",
+      evidenceClass: "production_binding:memory",
+      origin: "VERCEL_PROVIDER",
+      payload: {
+        project_id: "prj_brg3BJDcHfSftHH84NhnFtDJAnDO",
+        repository: "banataosystems/pandoras-box-memory",
+        branch: "main",
+        deployment_id: "dpl_G8trVgoSegxCtu5hE51KkBvCtchW",
+        git_sha: "e".repeat(40),
+        target: "production",
+        state: "READY",
+        source: "git",
+        aliases: ["https://pandorasbox-memory.vercel.app"],
+      },
+    }),
+    receipt({
+      id: "rollback",
+      evidenceClass: "rollback_target",
+      origin: "VERCEL_PROVIDER",
+      payload: {
+        deployment_id: "dpl_5Y3YmFgQ1Heg5nrH73g8uBvraELm",
+        git_sha: BASE,
+        state: "READY",
+        retrievable: true,
+        source: "git",
+        target: "staging",
+      },
+    }),
+    receipt({
+      id: "stateful",
+      evidenceClass: "stateful_change_matrix",
+      origin: "GITHUB_PROVIDER",
+      payload: {
+        changed_files: ["scripts/verify-vercel-release-evidence.mjs"],
+        disallowed: [],
+        classifications: {
+          database: "NOT_APPLICABLE",
+          edge_functions: "NOT_APPLICABLE",
+          auth: "NOT_APPLICABLE",
+          secrets_config: "NOT_APPLICABLE",
+          jobs_queues: "NOT_APPLICABLE",
+          other_provider_state: "NOT_APPLICABLE",
+        },
+      },
+    }),
+    route("candidate", "GET", "/health", "healthy_json"),
+    route("candidate", "GET", "/mcp", "unauthenticated_bearer_boundary"),
+    route("candidate", "POST", "/mcp", "unauthenticated_bearer_boundary"),
+    route("candidate", "GET", "/.well-known/oauth-protected-resource/mcp", "oauth_resource_metadata"),
+    route("rollback", "GET", "/health", "healthy_json"),
+    route("rollback", "GET", "/mcp", "unauthenticated_bearer_boundary"),
+    route("rollback", "POST", "/mcp", "unauthenticated_bearer_boundary"),
+    route("rollback", "GET", "/.well-known/oauth-protected-resource/mcp", "oauth_resource_metadata"),
+    receipt({
+      id: "rehearsal",
+      evidenceClass: "rollback_rehearsal",
+      origin: "GITHUB_PROVIDER",
+      issuer: "github-actions",
+      payload: {
+        mode: "parallel_read_only_non_production",
+        result: "PASS",
+        candidate_sha: SHA,
+        rollback_deployment_id: "dpl_5Y3YmFgQ1Heg5nrH73g8uBvraELm",
+        production_mutation: false,
+      },
+    }),
+  ];
+  if (includeReview) {
+    evidence.push(
+      receipt({
+        id: "review",
+        evidenceClass: "independent_review",
+        origin: "INDEPENDENT_REVIEWER",
+        issuer: "worker6-independent",
+        payload: {
+          subject_sha: SHA,
+          reviewer_identity: "worker6-independent",
+          verdict: "PASS",
+        },
+      }),
+    );
+  }
+  if (includeAuthorization) {
+    evidence.push(
+      receipt({
+        id: "owner-auth",
+        evidenceClass: "owner_authorization",
+        origin: "OWNER_AUTHORIZATION",
+        issuer: "owner-control-tower",
+        payload: {
+          subject_sha: SHA,
+          target: "production",
+          one_time: true,
+          revoked: false,
+        },
+      }),
+    );
+  }
+  return {
+    packet_version: "2.0.0",
+    generated_at: OBSERVED,
+    candidate: {
+      repository: "banataosystems/Pandoras-box",
+      pull_request: 58,
+      branch: "release/vercel-promotion-recovery-20260819",
+      sha: SHA,
+      tree_sha: TREE,
+      base_sha: BASE,
+      author_identity: "worker4-author",
+      observed_at: OBSERVED,
+    },
+    evidence,
+    derived: {},
+  };
+}
+
+function evaluate(packet, expectedSha = SHA) {
+  return evaluateExternalPacket(packet, { expectedSha, now: NOW });
+}
+
+const freshCandidate = () => JSON.parse(readFileSync(candidatePath, "utf8"));
+
+test("repository trust files validate", () => {
+  assert.deepEqual(verifyRepositoryFiles({ root }).errors, []);
+});
+
+test("source-controlled candidate cannot manufacture authorization", () => {
+  const candidate = freshCandidate();
+  candidate.production_authorization_present = true;
+  candidate.owner_authorization = true;
+  const errors = validateSourceCandidate(candidate);
+  assert.ok(errors.some((error) => error.includes("may not claim authorization")));
+  assert.ok(errors.some((error) => error.includes("source-controlled positive trust claim")));
+});
+
+test("valid external packet is release-ready but not owner-authorized", () => {
+  const result = evaluate(validPacket());
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.decision, "RELEASE_READY_BUT_NOT_AUTHORIZED");
+});
+
+test("owner authorization is accepted only as a separate external record", () => {
+  const result = evaluate(validPacket({ includeAuthorization: true }));
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.decision, "AUTHORIZED_FOR_PRODUCTION");
+});
+
+test("self-authored authorization marked independent fails", () => {
+  const packet = validPacket();
+  const review = packet.evidence.find((item) => item.evidence_class === "independent_review");
+  review.origin = "SOURCE_CONTROLLED";
+  const result = evaluate(packet);
+  assert.ok(result.errors.some((error) => error.includes("SOURCE_CONTROLLED evidence cannot satisfy")));
+  assert.equal(result.decision, "NOT_READY");
+});
+
+test("source-controlled deployment identity cannot satisfy provider provenance", () => {
+  const packet = validPacket();
+  packet.evidence.find((item) => item.evidence_class === "candidate_preview_deployment").origin = "SOURCE_CONTROLLED";
+  const result = evaluate(packet);
+  assert.ok(result.errors.some((error) => error.includes("origin SOURCE_CONTROLLED")));
+});
+
+test("wrong Git SHA bound to candidate deployment fails", () => {
+  const packet = validPacket();
+  packet.evidence.find((item) => item.evidence_class === "candidate_preview_deployment").payload.git_sha = "f".repeat(40);
+  assert.ok(evaluate(packet).errors.some((error) => error.includes("Git SHA mismatch")));
+});
+
+test("stale provider observation fails", () => {
+  const packet = validPacket();
+  packet.evidence[0].expires_at = "2026-08-19T09:59:59.000Z";
+  assert.ok(evaluate(packet).errors.some((error) => error.includes("external evidence is stale")));
+});
+
+test("preview mislabeled production fails", () => {
+  const packet = validPacket();
+  packet.evidence.find((item) => item.evidence_class === "candidate_preview_deployment").payload.target = "production";
+  assert.ok(evaluate(packet).errors.some((error) => error.includes("production/staging target is forbidden")));
+});
+
+test("production mislabeled preview fails", () => {
+  const packet = validPacket();
+  packet.evidence.find((item) => item.evidence_class === "production_binding:mcpmaster").payload.target = "preview";
+  assert.ok(evaluate(packet).errors.some((error) => error.includes("target must be production")));
+});
+
+test("READY deployment with failed application probe fails", () => {
+  const packet = validPacket();
+  const probe = packet.evidence.find((item) => item.evidence_class === "route_probe" && item.payload.surface === "candidate" && item.payload.route === "/health");
+  probe.payload.status = 500;
+  assert.ok(evaluate(packet).errors.some((error) => error.includes("handler semantics were not proven")));
+});
+
+test("rollback target no longer retrievable fails", () => {
+  const packet = validPacket();
+  packet.evidence.find((item) => item.evidence_class === "rollback_target").payload.retrievable = false;
+  assert.ok(evaluate(packet).errors.some((error) => error.includes("retrievability")));
+});
+
+test("rollback target bound to wrong Git SHA fails", () => {
+  const packet = validPacket();
+  packet.evidence.find((item) => item.evidence_class === "rollback_target").payload.git_sha = "f".repeat(40);
+  assert.ok(evaluate(packet).errors.some((error) => error.includes("provider-observed PR base SHA")));
+});
+
+test("missing rollback target fails", () => {
+  const packet = validPacket();
+  packet.evidence = packet.evidence.filter((item) => item.evidence_class !== "rollback_target");
+  assert.ok(evaluate(packet).errors.some((error) => error.includes("rollback target: required evidence is absent")));
+});
+
+test("rewrite fallback does not prove route semantics", () => {
+  const packet = validPacket();
+  const probe = packet.evidence.find((item) => item.evidence_class === "route_probe" && item.payload.surface === "candidate" && item.payload.route === "/health");
+  probe.payload.rewrite_ambiguous = true;
+  probe.payload.content_type = "text/html";
+  assert.ok(evaluate(packet).errors.some((error) => error.includes("rewrite ambiguity")));
+});
+
+test("GET 405 cannot be mistaken for functional POST success", () => {
+  const packet = validPacket();
+  const probe = packet.evidence.find((item) => item.evidence_class === "route_probe" && item.payload.surface === "candidate" && item.payload.method === "GET" && item.payload.route === "/mcp");
+  probe.payload.status = 405;
+  assert.ok(evaluate(packet).errors.some((error) => error.includes("GET 405")));
+});
+
+test("unauthenticated 401 cannot prove authenticated acceptance", () => {
+  const packet = validPacket();
+  const probe = packet.evidence.find((item) => item.evidence_class === "route_probe" && item.payload.surface === "candidate" && item.payload.route === "/mcp");
+  probe.payload.authenticated_acceptance = true;
+  assert.ok(evaluate(packet).errors.some((error) => error.includes("cannot prove authenticated acceptance")));
+});
+
+test("Vercel-only rollback fails when database state changed", () => {
+  const packet = validPacket();
+  packet.evidence.find((item) => item.evidence_class === "stateful_change_matrix").payload.classifications.database = "DOCUMENTED_ONLY";
+  assert.ok(evaluate(packet).errors.some((error) => error.includes("database: rollback-critical state is not safely classified")));
+});
+
+test("release approval without independent exact-head review fails", () => {
+  const result = evaluate(validPacket({ includeReview: false, includeAuthorization: true }));
+  assert.ok(result.errors.some((error) => error.includes("independent review")) || result.gates.independent_review === false);
+  assert.equal(result.decision, "NOT_READY");
+});
+
+test("production remains not authorized when owner authorization is absent", () => {
+  const packet = validPacket();
+  packet.derived.release_decision = "AUTHORIZED_FOR_PRODUCTION";
+  const result = evaluate(packet);
+  assert.equal(result.decision, "RELEASE_READY_BUT_NOT_AUTHORIZED");
+});
+
+test("candidate SHA movement invalidates the packet", () => {
+  const result = evaluate(validPacket(), "f".repeat(40));
+  assert.ok(result.errors.some((error) => error.includes("candidate moved")));
+  assert.equal(result.decision, "NOT_READY");
+});
+
+test("workflow is exact-head, immutable-action, read-only and non-promoting", () => {
+  const workflow = readFileSync(workflowPath, "utf8");
+  assert.deepEqual(validateWorkflowText(workflow), []);
+});
+
+test("workflow path filters, mutable actions, and promotion commands fail closed", () => {
+  const workflow = readFileSync(workflowPath, "utf8")
+    .replace("  pull_request:\n", "  pull_request:\n    paths:\n      - docs/**\n")
+    .replace(/actions\/checkout@[0-9a-f]{40}/, "actions/checkout@v4")
+    .concat("\n# vercel promote --prod\n");
+  const errors = validateWorkflowText(workflow);
+  assert.ok(errors.some((error) => error.includes("path filtering")));
+  assert.ok(errors.some((error) => error.includes("full immutable commit SHA")));
+  assert.ok(errors.some((error) => error.includes("provider/production mutation")));
+});
