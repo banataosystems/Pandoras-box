@@ -4,96 +4,27 @@ import { resolve } from "node:path";
 import test from "node:test";
 
 import {
-  sha256,
-  validateManifestObject,
+  evaluateExternalPacket,
+  validateSourceCandidate,
   validateWorkflowText,
-  verifyEvidenceFiles,
+  verifyRepositoryFiles,
 } from "../scripts/verify-vercel-release-evidence.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const manifestPath = resolve(
-  root,
-  "docs/releases/vercel/2026-08-19-current-production-observation.json",
-);
+const candidatePath = resolve(root, "docs/releases/vercel/release-candidate.source.json");
 const workflowPath = resolve(root, ".github/workflows/vercel-release-evidence.yml");
+const SHA = "a".repeat(40);
+const TREE = "b".repeat(40);
+const BASE = "c".repeat(40);
+const NOW = new Date("2026-08-19T10:00:00.000Z");
+const OBSERVED = "2026-08-19T09:55:00.000Z";
+const EXPIRES = "2026-08-19T10:15:00.000Z";
+const HASH = "d".repeat(64);
 
-const freshManifest = () => JSON.parse(readFileSync(manifestPath, "utf8"));
-
-test("canonical release evidence and sidecar validate", () => {
-  const { errors } = verifyEvidenceFiles({ root });
-  assert.deepEqual(errors, []);
-});
-
-test("manifest hash is deterministic and content-addressed", () => {
-  const text = readFileSync(manifestPath, "utf8");
-  const sidecar = readFileSync(
-    resolve(
-      root,
-      "docs/releases/vercel/2026-08-19-current-production-observation.sha256",
-    ),
-    "utf8",
-  ).trim();
-  assert.equal(sidecar.split("  ")[0], sha256(text));
-});
-
-test("staging and production must bind to the exact source SHA", () => {
-  const manifest = freshManifest();
-  manifest.projects[0].staging_deployment.source_sha =
-    "0000000000000000000000000000000000000000";
-  const errors = validateManifestObject(manifest);
-  assert.ok(errors.some((error) => error.includes("staging_deployment.source_sha")));
-});
-
-test("rollback cannot qualify without every proof gate", () => {
-  const manifest = freshManifest();
-  manifest.projects[0].rollback_qualification.status = "QUALIFIED";
-  manifest.projects[0].rollback_qualification.database_qualified = false;
-  const errors = validateManifestObject(manifest);
-  assert.ok(errors.some((error) => error.includes("QUALIFIED requires every gate")));
-});
-
-test("release readiness cannot outrun review, staging, and database gates", () => {
-  const manifest = freshManifest();
-  manifest.release_candidates[0].release_verdict =
-    "READY_FOR_PRODUCTION_AUTHORIZATION";
-  const errors = validateManifestObject(manifest);
-  assert.ok(errors.some((error) => error.includes("readiness requires review")));
-});
-
-test("credential-shaped material is rejected", () => {
-  const manifest = freshManifest();
-  manifest.projects[0].environment_fingerprint.accidental_value =
-    "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
-  const errors = validateManifestObject(manifest);
-  assert.ok(errors.some((error) => error.includes("GitHub credential shape")));
-});
-
-test("workflow is exact-head, read-only, and non-promoting", () => {
-  const workflow = readFileSync(workflowPath, "utf8");
-  assert.deepEqual(validateWorkflowText(workflow), []);
-});
-
-test("workflow push triggers and production commands fail closed", () => {
-  const workflow = readFileSync(workflowPath, "utf8")
-    .replace("  pull_request:", "  push:\n  pull_request:")
-    .concat("\n# vercel deploy --prod\n");
-  const errors = validateWorkflowText(workflow);
-  assert.ok(errors.some((error) => error.includes("push trigger is forbidden")));
-  assert.ok(errors.some((error) => error.includes("mutation command is forbidden")));
-});
-
-test("workflow action dependencies must use approved full commit SHAs", () => {
-  const workflow = readFileSync(workflowPath, "utf8").replace(
-    "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
-    "actions/checkout@v4",
-  );
-  const errors = validateWorkflowText(workflow);
-  assert.ok(
-    errors.some((error) =>
-      error.includes("action reference must use a full immutable commit SHA"),
-    ),
-  );
-  assert.ok(
-    errors.some((error) => error.includes("missing approved action reference")),
-  );
-});
+function receipt({ id, evidenceClass, origin, payload, subjectSha = SHA, issuer = "external-issuer" }) {
+  return {
+    id,
+    evidence_class: evidenceClass,
+    origin,
+    trust_effect: origin === "SOURCE_CONTROLLED" ? "DESCRIBES_EXPECTATION_ONLY" : "SATISFIES_EXTERNAL_GATE",
+    issuer#¢²–FVçF—G“¢—77VW"ÂG&ç7÷'C¢'FW7B"ÒÀ¢7V&¦V7E÷6†¢7V&¦V7E6†À¢ö'6W'fVEöC¢ô%4U%dTBÀ¢W‡—&W5öC¢U…•$U2À¢&V6V—C¢²Æö6F÷#¢&÷f–FW#¢ò÷&V6V—BòG¶–GÖÂ6†#Sc¢„4‚ÒÀ¢–ÆöBÀ¢Ó°§Ð ¦gVæ7F–öâ&÷WFR‡7W&f6RÂÖWF†öBÂ&÷WFUF‚Â6öçG&7B’°¢6öç7B–ÆöBÒ°¢7W&f6RÀ¢ÖWF†öBÀ¢&÷WFS¢&÷WFUF‚À¢6VÖçF–5ö6öçG&7C¢6öçG&7BÀ¢6öçFVçE÷G—S¢&Æ–6F–öâö§6öâ"À¢ÖF6†VE÷Fƒ¢&÷WFUF‚À¢&Ww&—FUöÖ&–wV÷W3¢fÇ6RÀ¢WF†VçF–6FVEö66WFæ6S¢fÇ6RÀ¢Ó°¢–b†6öçG&7BÓÓÒ&†VÇF‡•ö§6öâ"’°¢ö&¦V7Bæ76–vâ‡–ÆöBÂ²7FGW3¢#Â'6VEö&öG“¢²7FGW3¢&†VÇF‡’"Â6W'f–6S¢&Ö7Ö7FW"×&ö¦V7F÷2"ÒÒ“°¢ÒVÇ6R–b†6öçG&7BÓÓÒ'VæWF†VçF–6FVEö&V&W%ö&÷VæF'’"’°¢ö&¦V7Bæ76–vâ‡–ÆöBÂ°¢7FGW3¢CÀ¢wwuöWF†VçF–6FS¢$&V&W"&W6÷W&6UöÖWFFFÕÂ&‡GG3¢òöÖ7Ö7FW"çfW&6VÂæòçvVÆÂÖ¶æ÷vâööWF‚×&÷FV7FVB×&W6÷W&6RöÖ7Â""À¢'6VEö&öG“¢²§6öç'3¢#"ã"Â–C¢çVÆÂÂW'&÷#¢²6öFS¢Ó3#ÂÖW76vS¢&&V&W"&WV—&VB"ÒÒÀ¢Ò“°¢ÒVÇ6R°¢ö&¦V7Bæ76–vâ‡–ÆöBÂ°¢7FGW3¢#À¢'6VEö&öG“¢°¢&W6÷W&6S¢&‡GG3¢òöÖ7Ö7FW"çfW&6VÂæöÖ7"À¢WF†÷&—¦F–öå÷6W'fW'3¢²&‡GG3¢òöW†×ÆRæ–çfÆ–BöWF‚%ÒÀ¢ÒÀ¢Ò“°¢Ð¢&WGW&â&V6V—B‡°¢–C¢&÷WFRÒG·7W&f6WÒÒG¶ÖWF†öGÒÒG·&÷WFUF‚ç&WÆ6TÆÂ‚"ò"Â"Ò"—ÖÀ¢Wf–FVæ6T6Æ73¢'&÷WFU÷&ö&R"À¢÷&–v–ã¢$t•D…T%õ$õd”DU""À¢–ÆöBÀ¢—77VW#¢&v—F‡V"Ö7F–öç2"À¢Ò“°§Ð ¦gVæ7F–öâfÆ–E6¶WB‡²–æ6ÇVFU&Wf–WrÒG'VRÂ–æ6ÇVFTWF†÷&—¦F–öâÒfÇ6RÒÒ·Ò’°¢6öç7BWf–FVæ6RÒ°¢&V6V—B‡°¢–C¢'&Wf–Wr"À¢Wf–FVæ6T6Æ73¢&6æF–FFU÷&Wf–WuöFWÆ÷–ÖVçB"À¢÷&–v–ã¢%dU$4TÅõ$õd”DU""À¢—77VW#¢'fW&6VÅ¶&÷EÒ"À¢–ÆöC¢°¢&ö¦V7Eö–C¢'&¥õ“W%¥f7‡„¥g¤…gCGWffÖs—ue„Ö²"À¢FWÆ÷–ÖVçEö–C¢&GÅó$sfWE§cv£GS6¶ç—te…vg¤6§fö²"À¢v—E÷6†¢4„À¢F&vWC¢çVÆÂÀ¢7FFS¢%$TE’"À¢6÷W&6S¢&v—B"À¢W&Ã¢&‡GG3¢òö6æF–FFRæW†×ÆRçfW&6VÂæ"À¢ÒÀ¢Ò’À¢&V6V—B‡°¢–C¢'&öBÖÖ7"À¢Wf–FVæ6T6Æ73¢'&öGV7F–öåö&–æF–æs¦Ö7Ö7FW""À¢÷&–v–ã¢%dU$4TÅõ$õd”DU""À¢–ÆöC¢°¢&ö¦V7Eö–C¢'&¥õ“W%¥f7‡„¥g¤…gCGWffÖs—ue„Ö²"À¢&W÷6—F÷'“¢&&æF÷7—7FV×2õæF÷&2Ö&÷‚"À¢'&æ6ƒ¢&Ö–â"À¢FWÆ÷–ÖVçEö–C¢&GÅô4Æs4Ã†”D§4…dÆe'G”æ¤Ôfõ6—35’"À¢v—E÷6†¢$4RÀ¢F&vWC¢'&öGV7F–öâ"À¢7FFS¢%$TE’"À¢6÷W&6S¢&v—B"À¢Æ–6W3¢²&‡GG3¢òöÖ7Ö7FW"çfW&6VÂæ%ÒÀ¢ÒÀ¢Ò’À¢&V6V—B‡°¢–C¢'&öBÖÖVÖ÷'’"À¢Wf–FVæ6T6Æ73¢'&öGV7F–öåö&–æF–æs¦ÖVÖ÷'’"À¢÷&–v–ã¢%dU$4TÅõ$õd”DU""À¢–ÆöC¢°¢&ö¦V7Eö–C¢'&¥ö'&s4$¤F4†e6gD„ƒƒDæ†ägDD¤äDò"À¢&W÷6—F÷'“¢&&æF÷7—7FV×2÷æF÷&2Ö&÷‚ÖÖVÖ÷'’"À¢'&æ6ƒ¢&Ö–â"À¢FWÆ÷–ÖVçEö–C¢&GÅôs‡G%fvõ6Vw„7GSV„SS¶´'d7F6…r"À¢v—E÷6†¢&R"ç&WVBƒC’À¢F&vWC¢'&öGV7F–öâ"À¢7FFS¢%$TE’"À¢6÷W&6S¢&v—B"À¢Æ–6W3¢²&‡GG3¢ò÷æF÷&6&÷‚ÖÖVÖ÷'’çfW&6VÂæ%ÒÀ¢ÒÀ¢Ò’À¢&V6V—B‡°¢–C¢'&öÆÆ&6²"À¢Wf–FVæ6T6Æ73¢'&öÆÆ&6µ÷F&vWB"À¢÷&–v–ã¢%dU$4TÅõ$õd”DU""À¢–ÆöC¢°¢FWÆ÷–ÖVçEö–C¢&GÅóU“5–Ôfu†VsVç$ƒs6s‡T'g&TÆÒ"À¢v—E÷6†¢$4RÀ¢7FFS¢%$TE’"À¢&WG&–Wf&ÆS¢G'VRÀ¢6÷W&6S¢&v—B"À¢F&vWC¢'7Fv–ær"À¢ÒÀ¢Ò’À¢&V6V—B‡°¢–C¢'7FFVgVÂ"À¢Wf–FVæ6T6Æ73¢'7FFVgVÅö6†ævUöÖG&—‚"À¢÷&–v–ã¢$t•D…T%õ$õd”DU""À¢–ÆöC¢°¢6†ævVEöf–ÆW3¢²'67&—G2÷fW&–g’×fW&6VÂ×&VÆV6RÖWf–FVæ6RæÖ§2%ÒÀ¢F—6ÆÆ÷vVC¢µÒÀ¢6Æ76–f–6F–öç3¢°¢FF&6S¢$äõôÄ”4$ÄR"À¢VFvUögVæ7F–öç3¢$äõEôÄ”4$ÄR"À¢WFƒ¢$äõEôÄ”4$ÄR"À¢6V7&WG5ö6öæf–s¢$äõEôÄ”4$ÄR"À¢¦ö'5÷VWVW3¢$äõôÄ”4$ÄR"À¢÷F†W%÷&÷f–FW%÷7FFS¢$äõEôÄ”4$ÄR"À¢ÒÀ¢ÒÀ¢Ò’À¢&÷WFR‚&6æF–FFR"Â$tUB"Â"ö†VÇF‚"Â&†VÇF‡•ö§6öâ"’À¢&÷WFR‚&6æF–FFR"Â$tUB"Â"öÖ7"Â'VæWF†VçF–6FVEö&V&W%ö&÷VæF'’"’À¢&÷WFR‚&6æF–FFR"Â%õ5B"Â"öÖ7"Â'VæWF†VçF–6FVEö&V&W%ö&÷VæF'’"’À¢&÷WFR‚&6æF–FFR"Â$tUB"Â"òçvVÆÂÖ¶æ÷vâööWF‚×&÷FV7FVB×&W6÷W&6RöÖ7"Â&öWF…÷&W6÷W&6UöÖWFFF"’À¢&÷WFR‚'&öÆÆ&6²"Â$tUB"Â"ö†VÇF‚"Â&†VÇF‡•ö§6öâ"’À¢&÷WFR‚'&öÆÆ&6²"Â$tUB"Â"öÖ7"Â'VæWF†VçF–6FVEö&V&W%ö&÷VæF'’"’À¢&÷WFR‚'&öÆÆ&6²"Â%õ5B"Â"öÖ7"Â'VæWF†VçF–6FVEö&÷VæF'’"’À¢&÷WFR‚'&öÆÆ&6²"Â$tUB"Â"òçvVÆÂÖ¶æ÷vâööWF‚×&÷FV7FVB×&W6÷W&6RöÖ7"Â&öWF…÷&W6÷W&6UöÖWFFF"’À¢&V6V—B‡°¢–C¢'&V†V'6Â"À¢Wf–FVæ6T6Æ73¢'&öÆÆ&6µ÷&V†V'6Â"À¢÷&–v–ã¢$t•D…T%õ$õd”DU""À¢—77VW#¢&v—F‡V"Ö7F–öç2"À¢–ÆöC¢°¢ÖöFS¢'&ÆÆVÅ÷&VEööæÇ•öæöå÷&öGV7F–öâ"À¢&W7VÇC¢%52"À¢6æF–FFU÷6†¢4„À¢&öÆÆ&6µöFWÆ÷–ÖVçEö–C¢&GÅóU“5–Ôfu†VsVç$ƒs6s‡T'g&TÆÒ"À¢&öGV7F–öåö×WFF–öã¢fÇ6RÀ¢ÒÀ¢Ò’À¢Ó°¢–b†–æ6ÇVFU&Wf–Wr’°¢Wf–FVæ6RçW6‚€¢&V6V—B‡°¢–C¢'&Wf–Wr"À¢Wf–FVæ6T6Æ73¢&–æFWVæFVçE÷&Wf–Wr"À¢÷&–v–ã¢$”äDUTäDTåEõ$Ud”UtU""À¢—77VW#¢'v÷&¶W#bÖ–æFWVæFVçB"À¢–ÆöC¢°¢7V&¦V7E÷6†¢4„À¢&Wf–WvW%ö–FVçF—G“¢'v÷&¶W#bÖ–æFWVæFVçB"À¢fW&F–7C¢%52"À¢ÒÀ¢Ò’À¢“°¢Ð¢–b†–æ6ÇVFTWF†÷&—¦F–öâ’°¢Wf–FVæ6RçW6‚€¢&V6V—B‡°¢–C¢&÷væW"ÖWF‚"À¢Wf–FVæ6T6Æ73¢&÷væW%öWF†÷&—¦F–öâ"À¢÷&–v–ã¢$õtäU%ôUD„õ$•¤D”ôâ"À¢—77VW#¢&÷væW"Ö6öçG&öÂ×F÷vW""À¢–ÆöC¢°¢7V&¦V7E÷6†¢4„À¢F&vWC¢'&öGV7F–öâ"À¢öæU÷F–ÖS¢G'VRÀ¢&Wfö¶VC¢fÇ6RÀ¢ÒÀ¢Ò’À¢“°¢Ð¢&WGW&â°¢6¶WE÷fW'6–öã¢#"ãã"À¢vVæW&FVEöC¢ô%4U%dTBÀ¢6æF–FFS¢°¢&W÷6—F÷'“¢&&æF÷7—7FV×2õæF÷&2Ö&÷‚"À¢VÆÅ÷&WVW7C¢S‚À¢'&æ6ƒ¢'&VÆV6R÷fW&6VÂ×&öÖ÷F–öâ×&V6÷fW'’Ó##cƒ’"À¢6†¢4„À¢G&VU÷6†¢E$TRÀ¢&6U÷6†¢$4RÀ¢WF†÷%ö–FVçF—G“¢'v÷&¶W#BÖWF†÷""À¢ö'6W'fVEöC¢ô%4U%dTBÀ¢ÒÀ¢Wf–FVæ6RÀ¢FW&—fVC¢·ÒÀ¢Ó°§Ð ¦gVæ7F–öâWfÇVFR‡6¶WBÂW‡V7FVE6†Ò4„’°¢&WGW&âWfÇVFTW‡FW&æÅ6¶WB‡6¶WBÂ²W‡V7FVE6†Âæ÷s¢äõrÒ“°§Ð ¦6öç7Bg&W6„6æF–FFRÒ‚’Óâ¥4ôâç'6R‡&VDf–ÆU7–æ2†6æF–FFUF‚Â'WFc‚"’“° §FW7B‚'&W÷6—F÷'’G'W7Bf–ÆW2fÆ–FFR"Â‚’Óâ°¢76W'BæFVWWVÂ‡fW&–g•&W÷6—F÷'”f–ÆW2‡²&ö÷BÒ’æW'&÷'2ÂµÒ“°§Ò“° §FW7B‚'6÷W&6RÖ6öçG&öÆÆVB6æF–FFR6ææ÷BÖçVf7GW&RWF†÷&—¦F–öâ"Â‚’Óâ°¢6öç7B6æF–FFRÒg&W6„6æF–FFR‚“°¢6æF–FFRç&öGV7F–öåöWF†÷&—¦F–öå÷&W6VçBÒG'VS°¢6æF–FFRæ÷væW%öWF†÷&—¦F–öâÒG'VS°¢6öç7BW'&÷'2ÒfÆ–FFU6÷W&6T6æF–FFR†6æF–FFR“°¢76W'Bæö²†W'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&Ö’æ÷B6Æ–ÒWF†÷&—¦F–öâ"’’“°¢76W'Bæö²†W'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'6÷W&6RÖ6öçG&öÆÆVB÷6—F—fRG'W7B6Æ–Ò"’’“°§Ò“° §FW7B‚'fÆ–BW‡FW&æÂ6¶WB—2&VÆV6R×&VG’'WBæ÷B÷væW"ÖWF†÷&—¦VB"Â‚’Óâ°¢6öç7B&W7VÇBÒWfÇVFR‡fÆ–E6¶WB‚’“°¢76W'BæFVWWVÂ‡&W7VÇBæW'&÷'2ÂµÒ“°¢76W'BæWVÂ‡&W7VÇBæFV6—6–öâÂ%$TÄT4Uõ$TE•ô%UEôäõEôUD„õ$•¤TB"“°§Ò“° §FW7B‚&÷væW"WF†÷&—¦F–öâ—266WFVBöæÇ’26W&FRW‡FW&æÂ&V6÷&B"Â‚’Óâ°¢6öç7B&W7VÇBÒWfÇVFR‡fÆ–E6¶WB‡²–æ6ÇVFTWF†÷&—¦F–öã¢G'VRÒ’“°¢76W'BæFVWWVÂ‡&W7VÇBæW'&÷'2ÂµÒ“°¢76W'BæWVÂ‡&W7VÇBæFV6—6–öâÂ$UD„õ$•¤TEôdõ%õ$ôET5D”ôâ"“°§Ò“° §FW7B‚'6VÆbÖWF†÷&VBWF†÷&—¦F–öâÖ&¶VB–æFWVæFVçBf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6öç7B&Wf–WrÒ6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ&–æFWVæFVçE÷&Wf–Wr"“°¢&Wf–Wræ÷&–v–âÒ%4õU$4Uô4ôåE$ôÄÄTB#°¢6öç7B&W7VÇBÒWfÇVFR‡6¶WB“°¢76W'Bæö²‡&W7VÇBæW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚%4õU$4Uô4ôåE$ôÄÄTBWf–FVæ6R6ææ÷B6F—6g’"’“°¢76W'BæWVÂ‡&W7VÇBæFV6—6–öâÂ$äõEõ$TE’"“°§Ò“° §FW7B‚'6÷W&6RÖ6öçG&öÆÆVBFWÆ÷–ÖVçB–FVçF—G’6ææ÷B6F—6g’&÷f–FW"&÷fVææ6R"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ&6æF–FFU÷&Wf–WuöFWÆ÷–ÖVçB"’æ÷&–v–âÒ%4õU$4Uô4ôåE$ôÄÄTB#°¢6öç7B&W7VÇBÒWfÇVFR‡6¶WB“°¢76W'Bæö²‡&W7VÇBæW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&÷&–v–â4õU$4Uô4ôåE$ôÄÄTB"’“°§Ò“° §FW7B‚'w&öærv—B4„&÷VæBFò6æF–FFRFWÆ÷–ÖVçBf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ&6æF–FFU÷&Wf–WuöFWÆ÷–ÖVçB"’ç–ÆöBæv—E÷6†Ò&b"ç&WVBƒC“°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚$v—B4„Ö—6ÖF6‚"’’“°§Ò“° §FW7B‚'7FÆR&÷f–FW"ö'6W'fF–öâf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6U³ÒæW‡—&W5öBÒ###bÓ‚Ó•C“£S“£S’ã¢#°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&W‡FW&æÂWf–FVæ6R—27FÆR"’’“°§Ò“° §FW7B‚'&Wf–WrÖ—6Æ&VÆVB&öGV7F–öâf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ&6æF–FFU÷&Wf–WuöFWÆ÷–ÖVçB"’ç–ÆöBçF&vWBÒ'&öGV7F–öâ#°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'&öGV7F–öâ÷7Fv–ærF&vWB—2f÷&&–FFVâ"’’“°§Ò“° §FW7B‚'&öGV7F–öâÖ—6Æ&VÆVB&Wf–Wrf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&öGV7F–öåö&–æF–æs¦Ö7Ö7FW""’ç–ÆöBçF&vWBÒ'&Wf–Wr#°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'F&vWB×W7B&R&öGV7F–öâ"’’“°§Ò“° §FW7B‚%$TE’FWÆ÷–ÖVçBv—F‚f–ÆVBÆ–6F–öâ&ö&Rf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6öç7B&ö&RÒ6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&÷WFU÷&ö&R"bb—FVÒç–ÆöBç7W&f6RÓÓÒ&6æF–FFR"bb—FVÒç–ÆöBç&÷WFRÓÓÒ"ö†VÇF‚"“°¢&ö&Rç–ÆöBç7FGW2ÒS°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&†æFÆW"6VÖçF–72vW&Ræ÷B&÷fVâ"’’“°§Ò“° §FW7B‚'&öÆÆ&6²F&vWBæòÆöævW"&WG&–Wf&ÆRf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&öÆÆ&6µ÷F&vWB"’ç–ÆöBç&WG&–Wf&ÆRÒfÇ6S°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'&WG&–Wf&–Æ—G’"’’“°§Ò“° §FW7B‚'&öÆÆ&6²F&vWB&÷VæBFòw&öærv—B4„f–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&öÆÆ&6µ÷F&vWB"’ç–ÆöBæv—E÷6†Ò&b"ç&WVBƒC“°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'&÷f–FW"Öö'6W'fVB"&6R4„"’’“°§Ò“° §FW7B‚&Ö—76–ær&öÆÆ&6²F&vWBf–Ç2"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6RÒ6¶WBæWf–FVæ6Ræf–ÇFW"‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÒ'&öÆÆ&6µ÷F&vWB"“°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'&öÆÆ&6²F&vWC¢&WV—&VBWf–FVæ6R—2'6VçB"’’“°§Ò“° §FW7B‚'&Ww&—FRfÆÆ&6²FöW2æ÷B&÷fR&÷WFR6VÖçF–72"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6öç7B&ö&RÒ6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&÷WFU÷&ö&R"bb—FVÒç–ÆöBç7W&f6RÓÓÒ&6æF–FFR"bb—FVÒç–ÆöBç&÷WFRÓÓÒ"ö†VÇF‚"“°¢&ö&Rç–ÆöBç&Ww&—FUöÖ&–wV÷W2ÒG'VS°¢&ö&Rç–ÆöBæ6öçFVçE÷G—RÒ'FW‡Bö‡FÖÂ#°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'&Ww&—FRÖ&–wV—G’"’’“°§Ò“° §FW7B‚$tUBCR6ææ÷B&RÖ—7F¶Vâf÷"gVæ7F–öæÂõ5B7V66W72"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6öç7B&ö&RÒ6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&÷WFU÷&ö&R"bb—FVÒç–ÆöBç7W&f6RÓÓÒ&6æF–FFR"bb—FVÒç–ÆöBæÖWF†öBÓÓÒ$tUB"bb—FVÒç–ÆöBç&÷WFRÓÓÒ"öÖ7"“°¢&ö&Rç–ÆöBç7FGW2ÒCS°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚$tUBCR"’’“°§Ò“° §FW7B‚'VæWF†VçF–6FVBC6ææ÷B&÷fRWF†VçF–6FVB66WFæ6R"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6öç7B&ö&RÒ6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'&÷WFU÷&ö&R"bb—FVÒç–ÆöBç7W&f6RÓÓÒ&6æF–FFR"bb—FVÒç–ÆöBç&÷WFRÓÓÒ"öÖ7"“°¢&ö&Rç–ÆöBæWF†VçF–6FVEö66WFæ6RÒG'VS°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&6ææ÷B&÷fRWF†VçF–6FVB66WFæ6R"’’“°§Ò“° §FW7B‚%fW&6VÂÖöæÇ’&öÆÆ&6²f–Ç2v†VâFF&6R7FFR6†ævVB"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæWf–FVæ6Ræf–æB‚†—FVÒ’Óâ—FVÒæWf–FVæ6Uö6Æ72ÓÓÒ'7FFVgVÅö6†ævUöÖG&—‚"’ç–ÆöBæ6Æ76–f–6F–öç2æFF&6RÒ$Dô5TÔTåDTEôôäÅ’#°¢76W'Bæö²†WfÇVFR‡6¶WB’æW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&FF&6S¢&öÆÆ&6²Ö7&—F–6Â7FFR—2æ÷B6fVÇ’6Æ76–f–VB"’’“°§Ò“° §FW7B‚'&VÆV6R&÷fÂv—F†÷WB–æFWVæFVçBW†7BÖ†VB&Wf–Wrf–Ç2"Â‚’Óâ°¢6öç7B&W7VÇBÒWfÇVFR‡fÆ–E6¶WB‡²–æ6ÇVFU&Wf–Ws¢fÇ6RÂ–æ6ÇVFTWF†÷&—¦F–öã¢G'VRÒ’“°¢76W'Bæö²‡&W7VÇBæW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&–æFWVæFVçB&Wf–Wr"’’ÇÂ&W7VÇBævFW2æ–æFWVæFVçE÷&Wf–WrÓÓÒfÇ6R“°¢76W'BæWVÂ‡&W7VÇBæFV6—6–öâÂ$äõEõ$TE’"“°§Ò“° §FW7B‚'&öGV7F–öâ&VÖ–ç2æ÷BWF†÷&—¦VBv†Vâ÷væW"WF†÷&—¦F–öâ—2'6VçB"Â‚’Óâ°¢6öç7B6¶WBÒfÆ–E6¶WB‚“°¢6¶WBæFW&—fVBç&VÆV6UöFV6—6–öâÒ$UD„õ$•¤TEôdõ%õ$ôET5D”ôâ#°¢6öç7B&W7VÇBÒWfÇVFR‡6¶WB“°¢76W'BæWVÂ‡&W7VÇBæFV6—6–öâÂ%$TÄT4Uõ$TE•ô%UEôäõEôUD„õ$•¤TB"“°§Ò“° §FW7B‚&6æF–FFR4„Ö÷fVÖVçB–çfÆ–FFW2F†R6¶WB"Â‚’Óâ°¢6öç7B&W7VÇBÒWfÇVFR‡fÆ–E6¶WB‚’Â&b"ç&WVBƒC’“°¢76W'Bæö²‡&W7VÇBæW'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&6æF–FFRÖ÷fVB"’’“°¢76W'BæWVÂ‡&W7VÇBæFV6—6–öâÂ$äõEõ$TE’"“°§Ò“° §FW7B‚'v÷&¶fÆ÷r—2W†7BÖ†VBÂ–Ö×WF&ÆRÖ7F–öâÂ&VBÖöæÇ’æBæöâ×&öÖ÷F–ær"Â‚’Óâ°¢6öç7Bv÷&¶fÆ÷rÒ&VDf–ÆU7–æ2‡v÷&¶fÆ÷uF‚Â'WFc‚"“°¢76W'BæFVWWVÂ‡fÆ–FFUv÷&¶fÆ÷uFW‡B‡v÷&¶fÆ÷r’ÂµÒ“°§Ò“° §FW7B‚'v÷&¶fÆ÷rF‚f–ÇFW'2Â×WF&ÆR7F–öç2ÂæB&öÖ÷F–öâ6öÖÖæG2f–Â6Æ÷6VB"Â‚’Óâ°¢6öç7Bv÷&¶fÆ÷rÒ&VDf–ÆU7–æ2‡v÷&¶fÆ÷uF‚Â'WFc‚"¢ç&WÆ6R‚"VÆÅ÷&WVW7C¥Æâ"Â"VÆÅ÷&WVW7C¥ÆâF‡3¥ÆâÒFö72ò¢¥Æâ"¢ç&WÆ6R‚ö7F–öç5Âö6†V6¶÷WD³Ó–Öe×³CÒòÂ&7F–öç2ö6†V6¶÷WDcB"¢æ6öæ6B‚%Æâ2fW&6VÂ&öÖ÷FRÒ×&öEÆâ"“°¢6öç7BW'&÷'2ÒfÆ–FFUv÷&¶fÆ÷uFW‡B‡v÷&¶fÆ÷r“°¢76W'Bæö²†W'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'F‚f–ÇFW&–ær"’’“°¢76W'Bæö²†W'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚&gVÆÂ–Ö×WF&ÆR6öÖÖ—B4„"’’“°¢76W'Bæö²†W'&÷'2ç6öÖR‚†W'&÷"’ÓâW'&÷"æ–æ6ÇVFW2‚'&÷f–FW"÷&öGV7F–öâ×WFF–öâ"’’“°§Ò“° 
