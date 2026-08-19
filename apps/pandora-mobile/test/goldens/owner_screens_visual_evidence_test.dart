@@ -157,6 +157,31 @@ Future<void> _seedPandoraMarkImageCache(WidgetTester tester) async {
   _pandoraMarkImageSeeded = true;
 }
 
+Future<void> _waitForRenderedPandoraMark(
+  WidgetTester tester,
+  String caseName,
+) async {
+  final markFinder = find.byType(PandoraMark);
+  if (markFinder.evaluate().isEmpty) return;
+
+  const attempts = 100;
+  const decodeSlice = Duration(milliseconds: 20);
+  for (var attempt = 0; attempt < attempts; attempt++) {
+    final imageFinder =
+        find.descendant(of: markFinder, matching: find.byType(Image)).first;
+    final renderImage = tester.renderObject<RenderImage>(imageFinder);
+    if (renderImage.image != null) return;
+    await tester.runAsync(
+      () => Future<void>.delayed(decodeSlice),
+    );
+    await tester.pump();
+  }
+  throw TestFailure(
+    '$caseName did not paint the exact Pandora product mark within '
+    '100 bounded engine-decode slices.',
+  );
+}
+
 class _VisualCase {
   const _VisualCase({
     required this.name,
@@ -361,6 +386,7 @@ Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
     for (final frame in _renderFrames) {
       await tester.pump(frame);
     }
+    await _waitForRenderedPandoraMark(tester, visual.name);
     frameworkException = tester.takeException();
 
     final boundary = tester.renderObject<RenderRepaintBoundary>(
