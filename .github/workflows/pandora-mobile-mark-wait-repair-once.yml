@@ -1,0 +1,240 @@
+name: Pandora mobile mark wait repair once
+
+on:
+  push:
+    branches:
+      - 'integration/pandora-mobile-p1-current-main-20260819'
+    paths:
+      - '.github/workflows/pandora-mobile-mark-wait-repair-once.yml'
+
+permissions:
+  contents: write
+  statuses: write
+
+jobs:
+  repair-test-and-self-remove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: ${{ github.sha }}
+      BRANCH: integration/pandora-mobile-p1-current-main-20260819
+      APP_DIR: apps/pandora-mobile
+      TARGET: apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart
+      TARGET_IN_APP: test/goldens/owner_screens_visual_evidence_test.dart
+      WORKFLOW_PATH: .github/workflows/pandora-mobile-mark-wait-repair-once.yml
+      EVIDENCE_DIR: ${{ github.workspace }}/build/mark-wait-repair-evidence
+    steps:
+      - name: Register exact repair run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${SOURCE_SHA}" \
+            -f state='pending' \
+            -f context='Pandora Mobile mark wait repair once' \
+            -f description='Bounded exact-mark render repair is running.' \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+      - name: Check out exact trigger head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Verify exact source checkout
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+      - name: Replace out-of-clock wait with finite widget-frame budget
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          target = Path('apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart')
+          text = target.read_text()
+          old = '''Future<void> _waitForPandoraMark(WidgetTester tester) async {
+            final markFinder = find.byType(PandoraMark);
+            if (markFinder.evaluate().isEmpty) return;
+
+            final imageFinder =
+                find.descendant(of: markFinder, matching: find.byType(Image)).first;
+            final image = tester.widget<Image>(imageFinder);
+            final stream = image.image.resolve(
+              createLocalImageConfiguration(tester.element(imageFinder)),
+            );
+            final ready = Completer<void>();
+            late final ImageStreamListener listener;
+            listener = ImageStreamListener(
+              (_, __) {
+                if (!ready.isCompleted) ready.complete();
+              },
+              onError: (error, stackTrace) {
+                if (!ready.isCompleted) ready.completeError(error, stackTrace);
+              },
+            );
+            stream.addListener(listener);
+            try {
+              await tester.runAsync(
+                () => ready.future.timeout(const Duration(seconds: 5)),
+              );
+            } finally {
+              stream.removeListener(listener);
+            }
+            await tester.pump();
+          }
+          '''
+          new = '''Future<void> _waitForPandoraMark(WidgetTester tester) async {
+            final markFinder = find.byType(PandoraMark);
+            if (markFinder.evaluate().isEmpty) return;
+
+            final imageFinder =
+                find.descendant(of: markFinder, matching: find.byType(Image)).first;
+            final image = tester.widget<Image>(imageFinder);
+            final stream = image.image.resolve(
+              createLocalImageConfiguration(tester.element(imageFinder)),
+            );
+            var ready = false;
+            Object? imageError;
+            StackTrace? imageStackTrace;
+            late final ImageStreamListener listener;
+            listener = ImageStreamListener(
+              (_, __) => ready = true,
+              onError: (error, stackTrace) {
+                imageError = error;
+                imageStackTrace = stackTrace;
+              },
+            );
+            stream.addListener(listener);
+            try {
+              const frameStep = Duration(milliseconds: 16);
+              const frameBudget = 300;
+              for (
+                var frame = 0;
+                frame < frameBudget && !ready && imageError == null;
+                frame++
+              ) {
+                await tester.pump(frameStep);
+              }
+              if (imageError != null) {
+                Error.throwWithStackTrace(
+                  imageError!,
+                  imageStackTrace ?? StackTrace.current,
+                );
+              }
+              if (!ready) {
+                throw TestFailure(
+                  'The exact Pandora mark did not resolve within 300 widget-test frames.',
+                );
+              }
+            } finally {
+              stream.removeListener(listener);
+            }
+            await tester.pump();
+          }
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('Expected exactly one out-of-clock Pandora mark wait; refusing ambiguous edit.')
+          target.write_text(text.replace(old, new))
+          PY
+      - name: Resolve locked dependencies without retaining tooling side effects
+        shell: bash
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+          flutter pub get --enforce-lockfile
+          git restore --source="$SOURCE_SHA" -- analysis_options.yaml
+          test -z "$(git diff --name-only -- analysis_options.yaml)"
+          dart format "$TARGET_IN_APP"
+          dart format --output=none --set-exit-if-changed "$TARGET_IN_APP"
+      - name: Prove repaired production-screen suite
+        shell: bash
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+          flutter test "$TARGET_IN_APP" --reporter expanded
+      - name: Verify bounded mutation and prepare evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          mapfile -t changed < <(git diff --name-only)
+          if [[ ${#changed[@]} -ne 1 || "${changed[0]}" != "$TARGET" ]]; then
+            printf 'Unexpected pre-removal diff:\n' >&2
+            printf '%s\n' "${changed[@]}" >&2
+            exit 1
+          fi
+          git diff --check
+          git diff -- "$TARGET" > "$EVIDENCE_DIR/repair.patch"
+          test -s "$EVIDENCE_DIR/repair.patch"
+          target_sha=$(sha256sum "$TARGET" | cut -d ' ' -f1)
+          git add "$TARGET"
+          git rm "$WORKFLOW_PATH"
+          mapfile -t staged < <(git diff --cached --name-only | sort)
+          mapfile -t expected < <(printf '%s\n' "$TARGET" "$WORKFLOW_PATH" | sort)
+          if [[ "${staged[*]}" != "${expected[*]}" ]]; then
+            printf 'Unexpected staged paths:\n' >&2
+            printf '%s\n' "${staged[@]}" >&2
+            exit 1
+          fi
+          {
+            echo "source_sha=$SOURCE_SHA"
+            echo "target_sha256=$target_sha"
+            echo "flutter=$(flutter --version --machine | python3 -c 'import json,sys; print(json.load(sys.stdin)["frameworkVersion"])')"
+            echo "dart=$(dart --version 2>&1)"
+            echo "visual_cases=15"
+            echo "mark_wait=finite_300_widget_frames"
+            echo "mutation_paths=$TARGET,$WORKFLOW_PATH"
+          } > "$EVIDENCE_DIR/manifest.txt"
+      - name: Commit and fast-forward only if branch is unchanged
+        id: apply
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_head=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
+          if [[ "$remote_head" != "$SOURCE_SHA" ]]; then
+            echo "Branch moved from $SOURCE_SHA to $remote_head; refusing to overwrite." >&2
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'test(mobile): resolve exact mark inside bounded widget clock'
+          result_sha=$(git rev-parse HEAD)
+          git push origin "HEAD:refs/heads/$BRANCH"
+          echo "result_sha=$result_sha" >> "$GITHUB_OUTPUT"
+          echo "result_sha=$result_sha" >> "$EVIDENCE_DIR/manifest.txt"
+      - name: Upload immutable repair evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pandora-mobile-mark-wait-repair-evidence
+          path: build/mark-wait-repair-evidence
+          if-no-files-found: warn
+          include-hidden-files: true
+      - name: Finalize repair status
+        if: ${{ always() }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          RESULT_SHA: ${{ steps.apply.outputs.result_sha }}
+        run: |
+          set -euo pipefail
+          state=failure
+          description='Bounded exact-mark repair failed closed.'
+          if [[ "$JOB_STATUS" == 'success' ]]; then
+            state=success
+            description="Exact mark resolved in bounded widget clock at ${RESULT_SHA}."
+          fi
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${SOURCE_SHA}" \
+            -f state="$state" \
+            -f context='Pandora Mobile mark wait repair once' \
+            -f description="$description" \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
