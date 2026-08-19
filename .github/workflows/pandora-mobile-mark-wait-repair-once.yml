@@ -199,6 +199,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # `flutter test` performs its own package bootstrap and may modernize
+          # analysis_options.yaml again. Restore that tooling side effect before
+          # evaluating the exact mobile-source mutation set.
+          git restore --source="$SOURCE_SHA" -- apps/pandora-mobile/analysis_options.yaml
+          test -z "$(git diff --name-only -- apps/pandora-mobile/analysis_options.yaml)"
           mkdir -p "$EVIDENCE_DIR"
           mapfile -t changed < <(git diff --name-only)
           if [[ ${#changed[@]} -ne 1 || "${changed[0]}" != "$TARGET" ]]; then
