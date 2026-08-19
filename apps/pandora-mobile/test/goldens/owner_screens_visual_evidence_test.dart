@@ -12,6 +12,7 @@ import 'package:pandora_mobile/core/data/pandora_repository.dart';
 import 'package:pandora_mobile/core/diagnostics/diagnostics_store.dart';
 import 'package:pandora_mobile/core/models/pandora_models.dart';
 import 'package:pandora_mobile/core/network/pandora_api_error.dart';
+import 'package:pandora_mobile/core/widgets/pandora_mark.dart';
 import 'package:pandora_mobile/features/activity/activity_screen.dart';
 import 'package:pandora_mobile/features/approvals/approvals_screen.dart';
 import 'package:pandora_mobile/features/command/command_screen.dart';
@@ -107,6 +108,38 @@ Widget _withVisualFont(Widget child) => Builder(
         );
       },
     );
+
+Future<void> _waitForPandoraMark(WidgetTester tester) async {
+  final markFinder = find.byType(PandoraMark);
+  if (markFinder.evaluate().isEmpty) return;
+
+  final imageFinder = find
+      .descendant(of: markFinder, matching: find.byType(Image))
+      .first;
+  final image = tester.widget<Image>(imageFinder);
+  final stream = image.image.resolve(
+    createLocalImageConfiguration(tester.element(imageFinder)),
+  );
+  final ready = Completer<void>();
+  late final ImageStreamListener listener;
+  listener = ImageStreamListener(
+    (_, __) {
+      if (!ready.isCompleted) ready.complete();
+    },
+    onError: (error, stackTrace) {
+      if (!ready.isCompleted) ready.completeError(error, stackTrace);
+    },
+  );
+  stream.addListener(listener);
+  try {
+    await tester.runAsync(
+      () => ready.future.timeout(const Duration(seconds: 5)),
+    );
+  } finally {
+    stream.removeListener(listener);
+  }
+  await tester.pump();
+}
 
 class _VisualCase {
   const _VisualCase({
@@ -301,10 +334,12 @@ Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
         ),
       ),
     );
+    await _waitForPandoraMark(tester);
 
     // Keep repository microtasks and visual state changes inside the finite
     // widget-test clock. No case can hide later CI stages behind an unbounded
-    // settle.
+    // settle. The exact Pandora mark image stream is awaited separately above
+    // with a wall-clock ceiling so the first capture cannot omit the asset.
     for (final frame in _renderFrames) {
       await tester.pump(frame);
     }
