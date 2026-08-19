@@ -1,0 +1,163 @@
+name: Pandora mobile analyzer lint fix once
+
+on:
+  push:
+    branches:
+      - 'integration/pandora-mobile-p1-current-main-20260819'
+    paths:
+      - '.github/workflows/pandora-mobile-analyzer-lint-fix-once.yml'
+
+permissions:
+  contents: write
+  statuses: write
+
+jobs:
+  fix-verify-and-self-remove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      SOURCE_SHA: ${{ github.sha }}
+      BRANCH: integration/pandora-mobile-p1-current-main-20260819
+      APP_DIR: apps/pandora-mobile
+      TARGET: apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart
+      TARGET_IN_APP: test/goldens/owner_screens_visual_evidence_test.dart
+      WORKFLOW_PATH: .github/workflows/pandora-mobile-analyzer-lint-fix-once.yml
+      EVIDENCE_DIR: ${{ github.workspace }}/build/analyzer-lint-fix-evidence
+    steps:
+      - name: Register exact lint repair
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${SOURCE_SHA}" \
+            -f state='pending' \
+            -f context='Pandora Mobile analyzer lint fix once' \
+            -f description='Exact-head lint repair and 15-screen proof are running.' \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+      - name: Check out exact trigger head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Verify exact source checkout
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+      - name: Remove only the redundant painting import
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          target = Path('apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart')
+          text = target.read_text()
+          redundant = "import 'package:flutter/painting.dart';\n"
+          if text.count(redundant) != 1:
+              raise SystemExit('Expected exactly one redundant painting import; refusing ambiguous edit.')
+          target.write_text(text.replace(redundant, ''))
+          PY
+      - name: Resolve locked dependencies and verify package
+        shell: bash
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+          flutter pub get --enforce-lockfile
+          git restore --source="$SOURCE_SHA" -- analysis_options.yaml
+          dart format "$TARGET_IN_APP"
+          dart format --output=none --set-exit-if-changed "$TARGET_IN_APP"
+          flutter analyze --fatal-infos
+          flutter test "$TARGET_IN_APP" --reporter expanded
+          test "$(find build/owner-screen-evidence -maxdepth 1 -type f -name '*.png' | wc -l | tr -d ' ')" = '15'
+      - name: Verify exact mutation and prepare evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git restore --source="$SOURCE_SHA" -- apps/pandora-mobile/analysis_options.yaml
+          test -z "$(git diff --name-only -- apps/pandora-mobile/analysis_options.yaml)"
+          mapfile -t changed < <(git diff --name-only)
+          if [[ ${#changed[@]} -ne 1 || "${changed[0]}" != "$TARGET" ]]; then
+            printf 'Unexpected pre-removal diff:\n' >&2
+            printf '%s\n' "${changed[@]}" >&2
+            exit 1
+          fi
+          git diff --check
+          mkdir -p "$EVIDENCE_DIR"
+          git diff -- "$TARGET" > "$EVIDENCE_DIR/lint-fix.patch"
+          test -s "$EVIDENCE_DIR/lint-fix.patch"
+          target_sha=$(sha256sum "$TARGET" | cut -d ' ' -f1)
+          find apps/pandora-mobile/build/owner-screen-evidence -maxdepth 1 -type f -name '*.png' -print0 \
+            | sort -z \
+            | xargs -0 sha256sum > "$EVIDENCE_DIR/visual-sha256.txt"
+          test "$(wc -l < "$EVIDENCE_DIR/visual-sha256.txt" | tr -d ' ')" = '15'
+          git add "$TARGET"
+          git rm "$WORKFLOW_PATH"
+          mapfile -t staged < <(git diff --cached --name-only | sort)
+          mapfile -t expected < <(printf '%s\n' "$TARGET" "$WORKFLOW_PATH" | sort)
+          if [[ "${staged[*]}" != "${expected[*]}" ]]; then
+            printf 'Unexpected staged paths:\n' >&2
+            printf '%s\n' "${staged[@]}" >&2
+            exit 1
+          fi
+          {
+            echo "source_sha=$SOURCE_SHA"
+            echo "target_sha256=$target_sha"
+            echo "flutter=$(flutter --version --machine | python3 -c 'import json,sys; print(json.load(sys.stdin)["frameworkVersion"])')"
+            echo "dart=$(dart --version 2>&1)"
+            echo "analyze=fatal_infos_pass"
+            echo "visual_cases=15"
+            echo "mutation_paths=$TARGET,$WORKFLOW_PATH"
+          } > "$EVIDENCE_DIR/manifest.txt"
+      - name: Commit and fast-forward only if branch is unchanged
+        id: apply
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_head=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
+          if [[ "$remote_head" != "$SOURCE_SHA" ]]; then
+            echo "Branch moved from $SOURCE_SHA to $remote_head; refusing to overwrite." >&2
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'test(mobile): remove redundant visual harness import'
+          result_sha=$(git rev-parse HEAD)
+          git push origin "HEAD:refs/heads/$BRANCH"
+          echo "result_sha=$result_sha" >> "$GITHUB_OUTPUT"
+          echo "result_sha=$result_sha" >> "$EVIDENCE_DIR/manifest.txt"
+      - name: Upload immutable lint-fix evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pandora-mobile-analyzer-lint-fix-evidence
+          path: build/analyzer-lint-fix-evidence
+          if-no-files-found: warn
+          include-hidden-files: true
+      - name: Finalize lint-fix status
+        if: ${{ always() }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          RESULT_SHA: ${{ steps.apply.outputs.result_sha }}
+        run: |
+          set -euo pipefail
+          state=failure
+          description='Exact-head analyzer lint repair failed closed.'
+          if [[ "$JOB_STATUS" == 'success' ]]; then
+            state=success
+            description="Analyzer and 15 screens passed at ${RESULT_SHA}."
+          fi
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${SOURCE_SHA}" \
+            -f state="$state" \
+            -f context='Pandora Mobile analyzer lint fix once' \
+            -f description="$description" \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
