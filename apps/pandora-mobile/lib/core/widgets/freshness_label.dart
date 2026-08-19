@@ -73,7 +73,7 @@ String _relativeTime(DateTime value, DateTime now) {
     return '${difference.inHours}h ago';
   }
   if (difference.inDays < 7) {
-    return '${difference.inDays}d ago';
+    return '${difference.inDays}d';
   }
   return '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 }
