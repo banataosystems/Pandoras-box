@@ -2,16 +2,16 @@
 
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProviderExecutionOutcomeError = void 0;
+exports.markProviderOutcome = void 0;
+exports.prepareProviderResult = void 0;
+exports.prepareToolPresentation = void 0;
 exports.createProviderExecutionStateMachine = createProviderExecutionStateMachine;
-exports.markProviderOutcome = markProviderOutcome;
-exports.prepareProviderResult = prepareProviderResult;
-exports.prepareToolPresentation = prepareToolPresentation;
 
 const { AsyncLocalStorage } = require("node:async_hooks");
-const {
-  prepareProviderResult,
-  prepareToolPresentation,
-} = require("./provider-result-contract.js");
+const resultContract = require("./provider-result-contract.js");
+const outcomeContract = require("./provider-outcome-contract.js");
+
+const { prepareProviderResult, prepareToolPresentation } = resultContract;
 const {
   ProviderExecutionOutcomeError,
   emitReconciliationEvent,
@@ -22,9 +22,12 @@ const {
   operationIdentity,
   reconciliationSummary,
   sanitizedResultSummary,
-} = require("./provider-outcome-contract.js");
+} = outcomeContract;
 
 exports.ProviderExecutionOutcomeError = ProviderExecutionOutcomeError;
+exports.markProviderOutcome = markProviderOutcome;
+exports.prepareProviderResult = prepareProviderResult;
+exports.prepareToolPresentation = prepareToolPresentation;
 
 function createProviderExecutionStateMachine(options) {
   if (!options || typeof options.execute !== "function" || !options.ledger) {
@@ -112,7 +115,9 @@ function createProviderExecutionStateMachine(options) {
           enumerable: false,
           configurable: false,
         });
-      } catch { /* retain original response failure */ }
+      } catch {
+        // Retain the original response failure.
+      }
     }
   }
 
