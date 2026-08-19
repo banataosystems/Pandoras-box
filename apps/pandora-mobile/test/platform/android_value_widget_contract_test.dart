@@ -11,8 +11,14 @@ void main() {
 
   test('widget receiver is registered as non-exported', () {
     final configurator = read('tool/configure_owner_test_android.py');
-    expect(configurator, contains('android:name=\\".PandoraValueWidget\\"'));
-    expect(configurator, contains('android:exported=\\"false\\"'));
+    expect(
+      configurator,
+      contains('android:name=\\".PandoraValueWidget\\"'),
+    );
+    expect(
+      configurator,
+      contains('android:exported=\\"false\\"'),
+    );
     expect(
       configurator,
       contains('android.appwidget.action.APPWIDGET_UPDATE'),
@@ -72,6 +78,9 @@ void main() {
     );
     expect(widget, contains('Not measured yet'));
     expect(widget, contains('Value evidence is stale'));
-    expect(widget, contains('Waiting for fresh verified customer-value evidence'));
+    expect(
+      widget,
+      contains('Waiting for fresh verified customer-value evidence'),
+    );
   });
 }
