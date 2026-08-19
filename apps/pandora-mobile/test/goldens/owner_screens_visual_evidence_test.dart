@@ -418,7 +418,7 @@ Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
     if (baseline.existsSync()) {
       await expectLater(
         find.byKey(_surfaceKey),
-        matchesGoldenFile(baseline.path),
+        matchesGoldenFile('owner_screens/${visual.name}.png'),
       );
     }
   } finally {
