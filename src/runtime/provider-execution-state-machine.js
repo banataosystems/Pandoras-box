@@ -29,6 +29,23 @@ exports.markProviderOutcome = markProviderOutcome;
 exports.prepareProviderResult = prepareProviderResult;
 exports.prepareToolPresentation = prepareToolPresentation;
 
+function markKnownPreDispatchTransient(error) {
+  if (!error || typeof error !== "object" || error.providerOutcome) return error;
+  const status = Number.isInteger(error.status)
+    ? error.status
+    : Number.isInteger(error.failure?.httpStatus) ? error.failure.httpStatus : null;
+  const code = typeof error.code === "string"
+    ? error.code
+    : typeof error.failure?.safeErrorCode === "string" ? error.failure.safeErrorCode : null;
+  if (
+    status === 408 || status === 429
+    || code === "provider_timeout" || code === "provider_rate_limited"
+  ) {
+    return markProviderOutcome(error, "not_executed", "transient_rejected_before_dispatch");
+  }
+  return error;
+}
+
 function createProviderExecutionStateMachine(options) {
   if (!options || typeof options.execute !== "function" || !options.ledger) {
     throw new TypeError("Provider execution state machine requires execute and ledger dependencies");
@@ -77,12 +94,12 @@ function createProviderExecutionStateMachine(options) {
           error,
           identity,
           "provider_result_processing_failed",
-          "provider_response_contract_error",
+          "provider_result_contract_error",
         );
         throw execution.error;
       }
     } catch (error) {
-      const guarded = normalizedProviderError(error, identity);
+      const guarded = normalizedProviderError(markKnownPreDispatchTransient(error), identity);
       if (state && !state.execution) {
         state.execution = {
           providerOutcome: guarded.providerOutcome || "ambiguous",

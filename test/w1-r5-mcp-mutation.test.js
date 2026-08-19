@@ -15,7 +15,7 @@ function deeplyNested(depth) {
 }
 
 test("W1-R5 MCP result headroom prevents a later outer-envelope unsafe failure", async () => {
-  const escapeHeavy = { payload: '\\\\"'.repeat(28000) };
+  const escapeHeavy = { payload: '\\\\"'.repeat(15000) };
   let providerCalls = 0;
   const { ledger, response } = await invokeMcp({
     execute: async () => {

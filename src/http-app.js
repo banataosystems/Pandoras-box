@@ -42,13 +42,7 @@ function safeOuterError(error) {
       // Keep the generic bounded envelope.
     }
   }
-  return {
-    status,
-    payload: {
-      ok: false,
-      error: { code, message },
-    },
-  };
+  return { status, payload: { ok: false, error: { code, message } } };
 }
 
 function createHttpApp(
@@ -78,6 +72,16 @@ function createHttpApp(
     stateMachine.run(() => {
       const requestState = stateMachine.currentState();
       const originalJson = response.json.bind(response);
+      const originalStatus = response.status.bind(response);
+
+      response.status = function governedStatus(value) {
+        const outcomeStatus = requestState?.execution?.error?.status;
+        if (value === 500 && Number.isInteger(outcomeStatus)) {
+          return originalStatus(outcomeStatus);
+        }
+        return originalStatus(value);
+      };
+
       response.json = function governedJson(value) {
         let prepared;
         try {
@@ -116,9 +120,6 @@ function createHttpApp(
   });
   app.use(coreApp);
 
-  // The historical app contains its own error middleware. This parent boundary
-  // is deliberately last: it catches only an error that escapes or is thrown
-  // while the inner error response itself is being shaped/delivered.
   app.use((error, _request, response, next) => {
     if (response.headersSent) {
       next(error);
