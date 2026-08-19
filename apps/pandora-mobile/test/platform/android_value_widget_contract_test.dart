@@ -20,6 +20,15 @@ void main() {
     );
   });
 
+  test('materialized release manifest permits authenticated owner sync', () {
+    final manifest = read('android/app/src/main/AndroidManifest.xml');
+    expect(
+      manifest,
+      contains('android:name="android.permission.INTERNET"'),
+    );
+    expect(manifest, isNot(contains('android:usesCleartextTraffic="true"')));
+  });
+
   test('widget fallback cadence respects Android 30 minute floor', () {
     final info = read(
       'platform/android/app/src/main/res/xml/pandora_value_widget_info.xml',
