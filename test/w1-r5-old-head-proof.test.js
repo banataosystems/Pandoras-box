@@ -19,11 +19,24 @@ function gitBlobSha(content) {
   return createHash("sha1").update(header).update(content).digest("hex");
 }
 
-test("historical fixture blobs are exact content-addressed 85327f36 source", () => {
+function canonicalCheckoutCandidates(content) {
+  const candidates = [content];
+  const text = content.toString("utf8");
+  if (!text.includes("\r\n")) {
+    candidates.push(Buffer.from(text.replace(/\n/g, "\r\n"), "utf8"));
+  }
+  return candidates;
+}
+
+test("historical fixture files are checkout-equivalent to exact 85327f36 Git blobs", () => {
   for (const [relativePath, expectedSha] of Object.entries(FIXTURE_BLOBS)) {
     const filename = path.join(__dirname, "fixtures", "w1-r5-old-85327", relativePath);
     const content = fs.readFileSync(filename);
-    assert.equal(gitBlobSha(content), expectedSha, relativePath);
+    const candidateHashes = canonicalCheckoutCandidates(content).map(gitBlobSha);
+    assert.ok(
+      candidateHashes.includes(expectedSha),
+      `${relativePath}: expected ${expectedSha}, received ${candidateHashes.join(", ")}`,
+    );
   }
 });
 

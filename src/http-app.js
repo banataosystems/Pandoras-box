@@ -20,6 +20,37 @@ function defaultToolExecutor(tool, args, context) {
   return executeTool(tool, args, buildToolConfiguration(tool, context));
 }
 
+function safeOuterError(error) {
+  const status = Number.isInteger(error?.status) && error.status >= 400 && error.status <= 599
+    ? error.status
+    : 500;
+  const failure = error?.failure && typeof error.failure === "object" && !Array.isArray(error.failure)
+    ? error.failure
+    : null;
+  let message = "An internal ProjectOS error occurred.";
+  let code = "INTERNAL_ERROR";
+  if (failure) {
+    try {
+      const serialized = JSON.stringify(failure);
+      if (Buffer.byteLength(serialized, "utf8") <= 1000) {
+        message = serialized;
+        code = typeof failure.safeErrorCode === "string"
+          ? failure.safeErrorCode
+          : "provider_execution_failed";
+      }
+    } catch {
+      // Keep the generic bounded envelope.
+    }
+  }
+  return {
+    status,
+    payload: {
+      ok: false,
+      error: { code, message },
+    },
+  };
+}
+
 function createHttpApp(
   config,
   runtimeSecurityResolver,
@@ -84,6 +115,36 @@ function createHttpApp(
     });
   });
   app.use(coreApp);
+
+  // The historical app contains its own error middleware. This parent boundary
+  // is deliberately last: it catches only an error that escapes or is thrown
+  // while the inner error response itself is being shaped/delivered.
+  app.use((error, _request, response, next) => {
+    if (response.headersSent) {
+      next(error);
+      return;
+    }
+    const safe = safeOuterError(error);
+    let payload;
+    try {
+      payload = stateMachine.preparePresentation(
+        safe.payload,
+        "http_terminal_error_shaping_failed",
+      );
+    } catch {
+      payload = {
+        ok: false,
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An internal ProjectOS error occurred.",
+        },
+      };
+    }
+    response.statusCode = safe.status;
+    response.setHeader("Content-Type", "application/json; charset=utf-8");
+    response.end(JSON.stringify(payload));
+  });
+
   return app;
 }
 
