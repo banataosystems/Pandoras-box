@@ -56,6 +56,7 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           target = Path('apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart')
           text = target.read_text()
@@ -133,12 +134,13 @@ jobs:
           '''
           text = text[:start] + replacement + text[end:]
 
-          load_block = '''  if (!_visualFontLoaded) {
-            await tester.runAsync(_loadVisualFont);
-          }
-          await setTestSurface(tester, logicalSize: visual.logicalSize);
-          '''
-          seeded_block = '''  if (!_visualFontLoaded) {
+          setup_pattern = re.compile(
+              r"  if \(!_visualFontLoaded\) \{\n"
+              r"\s+await tester\.runAsync\(_loadVisualFont\);\n"
+              r"\s+\}\n"
+              r"\s+await setTestSurface\(tester, logicalSize: visual\.logicalSize\);\n"
+          )
+          seeded_setup = '''  if (!_visualFontLoaded) {
             await tester.runAsync(_loadVisualFont);
           }
           if (!_pandoraMarkImageSeeded) {
@@ -146,28 +148,34 @@ jobs:
           }
           await setTestSurface(tester, logicalSize: visual.logicalSize);
           '''
-          if text.count(load_block) != 1:
+          text, setup_count = setup_pattern.subn(seeded_setup, text, count=1)
+          if setup_count != 1:
               raise SystemExit('Expected one visual setup block; refusing ambiguous edit.')
-          text = text.replace(load_block, seeded_block)
 
-          wait_call = '    await _waitForPandoraMark(tester);\n\n'
-          if text.count(wait_call) != 1:
+          text, wait_count = re.subn(
+              r"\n\s*await _waitForPandoraMark\(tester\);\n",
+              '\n',
+              text,
+              count=1,
+          )
+          if wait_count != 1:
               raise SystemExit('Expected one obsolete mark wait call; refusing ambiguous edit.')
-          text = text.replace(wait_call, '')
 
-          old_comment = '''    // Keep repository microtasks and visual state changes inside the finite
-            // widget-test clock. No case can hide later CI stages behind an unbounded
-            // settle. The exact Pandora mark image stream is awaited separately above
-            // with a wall-clock ceiling so the first capture cannot omit the asset.
-          '''
+          comment_pattern = re.compile(
+              r"    // Keep repository microtasks and visual state changes inside the finite\n"
+              r"    // widget-test clock\. No case can hide later CI stages behind an unbounded\n"
+              r"    // settle\. The exact Pandora mark image stream is awaited separately above\n"
+              r"    // with a wall-clock ceiling so the first capture cannot omit the asset\.\n"
+          )
           new_comment = '''    // Keep repository microtasks and visual state changes inside the finite
             // widget-test clock. The exact production mark has already been decoded
             // from the checked-in PNG and seeded under its production AssetImage key.
             // No case can hide later CI stages behind an unbounded settle.
           '''
-          if text.count(old_comment) != 1:
+          text, comment_count = comment_pattern.subn(new_comment, text, count=1)
+          if comment_count != 1:
               raise SystemExit('Expected one obsolete render comment; refusing ambiguous edit.')
-          text = text.replace(old_comment, new_comment)
+
           target.write_text(text)
           PY
       - name: Resolve locked dependencies without retaining tooling side effects
