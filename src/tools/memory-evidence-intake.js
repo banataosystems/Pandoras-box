@@ -3,11 +3,15 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.submitEvidenceCandidate = submitEvidenceCandidate;
 
+const { z } = require("zod");
 const core = require("./memory-evidence-intake-core.js");
 
-// Static source-contract mirror retained for the existing drift guard. The
-// executable Zod schema remains defined and exported by the immutable core:
-// summary: z.string().trim().min(1).max(1800),
+// This executable mirror keeps the canonical entry file bound to the backend
+// limit while the complete published contract remains in the immutable core.
+const OutcomeObservationArgsSchema = z.object({
+  summary: z.string().trim().min(1).max(1800),
+}).passthrough();
+
 for (const [name, value] of Object.entries(core)) {
   if (name !== "submitEvidenceCandidate") exports[name] = value;
 }
@@ -98,6 +102,12 @@ async function responseOutcome(response) {
 }
 
 async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis.fetch) {
+  try {
+    OutcomeObservationArgsSchema.parse(args);
+  } catch (error) {
+    throw markProviderOutcome(error, "failed_before_side_effects");
+  }
+
   if (typeof fetchFn !== "function") {
     try {
       return await core.submitEvidenceCandidate(args, configuration, fetchFn);

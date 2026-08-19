@@ -22,6 +22,9 @@ const PROVIDER_OUTCOMES = new Set([
   "ambiguous",
   "succeeded",
 ]);
+const PROVIDER_IDEMPOTENCY_TOOLS = new Set([
+  "memory.submitEvidenceCandidate",
+]);
 const SAFE_TOKEN = /^[a-z0-9][a-z0-9._:-]{0,79}$/;
 const SAFE_CORRELATION_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
@@ -53,14 +56,14 @@ function operationIdentity(tool, args) {
   const idempotencyValue = [
     args?.idempotencyKey,
     args?.idempotency_key,
-    args?.requestId,
-    args?.request_id,
   ].find((value) => typeof value === "string" && value.trim().length > 0);
+  const providerIdempotencySupported = PROVIDER_IDEMPOTENCY_TOOLS.has(tool)
+    && typeof idempotencyValue === "string";
   return Object.freeze({
     tool,
     payloadHash: executionPayloadHash(tool, args),
-    providerIdempotencySupported: typeof idempotencyValue === "string",
-    idempotencyIdentityHash: typeof idempotencyValue === "string"
+    providerIdempotencySupported,
+    idempotencyIdentityHash: providerIdempotencySupported
       ? identityHash(idempotencyValue.trim())
       : null,
   });
@@ -256,9 +259,6 @@ function normalizedProviderError(error, identity) {
     ) {
       providerOutcome = "not_executed";
       retryable = true;
-    } else if (status >= 400 && status < 500) {
-      providerOutcome = "failed_before_side_effects";
-      retryable = false;
     } else {
       providerOutcome = "ambiguous";
       retryable = identity.providerIdempotencySupported;
