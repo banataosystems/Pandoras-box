@@ -19,7 +19,7 @@ const memoryConfig = {
   baseUrl: "https://pandorasbox-memory.vercel.app",
   oidcToken: "test-oidc-token-material-long-enough-for-contract-tests",
   allowedNamespaces: ["real_life"],
-  grantedScopes: ["memory:read", "memory:write"],
+  grantedScopes: ["memory:read", "memory:evidence-candidate:submit"],
   allowMutations: true,
   timeoutMs: 1000,
   maxResponseBytes: 100000,
