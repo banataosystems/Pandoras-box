@@ -38,11 +38,9 @@ void main() {
     final platform = snapshot.toPlatformMessage();
     expect(platform['verified'], isTrue);
     expect(platform['score'], 75);
-    expect(platform.keys, containsAll(<String>[
-      'freshnessState',
-      'lastVerifiedAtEpochMs',
-      'staleAfterEpochMs',
-    ]));
+    expect(platform, contains('freshnessState'));
+    expect(platform, contains('lastVerifiedAtEpochMs'));
+    expect(platform, contains('staleAfterEpochMs'));
     expect(platform, isNot(contains('customerName')));
     expect(platform, isNot(contains('notes')));
   });
