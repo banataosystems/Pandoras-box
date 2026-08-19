@@ -1,9 +1,7 @@
 name: Pandora format diagnostic
 
 on:
-  push:
-    branches:
-      - 'feat/pandora-users-access-v1-20260820'
+  pull_request:
 
 permissions:
   contents: read
@@ -12,12 +10,16 @@ jobs:
   format-diff:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
       - name: Check out exact source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.SOURCE_SHA }}
           persist-credentials: false
+      - name: Verify exact source checkout
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
       - name: Install pinned Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
