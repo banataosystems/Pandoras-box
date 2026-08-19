@@ -1,5 +1,5 @@
 -- Pandora PostHog Phase 1: privacy-safe lifecycle contracts only.
--- All contracts remain inactive. This migration does not enable PostHog capture,
+-- All new Pandora lifecycle contracts remain inactive. This migration does not enable PostHog capture,
 -- replay, autocapture, network payload capture, flags, experiments, or production use.
 
 DO $migration$
@@ -35,6 +35,31 @@ DECLARE
     'evidence_count'
   ];
 BEGIN
+  INSERT INTO private.projectos_product_registry (
+    organization_id,
+    product_key,
+    title,
+    repo_full_name,
+    posthog_project_id,
+    posthog_dashboard_id,
+    posthog_dashboard_url,
+    supabase_project_ref,
+    status,
+    data_classification
+  ) VALUES (
+    v_organization_id,
+    'pandoras_box',
+    'Pandoras-Box / ProjectOS',
+    'banataosystems/Pandoras-box',
+    526760,
+    1934160,
+    'https://us.posthog.com/project/526760/dashboard/1934160',
+    'jcyqixttuebxqqfkjonq',
+    'active',
+    'aggregate_only'
+  )
+  ON CONFLICT (organization_id, product_key) DO NOTHING;
+
   IF NOT EXISTS (
     SELECT 1
     FROM private.projectos_product_registry
@@ -49,10 +74,14 @@ BEGIN
     FROM private.projectos_product_registry
     WHERE organization_id = v_organization_id
       AND product_key = 'pandoras_box'
-      AND repo_full_name IS DISTINCT FROM 'mbanatao/mcpmaster'
-      AND repo_full_name IS DISTINCT FROM 'banataosystems/Pandoras-box'
+      AND (
+        repo_full_name IS DISTINCT FROM 'mbanatao/mcpmaster'
+        AND repo_full_name IS DISTINCT FROM 'banataosystems/Pandoras-box'
+        OR posthog_project_id IS DISTINCT FROM 526760
+        OR supabase_project_ref IS DISTINCT FROM 'jcyqixttuebxqqfkjonq'
+      )
   ) THEN
-    RAISE EXCEPTION 'pandora_product_registry_repository_conflict';
+    RAISE EXCEPTION 'pandora_product_registry_identity_conflict';
   END IF;
 
   UPDATE private.projectos_product_registry
