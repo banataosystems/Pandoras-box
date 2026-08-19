@@ -5,9 +5,9 @@ exports.submitEvidenceCandidate = submitEvidenceCandidate;
 
 const { z } = require("zod");
 const core = require("./memory-evidence-intake-core.js");
+const { markProviderOutcome } = require("../runtime/provider-execution-state-machine.js");
 
-// This executable mirror keeps the canonical entry file bound to the backend
-// limit while the complete published contract remains in the immutable core.
+// Keep the canonical entrypoint visibly bound to the backend summary limit.
 const OutcomeObservationArgsSchema = z.object({
   summary: z.string().trim().min(1).max(1800),
 }).passthrough();
@@ -17,30 +17,33 @@ for (const [name, value] of Object.entries(core)) {
 }
 
 const MAX_OBSERVED_RESPONSE_BYTES = 100_000;
-const PROVIDER_OUTCOMES = new Set([
-  "not_executed",
-  "failed_before_side_effects",
-  "ambiguous",
-  "succeeded",
+const PROVEN_NO_SIDE_EFFECT_CODES = new Map([
+  [400, new Set([
+    "unsupported_action",
+    "unexpected_field",
+    "project_identity_invalid",
+    "evidence_candidate_invalid",
+    "sensitive_candidate_rejected",
+  ])],
+  [403, new Set([
+    "namespace_not_allowed",
+    "scope_not_allowed",
+    "project_not_allowed",
+  ])],
 ]);
 
-function markProviderOutcome(error, providerOutcome) {
-  if (!error || typeof error !== "object" || !PROVIDER_OUTCOMES.has(providerOutcome)) {
-    return error;
-  }
-  if (PROVIDER_OUTCOMES.has(error.providerOutcome)) return error;
-  try {
-    Object.defineProperty(error, "providerOutcome", {
-      value: providerOutcome,
-      enumerable: false,
-      configurable: false,
-      writable: false,
-    });
-  } catch {
-    // Core errors are extensible. A frozen foreign error is left unmodified so
-    // the outer execution guard will conservatively classify it as ambiguous.
-  }
-  return error;
+function safeBackendCode(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const candidate = typeof body.error === "string"
+    ? body.error
+    : typeof body.error?.code === "string"
+      ? body.error.code
+      : typeof body.code === "string"
+        ? body.code
+        : null;
+  return candidate && /^[a-z0-9][a-z0-9._:-]{0,79}$/.test(candidate)
+    ? candidate
+    : null;
 }
 
 async function readObservedResponse(response) {
@@ -84,20 +87,56 @@ async function readObservedResponse(response) {
 
 async function responseOutcome(response) {
   const status = Number.isInteger(response?.status) ? response.status : 0;
-  if (status === 408 || status === 429) return "not_executed";
-  if (status >= 400 && status < 500) return "failed_before_side_effects";
-  if (status >= 500) return "ambiguous";
-  if (status < 200 || status >= 300) return "ambiguous";
+  if (status === 408 || status === 429) {
+    return { outcome: "not_executed", evidence: `memory_http_${status}_not_dispatched` };
+  }
+  if (status >= 500 || status === 409 || status < 200 || status >= 300) {
+    if (status !== 400 && status !== 403) {
+      return { outcome: "ambiguous", evidence: `memory_http_${status || "unknown"}_ambiguous` };
+    }
+  }
 
   try {
     const text = await readObservedResponse(response);
-    if (text === null) return "ambiguous";
+    if (text === null) {
+      return { outcome: "ambiguous", evidence: "memory_response_unbounded" };
+    }
     const body = text ? JSON.parse(text) : {};
-    return body && typeof body === "object" && body.ok === false
-      ? "failed_before_side_effects"
-      : "ambiguous";
+    const code = safeBackendCode(body);
+
+    if (status >= 200 && status < 300) {
+      if (body && typeof body === "object" && body.ok === true) {
+        return { outcome: "succeeded", evidence: "memory_success_acknowledgement" };
+      }
+      if (body && typeof body === "object" && body.ok === false) {
+        for (const [expectedStatus, codes] of PROVEN_NO_SIDE_EFFECT_CODES.entries()) {
+          if (codes.has(code)) {
+            return {
+              outcome: "failed_before_side_effects",
+              evidence: `memory_body_rejection_${expectedStatus}_${code}`,
+            };
+          }
+        }
+      }
+      return { outcome: "ambiguous", evidence: "memory_2xx_body_ambiguous" };
+    }
+
+    if (status === 400 || status === 403) {
+      const codes = PROVEN_NO_SIDE_EFFECT_CODES.get(status);
+      if (code && codes?.has(code)) {
+        return {
+          outcome: "failed_before_side_effects",
+          evidence: `memory_contract_rejection_${status}_${code}`,
+        };
+      }
+    }
+
+    // A 409 is deliberately ambiguous. The canonical Memory contract can
+    // reconcile or write a review row before returning a conflict, so status
+    // alone never proves that no side effect occurred.
+    return { outcome: "ambiguous", evidence: `memory_http_${status}_ambiguous` };
   } catch {
-    return "ambiguous";
+    return { outcome: "ambiguous", evidence: "memory_response_parse_ambiguous" };
   }
 }
 
@@ -105,27 +144,27 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
   try {
     OutcomeObservationArgsSchema.parse(args);
   } catch (error) {
-    throw markProviderOutcome(error, "failed_before_side_effects");
+    throw markProviderOutcome(error, "failed_before_side_effects", "local_schema_validation");
   }
 
   if (typeof fetchFn !== "function") {
     try {
       return await core.submitEvidenceCandidate(args, configuration, fetchFn);
     } catch (error) {
-      throw markProviderOutcome(error, "failed_before_side_effects");
+      throw markProviderOutcome(error, "failed_before_side_effects", "fetch_unavailable_before_dispatch");
     }
   }
 
-  let fetchStarted = false;
-  let observedOutcome;
+  let dispatchStarted = false;
+  let observed;
   const observingFetch = async (...fetchArgs) => {
-    fetchStarted = true;
+    dispatchStarted = true;
     try {
       const response = await fetchFn(...fetchArgs);
-      observedOutcome = await responseOutcome(response);
+      observed = await responseOutcome(response);
       return response;
     } catch (error) {
-      observedOutcome = "ambiguous";
+      observed = { outcome: "ambiguous", evidence: "transport_failed_after_dispatch" };
       throw error;
     }
   };
@@ -133,8 +172,9 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
   try {
     return await core.submitEvidenceCandidate(args, configuration, observingFetch);
   } catch (error) {
-    const providerOutcome = observedOutcome
-      || (fetchStarted ? "ambiguous" : "failed_before_side_effects");
-    throw markProviderOutcome(error, providerOutcome);
+    const resolved = observed || (dispatchStarted
+      ? { outcome: "ambiguous", evidence: "dispatch_outcome_unobserved" }
+      : { outcome: "failed_before_side_effects", evidence: "local_failure_before_dispatch" });
+    throw markProviderOutcome(error, resolved.outcome, resolved.evidence);
   }
 }
