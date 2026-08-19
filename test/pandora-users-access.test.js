@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const migration = fs.readFileSync(new URL('../supabase/migrations/20260820000500_pandora_member_access_control.sql', import.meta.url), 'utf8');
 const approvalCompat = fs.readFileSync(new URL('../supabase/migrations/20260820000600_pandora_approval_permission_compat.sql', import.meta.url), 'utf8');
+const delegationHardening = fs.readFileSync(new URL('../supabase/migrations/20260820000700_harden_root_permission_delegation.sql', import.meta.url), 'utf8');
 const ownerApi = fs.readFileSync(new URL('../supabase/functions/pandora-owner-api/index.ts', import.meta.url), 'utf8');
 const accessApi = fs.readFileSync(new URL('../supabase/functions/pandora-user-access-api/index.ts', import.meta.url), 'utf8');
 const mobileConfig = fs.readFileSync(new URL('../apps/pandora-mobile/lib/pandora_config.dart', import.meta.url), 'utf8');
@@ -28,6 +29,31 @@ test('explicit permissions govern high-risk surfaces', () => {
   assert.doesNotMatch(approvalCompat, /auth\.sessions|auth\.aal_level|current_session_id/i);
   assert.match(migration, /projectos_accept_intake[\s\S]*connections\.manage/i);
   assert.match(migration, /projectos_accept_intake[\s\S]*autopilot\.run/i);
+});
+
+test('root authority cannot be delegated indirectly through a role template', () => {
+  assert.match(delegationHardening, /set schema private/i);
+  assert.match(
+    delegationHardening,
+    /pandora_configure_membership_access_core[\s\S]*from public, anon, authenticated, service_role/i,
+  );
+  assert.match(
+    delegationHardening,
+    /v_target_will_user_manage[\s\S]*pandora_role_permission_default[\s\S]*users\.manage/i,
+  );
+  assert.match(
+    delegationHardening,
+    /v_target_will_user_manage and not v_target_had_user_manage/i,
+  );
+  assert.match(
+    delegationHardening,
+    /v_target_will_release and not v_target_had_release/i,
+  );
+  assert.match(delegationHardening, /ROOT_PERMISSION_REQUIRES_OWNER/i);
+  assert.match(
+    delegationHardening,
+    /grant execute on function public\.pandora_configure_membership_access[\s\S]*to service_role/i,
+  );
 });
 
 test('owner API no longer throws a coarse owner-admin gate', () => {
