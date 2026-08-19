@@ -240,7 +240,11 @@ class ProviderExecutionOutcomeError extends Error {
     );
     const providerIdempotencySupported = input.identity?.providerIdempotencySupported === true;
     let retryable = input.retryable === true;
-    if (providerOutcome === "ambiguous" || providerOutcome === "succeeded") retryable = false;
+    if (providerOutcome === "ambiguous") {
+      retryable = retryable && providerIdempotencySupported;
+    } else if (providerOutcome === "succeeded") {
+      retryable = false;
+    }
     const failure = Object.freeze({
       schemaVersion: "1.1.0",
       safeErrorCode: safeToken(input.safeErrorCode, "provider_execution_outcome_ambiguous"),
@@ -250,6 +254,7 @@ class ProviderExecutionOutcomeError extends Error {
       downstreamProcessingOutcome,
       validationCategory: safeToken(input.validationCategory, "provider_execution"),
       retryable,
+      automaticRetryAllowed: false,
       retryContract: retryContract(
         providerOutcome,
         providerIdempotencySupported,
@@ -334,7 +339,11 @@ function normalizedProviderError(error, identity) {
   const originalCategory = safeToken(failure.validationCategory, "provider_execution");
   const providerOutcome = explicitOutcome(error) || "ambiguous";
   let retryable = error?.retryable === true || failure.retryable === true;
-  if (providerOutcome === "ambiguous" || providerOutcome === "succeeded") retryable = false;
+  if (providerOutcome === "ambiguous") {
+    retryable = identity.providerIdempotencySupported;
+  } else if (providerOutcome === "succeeded") {
+    retryable = false;
+  }
   const reconciliationRequired = providerOutcome === "ambiguous" || providerOutcome === "succeeded";
 
   if (!reconciliationRequired && preservableStructuredFailure(error)) {
@@ -448,6 +457,7 @@ function reconciliationSummary(execution, failure) {
     failure?.downstreamProcessingOutcome,
     providerOutcome === "succeeded" ? "local_processing_failed" : "not_started",
   );
+  const retryable = failure?.retryable === true && execution.identity.providerIdempotencySupported;
   return prepareToolPresentation({
     type: "provider_execution_reconciliation",
     schemaVersion: "1.1.0",
@@ -455,11 +465,12 @@ function reconciliationSummary(execution, failure) {
     mutationState: mutationState(providerOutcome, downstreamProcessingOutcome),
     downstreamProcessingOutcome,
     safeErrorCode: safeToken(failure?.safeErrorCode, "provider_execution_outcome_ambiguous"),
-    retryable: false,
+    retryable,
+    automaticRetryAllowed: false,
     retryContract: retryContract(
       providerOutcome,
       execution.identity.providerIdempotencySupported,
-      false,
+      retryable,
     ),
     reconciliationRequired: true,
     providerIdempotencySupported: execution.identity.providerIdempotencySupported,
@@ -513,7 +524,7 @@ function createProviderExecutionStateMachine(options) {
         downstreamProcessingOutcome: safeToken(phase, "local_processing_failed"),
         safeErrorCode: code || "provider_execution_outcome_ambiguous",
         validationCategory: "local_processing",
-        retryable: false,
+        retryable: execution.identity.providerIdempotencySupported,
         reconciliationRequired: true,
         status: 503,
         identity: execution.identity,
@@ -573,9 +584,25 @@ function createProviderExecutionStateMachine(options) {
   function recordResponseFailureForState(state, error, phase = "response_delivery_failed", planId) {
     const execution = state?.execution;
     if (!execution || !["succeeded", "ambiguous"].includes(execution.providerOutcome)) return;
-    const guarded = ensureExecutionFailure(phase, "response_delivery_failed");
+    let guarded = execution.error;
+    if (!(guarded instanceof ProviderExecutionOutcomeError)) {
+      guarded = execution.providerOutcome === "succeeded"
+        ? localPostSuccessError(null, execution.identity, phase, "response_delivery_failed")
+        : new ProviderExecutionOutcomeError({
+          providerOutcome: "ambiguous",
+          downstreamProcessingOutcome: safeToken(phase, "response_delivery_failed"),
+          safeErrorCode: "response_delivery_failed",
+          validationCategory: "response_delivery",
+          retryable: execution.identity.providerIdempotencySupported,
+          reconciliationRequired: true,
+          status: 503,
+          identity: execution.identity,
+          summary: "Provider dispatch may have occurred but response delivery failed; reconciliation is required",
+        });
+      execution.error = guarded;
+    }
     emitReconciliationEvent(execution, phase, planId);
-    if (guarded && error && typeof error === "object" && !error.cause) {
+    if (error && typeof error === "object" && !error.cause) {
       try {
         Object.defineProperty(error, "cause", {
           value: guarded,
