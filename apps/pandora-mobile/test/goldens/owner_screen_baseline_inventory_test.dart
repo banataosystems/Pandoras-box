@@ -33,7 +33,8 @@ int _readUint32BigEndian(List<int> bytes, int offset) =>
     bytes[offset + 3];
 
 void main() {
-  test('production-screen baseline inventory is exact and provenance-bound', () {
+  test(
+      'production-screen baseline inventory is exact and provenance-bound', () {
     final directory = Directory(_baselineDirectory);
     expect(
       directory.existsSync(),
