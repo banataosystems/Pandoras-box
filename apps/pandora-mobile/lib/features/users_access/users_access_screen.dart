@@ -39,8 +39,7 @@ class _UsersAccessScreenState extends State<UsersAccessScreen> {
     if (repository == null) {
       setState(() {
         _loading = false;
-        _error =
-            'Users & access is not connected in this build. No access changes can be made.';
+        _error = 'Users & access is not connected in this build. No access changes can be made.';
       });
       return;
     }
@@ -128,80 +127,82 @@ class _UsersAccessScreenState extends State<UsersAccessScreen> {
 
   @override
   Widget build(BuildContext context) => PandoraPage(
-        title: 'Users & access',
-        subtitle: 'Invite people and give each person only the access they need.',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(PandoraSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Least privilege by default',
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Permissions are enforced by Pandora authorization and database policies. Hiding a button is never treated as security.',
-                    ),
-                  ],
+    title: 'Users & access',
+    subtitle: 'Invite people and give each person only the access they need.',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(PandoraSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Least privilege by default',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-              ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Permissions are enforced by Pandora authorization and database policies. Hiding a button is never treated as security.',
+                ),
+              ],
             ),
-            const SizedBox(height: PandoraSpacing.md),
-            FilledButton.icon(
-              onPressed: _accessRepository == null || _loading
-                  ? null
-                  : () => _edit(),
-              icon: const Icon(Icons.person_add_alt_1_rounded),
-              label: const Text('Add user'),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: PandoraSpacing.md),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(PandoraSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_error!),
-                      TextButton.icon(
-                        onPressed: _loading ? null : _load,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Try again'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: PandoraSpacing.lg),
-            if (_loading)
-              const Center(child: CircularProgressIndicator())
-            else if (_members.isEmpty && _error == null)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(PandoraSpacing.lg),
-                  child: Text('No organization users were returned.'),
-                ),
-              )
-            else
-              ..._members.map(
-                (member) => Padding(
-                  padding: const EdgeInsets.only(bottom: PandoraSpacing.sm),
-                  child: _MemberCard(
-                    member: member,
-                    onEdit: () => _edit(member),
-                    onRevoke: member.status == MembershipAccessStatus.revoked
-                        ? null
-                        : () => _revoke(member),
-                  ),
-                ),
-              ),
-          ],
+          ),
         ),
-      );
+        const SizedBox(height: PandoraSpacing.md),
+        FilledButton.icon(
+          onPressed: _accessRepository == null || _loading
+              ? null
+              : () => _edit(),
+          icon: const Icon(Icons.person_add_alt_1_rounded),
+          label: const Text('Add user'),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: PandoraSpacing.md),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(PandoraSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_error!),
+                  TextButton.icon(
+                    onPressed: _loading ? null : _load,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Try again'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: PandoraSpacing.lg),
+        if (_loading)
+          const Center(child: CircularProgressIndicator())
+        else if (_members.isEmpty && _error == null)
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(PandoraSpacing.lg),
+              child: Text('No organization users were returned.'),
+            ),
+          )
+        else
+          ..._members.map(
+            (member) => Padding(
+              padding: const EdgeInsets.only(bottom: PandoraSpacing.sm),
+              child: _MemberCard(
+                member: member,
+                onEdit: () => _edit(member),
+                onRevoke: member.status == MembershipAccessStatus.revoked
+                    ? null
+                    : () => _revoke(member),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 class _MemberCard extends StatelessWidget {
@@ -240,7 +241,9 @@ class _MemberCard extends StatelessWidget {
               children: [
                 Chip(label: Text(projectLabel)),
                 Chip(
-                  label: Text('${member.effectivePermissions.length} permissions'),
+                  label: Text(
+                    '${member.effectivePermissions.length} permissions',
+                  ),
                 ),
                 Chip(label: Text('Access v${member.accessVersion}')),
               ],
@@ -338,7 +341,9 @@ class _UserAccessEditorScreenState extends State<UserAccessEditorScreen> {
       _projectError = null;
     });
     try {
-      final snapshot = await widget.projectRepository.projects(allowCached: true);
+      final snapshot = await widget.projectRepository.projects(
+        allowCached: true,
+      );
       if (!mounted) return;
       setState(() {
         _projects = snapshot.data;
@@ -348,8 +353,7 @@ class _UserAccessEditorScreenState extends State<UserAccessEditorScreen> {
       if (!mounted) return;
       setState(() {
         _projectsLoading = false;
-        _projectError =
-            'Project names could not be loaded. Selected-project access cannot be saved until they are available.';
+        _projectError = 'Project names could not be loaded. Selected-project access cannot be saved until they are available.';
       });
     }
   }
@@ -410,7 +414,9 @@ class _UserAccessEditorScreenState extends State<UserAccessEditorScreen> {
     if (_saving) return false;
     if (_isNew && _emailController.text.trim().isEmpty) return false;
     if (_scope == MembershipProjectScope.selected) {
-      return !_projectsLoading && _projectError == null && _projectIds.isNotEmpty;
+      return !_projectsLoading &&
+          _projectError == null &&
+          _projectIds.isNotEmpty;
     }
     return true;
   }
@@ -483,10 +489,10 @@ class _UserAccessEditorScreenState extends State<UserAccessEditorScreen> {
             value: _role,
             decoration: const InputDecoration(labelText: 'Role template'),
             items: PandoraMemberRole.values
-                .map((role) => DropdownMenuItem(
-                      value: role,
-                      child: Text(role.label),
-                    ))
+                .map(
+                  (role) =>
+                      DropdownMenuItem(value: role, child: Text(role.label)),
+                )
                 .toList(),
             onChanged: _saving ? null : _setRole,
           ),
@@ -497,10 +503,12 @@ class _UserAccessEditorScreenState extends State<UserAccessEditorScreen> {
               decoration: const InputDecoration(labelText: 'Access state'),
               items: MembershipAccessStatus.values
                   .where((status) => status != MembershipAccessStatus.invited)
-                  .map((status) => DropdownMenuItem(
-                        value: status,
-                        child: Text(status.label),
-                      ))
+                  .map(
+                    (status) => DropdownMenuItem(
+                      value: status,
+                      child: Text(status.label),
+                    ),
+                  )
                   .toList(),
               onChanged: _saving
                   ? null
@@ -525,12 +533,12 @@ class _UserAccessEditorScreenState extends State<UserAccessEditorScreen> {
             onSelectionChanged: _role == PandoraMemberRole.owner || _saving
                 ? null
                 : (values) => setState(() {
-                      _mode = values.first;
-                      if (_mode == MembershipAccessMode.custom &&
-                          _permissions.isEmpty) {
-                        _permissions = roleTemplatePermissions(_role);
-                      }
-                    }),
+                    _mode = values.first;
+                    if (_mode == MembershipAccessMode.custom &&
+                        _permissions.isEmpty) {
+                      _permissions = roleTemplatePermissions(_role);
+                    }
+                  }),
           ),
           if (_role == PandoraMemberRole.owner) ...[
             const SizedBox(height: PandoraSpacing.sm),
@@ -543,22 +551,28 @@ class _UserAccessEditorScreenState extends State<UserAccessEditorScreen> {
           const SizedBox(height: PandoraSpacing.sm),
           SegmentedButton<MembershipProjectScope>(
             segments: const [
-              ButtonSegment(value: MembershipProjectScope.all, label: Text('All')),
+              ButtonSegment(
+                value: MembershipProjectScope.all,
+                label: Text('All'),
+              ),
               ButtonSegment(
                 value: MembershipProjectScope.selected,
                 label: Text('Selected'),
               ),
-              ButtonSegment(value: MembershipProjectScope.none, label: Text('None')),
+              ButtonSegment(
+                value: MembershipProjectScope.none,
+                label: Text('None'),
+              ),
             ],
             selected: {_scope},
             onSelectionChanged: _role == PandoraMemberRole.owner || _saving
                 ? null
                 : (values) => setState(() {
-                      _scope = values.first;
-                      if (_scope != MembershipProjectScope.selected) {
-                        _projectIds.clear();
-                      }
-                    }),
+                    _scope = values.first;
+                    if (_scope != MembershipProjectScope.selected) {
+                      _projectIds.clear();
+                    }
+                  }),
           ),
           if (_scope == MembershipProjectScope.selected) ...[
             const SizedBox(height: PandoraSpacing.sm),
@@ -578,22 +592,24 @@ class _UserAccessEditorScreenState extends State<UserAccessEditorScreen> {
               Card(
                 child: Column(
                   children: _projects
-                      .map((project) => CheckboxListTile(
-                            value: _projectIds.contains(project.id),
-                            title: Text(project.name),
-                            subtitle: project.repository == null
-                                ? null
-                                : Text(project.repository!),
-                            onChanged: _saving
-                                ? null
-                                : (selected) => setState(() {
-                                      if (selected == true) {
-                                        _projectIds.add(project.id);
-                                      } else {
-                                        _projectIds.remove(project.id);
-                                      }
-                                    }),
-                          ))
+                      .map(
+                        (project) => CheckboxListTile(
+                          value: _projectIds.contains(project.id),
+                          title: Text(project.name),
+                          subtitle: project.repository == null
+                              ? null
+                              : Text(project.repository!),
+                          onChanged: _saving
+                              ? null
+                              : (selected) => setState(() {
+                                  if (selected == true) {
+                                    _projectIds.add(project.id);
+                                  } else {
+                                    _projectIds.remove(project.id);
+                                  }
+                                }),
+                        ),
+                      )
                       .toList(),
                 ),
               ),
@@ -610,7 +626,8 @@ class _UserAccessEditorScreenState extends State<UserAccessEditorScreen> {
                     : permission.group,
               ),
               value: effective.contains(permission),
-              onChanged: _mode == MembershipAccessMode.custom &&
+              onChanged:
+                  _mode == MembershipAccessMode.custom &&
                       _role != PandoraMemberRole.owner &&
                       !_saving
                   ? (enabled) => _toggle(permission, enabled)
@@ -637,9 +654,11 @@ class _UserAccessEditorScreenState extends State<UserAccessEditorScreen> {
                     dimension: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Icon(_isNew
-                    ? Icons.person_add_alt_1_rounded
-                    : Icons.save_outlined),
+                : Icon(
+                    _isNew
+                        ? Icons.person_add_alt_1_rounded
+                        : Icons.save_outlined,
+                  ),
             label: Text(_isNew ? 'Send invite' : 'Save access'),
           ),
         ],
