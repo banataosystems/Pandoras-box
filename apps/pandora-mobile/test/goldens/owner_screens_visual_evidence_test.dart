@@ -264,9 +264,9 @@ class _FixtureRepository implements PandoraRepository {
 
 Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
   if (!_visualFontLoaded) {
-  await tester.runAsync(_loadVisualFont);
-}
-await setTestSurface(tester, logicalSize: visual.logicalSize);
+    await tester.runAsync(_loadVisualFont);
+  }
+  await setTestSurface(tester, logicalSize: visual.logicalSize);
   final repository = _FixtureRepository(
     failing: visual.failing,
     pending: visual.pending,
