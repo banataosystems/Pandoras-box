@@ -125,6 +125,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Flutter creates untracked package/build caches; remove only those
+          # generated paths before enforcing the exact source mutation set.
+          rm -rf "$APP_DIR/.dart_tool" "$APP_DIR/build"
           git diff --check
           mapfile -t changed < <(git status --short | sed -E 's/^.. //' | sort)
           allowed_prefix="$BASELINE_DIR/"
