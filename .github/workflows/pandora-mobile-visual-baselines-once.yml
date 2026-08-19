@@ -2,6 +2,7 @@ name: Pandora mobile visual baseline candidates once
 
 # Triggered only after the exact-head inventory gate proved the 15 real-screen
 # comparison baselines were absent. Outputs remain unreviewed candidates.
+# Re-run after correcting only the test-relative golden matcher path.
 on:
   push:
     branches:
