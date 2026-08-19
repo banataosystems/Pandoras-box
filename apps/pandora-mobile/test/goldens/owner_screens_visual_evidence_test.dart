@@ -37,6 +37,7 @@ const _renderFrames = <Duration>[
 ];
 
 const _visualFontFamily = 'Roboto';
+const _visualIconFontFamily = 'MaterialIcons';
 bool _visualFontLoaded = false;
 
 Future<void> _loadVisualFont() async {
@@ -55,26 +56,38 @@ Future<void> _loadVisualFont() async {
     cursor = parent;
   }
   File? font;
+  File? iconFont;
   for (final root in roots) {
-    final candidate = File(
-      '$root${separator}bin${separator}cache${separator}artifacts'
-      '${separator}material_fonts${separator}Roboto-Regular.ttf',
+    final materialFonts =
+        '$root${separator}bin${separator}cache${separator}artifacts'
+        '${separator}material_fonts';
+    final textCandidate = File(
+      '$materialFonts${separator}Roboto-Regular.ttf',
     );
-    if (candidate.existsSync()) {
-      font = candidate;
-      break;
+    final iconCandidate = File(
+      '$materialFonts${separator}MaterialIcons-Regular.otf',
+    );
+    if (font == null && textCandidate.existsSync()) {
+      font = textCandidate;
     }
+    if (iconFont == null && iconCandidate.existsSync()) {
+      iconFont = iconCandidate;
+    }
+    if (font != null && iconFont != null) break;
   }
-  if (font == null) {
+  if (font == null || iconFont == null) {
     throw StateError(
-      'Pinned Flutter SDK Roboto-Regular.ttf was not found; readable '
-      'visual evidence cannot be generated.',
+      'Pinned Flutter SDK Roboto and Material Icons fonts were not found; '
+      'readable visual evidence cannot be generated.',
     );
   }
   final bytes = await font.readAsBytes();
+  final iconBytes = await iconFont.readAsBytes();
   final loader = FontLoader(_visualFontFamily)
     ..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
-  await loader.load();
+  final iconLoader = FontLoader(_visualIconFontFamily)
+    ..addFont(Future<ByteData>.value(ByteData.sublistView(iconBytes)));
+  await Future.wait([loader.load(), iconLoader.load()]);
   _visualFontLoaded = true;
 }
 
