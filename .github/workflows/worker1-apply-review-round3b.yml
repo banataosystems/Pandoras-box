@@ -1,0 +1,146 @@
+name: Worker 1 reliability review round 3b
+
+on:
+  push:
+    branches:
+      - fix/projectos-memory-supabase-contracts-20260819
+    paths:
+      - .github/workflows/worker1-apply-review-round3b.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: worker1-memory-projectos-review-round3
+  cancel-in-progress: false
+
+jobs:
+  apply-verify-clean:
+    name: Apply, verify, and remove temporary automation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout latest isolated lane
+        uses: actions/checkout@v4
+        with:
+          ref: fix/projectos-memory-supabase-contracts-20260819
+          fetch-depth: 0
+
+      - name: Record immutable input
+        id: input
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "fix/projectos-memory-supabase-contracts-20260819"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Apply or verify the bounded transformation
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f .github/scripts/worker1_apply_review_round3.py; then
+            python -m py_compile .github/scripts/worker1_apply_review_round3.py
+            python .github/scripts/worker1_apply_review_round3.py
+          else
+            grep -q 'execution_finalization_ambiguous' src/runtime/execution-ledger-client.js
+            grep -q 'provider_response_contract_error' src/projectos-mcp-handler.js
+            grep -q 'strict Memory success response rejects unknown and mismatched trust fields' test/projectos-memory-supabase-contract-regression.test.js
+            test -f test/execution-ledger-finalization-contract.test.js
+          fi
+
+      - name: Remove all Worker 1 round-three temporary artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            .github/scripts/worker1_apply_review_round3.py \
+            .github/scripts/worker1_round3_retry_20260819.txt \
+            .github/workflows/worker1-apply-review-round3.yml \
+            .github/workflows/worker1-apply-review-round3-trigger.yml \
+            .github/workflows/worker1-apply-review-round3b.yml
+
+      - name: Enforce owned-path boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            git diff --name-only
+            git ls-files --others --exclude-standard
+          } | sort -u > /tmp/actual-paths.txt
+          cat > /tmp/allowed-paths.txt <<'EOF'
+          .github/scripts/worker1_apply_review_round3.py
+          .github/scripts/worker1_round3_retry_20260819.txt
+          .github/workflows/worker1-apply-review-round3-trigger.yml
+          .github/workflows/worker1-apply-review-round3.yml
+          .github/workflows/worker1-apply-review-round3b.yml
+          src/projectos-mcp-handler.js
+          src/runtime/execution-ledger-client.js
+          src/tools/memory-evidence-intake.js
+          test/execution-ledger-finalization-contract.test.js
+          test/projectos-memory-supabase-contract-regression.test.js
+          EOF
+          sort -o /tmp/allowed-paths.txt /tmp/allowed-paths.txt
+          echo 'Changed paths:'
+          cat /tmp/actual-paths.txt
+          comm -23 /tmp/actual-paths.txt /tmp/allowed-paths.txt > /tmp/unowned-paths.txt
+          test ! -s /tmp/unowned-paths.txt
+          grep -q '^src/projectos-mcp-handler.js$' /tmp/actual-paths.txt || grep -q 'provider_response_contract_error' src/projectos-mcp-handler.js
+          grep -q '^src/runtime/execution-ledger-client.js$' /tmp/actual-paths.txt || grep -q 'execution_finalization_ambiguous' src/runtime/execution-ledger-client.js
+          grep -q '^src/tools/memory-evidence-intake.js$' /tmp/actual-paths.txt || grep -q 'status_intake_mismatch' src/tools/memory-evidence-intake.js
+          test -f test/execution-ledger-finalization-contract.test.js
+          ! grep -R --line-number --fixed-strings 'worker1_apply_review_round3' src test
+          ! grep -R --line-number --fixed-strings 'worker1-apply-review-round3' src test
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Source and migration integrity
+        run: npm run check:source
+
+      - name: Targeted reliability regressions
+        shell: bash
+        run: |
+          node --test test/projectos-memory-supabase-contract-regression.test.js
+          node --test test/execution-ledger-finalization-contract.test.js
+
+      - name: Complete repository test suite
+        run: npm test
+
+      - name: Production dependency security audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Commit verified candidate or cleanup
+        id: commit
+        shell: bash
+        env:
+          INPUT_SHA: ${{ steps.input.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            FINAL_SHA="$(git rev-parse HEAD)"
+          else
+            git commit -m 'fix(projectos): close reliability review gaps'
+            FINAL_SHA="$(git rev-parse HEAD)"
+            git push origin HEAD:fix/projectos-memory-supabase-contracts-20260819
+          fi
+          echo "sha=$FINAL_SHA" >> "$GITHUB_OUTPUT"
+          {
+            echo '## Worker 1 reliability review round 3b'
+            echo
+            echo "- Input SHA: \`$INPUT_SHA\`"
+            echo "- Final SHA: \`$FINAL_SHA\`"
+            echo '- Temporary Worker 1 automation removed from the final tree.'
+            echo '- Source integrity, targeted regressions, full tests, and production dependency audit passed before any push.'
+            echo '- No merge, deployment, or production mutation performed.'
+          } >> "$GITHUB_STEP_SUMMARY"
