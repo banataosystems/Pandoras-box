@@ -259,6 +259,9 @@ function normalizedProviderError(error, identity) {
     ) {
       providerOutcome = "not_executed";
       retryable = true;
+    } else if (status >= 400 && status < 500) {
+      providerOutcome = "failed_before_side_effects";
+      retryable = false;
     } else {
       providerOutcome = "ambiguous";
       retryable = identity.providerIdempotencySupported;

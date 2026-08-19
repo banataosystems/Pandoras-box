@@ -26,8 +26,8 @@ async function runAmbiguousCase(tool, args) {
     ledger,
     async execute() {
       throw Object.assign(new Error("private post-dispatch provider detail"), {
-        status: 409,
-        code: "provider_conflict",
+        status: 503,
+        code: "provider_transport_failed",
       });
     },
   });
