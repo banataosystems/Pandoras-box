@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   formatter-evidence:
@@ -18,6 +19,18 @@ jobs:
       SOURCE_SHA: ${{ github.sha }}
       TARGET: apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart
     steps:
+      - name: Register exact formatter-evidence run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${SOURCE_SHA}" \
+            -f state='pending' \
+            -f context='Pandora Mobile formatter evidence' \
+            -f description='Pinned Dart formatter evidence is running.' \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
       - name: Check out exact source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -47,7 +60,7 @@ jobs:
             echo "before_sha256=$before"
             echo "after_sha256=$after"
             echo "formatter=$(dart --version 2>&1)"
-            echo "mutation_capability=none"
+            echo "mutation_capability=status_only"
           } > build/formatter-evidence/manifest.txt
       - name: Upload exact formatter evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
@@ -56,3 +69,23 @@ jobs:
           path: build/formatter-evidence
           if-no-files-found: error
           include-hidden-files: true
+      - name: Finalize formatter-evidence status
+        if: ${{ always() }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          state=failure
+          description='Pinned Dart formatter evidence failed.'
+          if [[ "$JOB_STATUS" == 'success' ]]; then
+            state=success
+            description='Pinned Dart formatter evidence is available.'
+          fi
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${SOURCE_SHA}" \
+            -f state="$state" \
+            -f context='Pandora Mobile formatter evidence' \
+            -f description="$description" \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
