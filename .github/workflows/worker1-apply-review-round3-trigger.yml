@@ -1,0 +1,18 @@
+name: Worker 1 trigger reliability review round 3
+
+on:
+  push:
+    branches:
+      - fix/projectos-memory-supabase-contracts-20260819
+    paths:
+      - .github/workflows/worker1-apply-review-round3-trigger.yml
+
+permissions:
+  contents: read
+
+jobs:
+  trigger-observation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo 'Trigger-only observation; no source, provider, deployment, or production mutation.'
