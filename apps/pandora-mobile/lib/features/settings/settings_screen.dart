@@ -11,6 +11,7 @@ import '../connections/connections_screen.dart';
 import '../diagnostics/developer_diagnostics_screen.dart';
 import '../intelligence/owner_intelligence_screen.dart';
 import '../safety/safety_screen.dart';
+import '../users_access/users_access_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -168,6 +169,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'Developer diagnostics',
                   subtitle: 'Sanitized, temporary request metadata',
                   onTap: () => _open(const DeveloperDiagnosticsScreen()),
+                ),
+              ],
+            ),
+            const SizedBox(height: PandoraSpacing.xl),
+            const OwnerSectionHeading(
+              title: 'Users & access',
+              subtitle: 'Invite people and control exactly what they can use.',
+            ),
+            const SizedBox(height: PandoraSpacing.sm),
+            _SettingsGroup(
+              children: [
+                _SettingsAction(
+                  icon: Icons.manage_accounts_outlined,
+                  title: 'Users & access',
+                  subtitle: 'Add, edit, suspend, revoke, and limit permissions',
+                  onTap: () => _open(const UsersAccessScreen()),
                 ),
               ],
             ),
