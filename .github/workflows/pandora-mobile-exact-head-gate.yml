@@ -259,6 +259,41 @@ jobs:
           if not gate_pass:
               raise SystemExit('Exact-head gate blocked: ' + '; '.join(failures))
           PY
+      - name: Verify packaged Android INTERNET evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          gate_json=build/exact-head-gate/gate.json
+          mobile_run_id="$(jq -r '.workflows["Pandora mobile integration"].id' "$gate_json")"
+          test "$mobile_run_id" != "null"
+          rm -rf build/android-package-gate
+          mkdir -p build/android-package-gate
+          gh run download "$mobile_run_id" \
+            --repo "$REPOSITORY" \
+            --name pandora-mobile-android-owner-test \
+            --dir build/android-package-gate
+          mapfile -t permissions_files < <(
+            find build/android-package-gate -type f \
+              -path '*/android-package-evidence/permissions.txt' | sort
+          )
+          test "${#permissions_files[@]}" -eq 1
+          grep -Fqx "uses-permission: name='android.permission.INTERNET'" \
+            "${permissions_files[0]}"
+          mapfile -t manifests < <(
+            find build/android-package-gate -type f \
+              -name pandora-mobile-artifact-manifest.txt | sort
+          )
+          test "${#manifests[@]}" -eq 1
+          grep -Fqx "source_sha=${SOURCE_SHA}" "${manifests[0]}"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('build/exact-head-gate/gate.json')
+          data = json.loads(path.read_text())
+          data['android_internet_permission_verified'] = True
+          path.write_text(json.dumps(data, indent=2, sort_keys=True) + '\n')
+          PY
       - name: Upload immutable exact-head gate evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
