@@ -50,7 +50,7 @@ test("W1-R5 non-idempotent ambiguity cannot be blindly retried", async () => {
   assertReconciliationSummary(ledger.finishInputs[0].resultSummary, "ambiguous");
 });
 
-test("W1-R5 idempotent replay uses the same identity but never permits blind automatic retry", async () => {
+test("W1-R5 idempotent replay uses one identity but never permits blind automatic retry", async () => {
   const args = evidenceArgs({ idempotencyKey: "worker1-w1-r5-stable-idempotency" });
   const applied = new Set();
   let sideEffects = 0;
@@ -69,10 +69,7 @@ test("W1-R5 idempotent replay uses the same identity but never permits blind aut
   assert.equal(firstFailure.providerIdempotencySupported, true);
   assert.equal(firstFailure.retryable, true);
   assert.equal(firstFailure.automaticRetryAllowed, false);
-  assert.equal(
-    firstFailure.retryContract,
-    "reconcile_then_same_immutable_provider_identity_only",
-  );
+  assert.equal(firstFailure.retryContract, "same_immutable_idempotency_identity_only");
   assert.match(firstFailure.idempotencyIdentityHash, /^[a-f0-9]{64}$/);
 
   const second = await invokeMcp({
@@ -127,8 +124,8 @@ test("W1-R5 sensitive successful result cannot enter reconciliation evidence", a
   const result = await invokeHttp({ execute: async () => value });
   assert.doesNotMatch(JSON.stringify(result.body), new RegExp(secret));
   assert.doesNotMatch(JSON.stringify(result.ledger.finishInputs), new RegExp(secret));
-  assert.match(
+  assert.equal(
     result.ledger.finishInputs[0].resultSummary.evidencePolicy,
-    /^privacy_safe_summary_only_v[12]$/,
+    "privacy_safe_summary_only_v1",
   );
 });

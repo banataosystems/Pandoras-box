@@ -4,30 +4,46 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
+const { createHash } = require("node:crypto");
 
-const files = [
-  "w1-r5-memory-classification.test.js",
-  "w1-r5-mcp-mutation.test.js",
-  "w1-r5-http-mutation.test.js",
-].map((name) => path.join(__dirname, name));
+const FIXTURE_BLOBS = Object.freeze({
+  "src/http-app.js": "cb9efe807c0fbbb0f40b295c5c5a431e7393c923",
+  "src/projectos-mcp-handler.js": "58d5675ba6c8a05cd5812f77d41541b026822e1c",
+  "src/runtime/provider-execution-state-machine.js": "dc118a0b3d1bf1da74446e595762ad14dec98ab3",
+  "src/tools/memory-evidence-intake.js": "1003a7f574f31e22ae2de6bf5ac6f41123525044",
+});
 
-test("historical 85327f36 fails the new W1-R5 tests for behavioral reasons", () => {
-  const result = spawnSync(process.execPath, ["--test", ...files], {
+function gitBlobSha(content) {
+  const header = Buffer.from(`blob ${content.length}\0`, "utf8");
+  return createHash("sha1").update(header).update(content).digest("hex");
+}
+
+test("historical fixture blobs are exact content-addressed 85327f36 source", () => {
+  for (const [relativePath, expectedSha] of Object.entries(FIXTURE_BLOBS)) {
+    const filename = path.join(__dirname, "fixtures", "w1-r5-old-85327", relativePath);
+    const content = fs.readFileSync(filename);
+    assert.equal(gitBlobSha(content), expectedSha, relativePath);
+  }
+});
+
+test("historical 85327f36 fails the new W1-R5 invariants behaviorally", () => {
+  const runner = path.join(__dirname, "w1-r5-old-head-runner.js");
+  const result = spawnSync(process.execPath, [runner], {
     cwd: path.resolve(__dirname, ".."),
-    env: { ...process.env, W1_R5_IMPLEMENTATION: "old" },
     encoding: "utf8",
     timeout: 120000,
     maxBuffer: 8 * 1024 * 1024,
   });
   const output = `${result.stdout || ""}\n${result.stderr || ""}`;
-  assert.notEqual(result.status, 0, "the historical reviewed source must fail the new contract");
+  assert.equal(result.status, 1, output.slice(-4000));
   assert.doesNotMatch(output, /MODULE_NOT_FOUND|Cannot find module|SyntaxError|ReferenceError/);
-  assert.match(output, /write-then-409 is ambiguous/);
-  assert.match(output, /HTTP provider success plus cyclic serialization/);
-  assert.match(output, /MCP outer-envelope overflow/);
-  const match = output.match(/ℹ fail (\d+)/) || output.match(/# fail (\d+)/);
-  assert.ok(match, `unable to recover historical failure count:\n${output.slice(-4000)}`);
-  const failures = Number(match[1]);
-  assert.ok(failures >= 3, `expected at least three behavioral failures, received ${failures}`);
-  assert.match(output, /AssertionError|Expected values to be strictly equal|expected MCP failure/);
+  const line = output.split(/\r?\n/).find((entry) => entry.startsWith("W1_R5_OLD_HEAD_RESULT="));
+  assert.ok(line, output.slice(-4000));
+  const summary = JSON.parse(line.slice("W1_R5_OLD_HEAD_RESULT=".length));
+  assert.equal(summary.historicalSha, "85327f360976c87b385a93289ea71c7b6ce587d2");
+  assert.equal(summary.total, 5);
+  assert.equal(summary.infrastructureFailures, 0);
+  assert.equal(summary.unexpectedPasses, 0);
+  assert.equal(summary.expectedBehavioralFailures, 5);
 });

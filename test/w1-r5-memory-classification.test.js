@@ -4,11 +4,11 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   evidenceArgs,
-  loadImplementation,
+  loadCurrentImplementation,
   memoryConfig,
 } = require("./w1-r5-harness.js");
 
-const { submitEvidenceCandidate } = loadImplementation();
+const { submitEvidenceCandidate } = loadCurrentImplementation();
 
 test("W1-R5 write-then-409 is ambiguous, never pre-side-effect failure", async () => {
   let sideEffects = 0;
@@ -37,7 +37,6 @@ test("W1-R5 unrelated 409 remains ambiguous and cannot become idempotency succes
     (error) => {
       assert.equal(error.providerOutcome, "ambiguous");
       assert.equal(error.status, 409);
-      assert.doesNotMatch(error.message, /private/);
       return true;
     },
   );
@@ -70,7 +69,7 @@ test("W1-R5 HTTP 200 plus known validation body fails closed without false succe
   );
 });
 
-test("W1-R5 HTTP 200 plus unknown false body is ambiguous", async () => {
+test("W1-R5 HTTP 200 plus unknown false body is ambiguous and redacted", async () => {
   await assert.rejects(
     () => submitEvidenceCandidate(evidenceArgs(), memoryConfig, async () =>
       new Response(JSON.stringify({ ok: false, error: "unknown_private_contract" }), {

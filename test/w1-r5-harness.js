@@ -6,7 +6,6 @@ const path = require("node:path");
 const Module = require("node:module");
 
 const ROOT = path.resolve(__dirname, "..");
-const HISTORICAL = process.env.W1_R5_IMPLEMENTATION === "old";
 
 function compileHistorical(relativePath, mappings = {}) {
   const filename = path.join(__dirname, "fixtures", "w1-r5-old-85327", relativePath);
@@ -30,19 +29,22 @@ function current(relativePath) {
   return require(path.join(ROOT, "dist", relativePath));
 }
 
-let implementation;
-function loadImplementation() {
-  if (implementation) return implementation;
-  if (!HISTORICAL) {
-    implementation = {
+let currentImplementation;
+function loadCurrentImplementation() {
+  if (!currentImplementation) {
+    currentImplementation = Object.freeze({
       ...current("http-app.js"),
       ...current("projectos-mcp-handler.js"),
       ...current("tools/memory-evidence-intake.js"),
       historical: false,
-    };
-    return implementation;
+    });
   }
+  return currentImplementation;
+}
 
+let historicalImplementation;
+function loadHistoricalImplementation() {
+  if (historicalImplementation) return historicalImplementation;
   const historicalHttp = compileHistorical("src/http-app.js", {
     "./tools/index.js": () => current("tools/index.js"),
     "./runtime/service-config.js": () => current("runtime/service-config.js"),
@@ -64,13 +66,13 @@ function loadImplementation() {
   const historicalMemory = compileHistorical("src/tools/memory-evidence-intake.js", {
     "./memory-evidence-intake-core.js": () => current("tools/memory-evidence-intake-core.js"),
   });
-  implementation = {
+  historicalImplementation = Object.freeze({
     ...historicalHttp,
     ...historicalMcp,
     ...historicalMemory,
     historical: true,
-  };
-  return implementation;
+  });
+  return historicalImplementation;
 }
 
 const ADMIN_TOKEN = "worker-one-http-admin-token-material-long-enough";
@@ -171,7 +173,7 @@ function mcpRequest(planId = PLAN_ID) {
   };
 }
 
-function createLedger(args, options = {}) {
+function createLedger(args, options = {}, implementation = loadCurrentImplementation()) {
   const planId = options.planId || PLAN_ID;
   let claimed = false;
   let status = "approved";
@@ -185,14 +187,13 @@ function createLedger(args, options = {}) {
       if (claimed) throw Object.assign(new Error("Plan is no longer claimable"), { status: 409 });
       claimed = true;
       status = "executing";
-      const { executionPayloadHash } = loadImplementation();
       return {
         planId,
         requestId: REQUEST_ID,
         tool: TOOL,
         risk: "write",
         args,
-        payloadHash: executionPayloadHash(TOOL, args),
+        payloadHash: implementation.executionPayloadHash(TOOL, args),
         status,
       };
     },
@@ -233,10 +234,12 @@ function mcpDependencies(ledger, execute, scopes = ["openid", "projectos:execute
   };
 }
 
-async function invokeMcp({ args = evidenceArgs(), execute, scopes, ledgerOptions } = {}) {
-  const ledger = createLedger(args, ledgerOptions);
-  const { createProjectOsMcpHandler } = loadImplementation();
-  const handler = createProjectOsMcpHandler(mcpDependencies(
+async function invokeMcpWith(
+  implementation,
+  { args = evidenceArgs(), execute, scopes, ledgerOptions } = {},
+) {
+  const ledger = createLedger(args, ledgerOptions, implementation);
+  const handler = implementation.createProjectOsMcpHandler(mcpDependencies(
     ledger,
     execute || (async () => ({ ok: true })),
     scopes,
@@ -245,6 +248,10 @@ async function invokeMcp({ args = evidenceArgs(), execute, scopes, ledgerOptions
   const response = responseRecorder();
   await handler(request, response);
   return { handler, ledger, request, response };
+}
+
+function invokeMcp(options) {
+  return invokeMcpWith(loadCurrentImplementation(), options);
 }
 
 function parseMcpFailure(response) {
@@ -264,17 +271,19 @@ function runtimeConfig() {
   };
 }
 
-async function invokeHttp({
-  args = evidenceArgs(),
-  execute,
-  ledgerOptions,
-  authorization = `Bearer ${ADMIN_TOKEN}`,
-  path: requestPath = "/tools/execute",
-} = {}) {
-  const ledger = createLedger(args, ledgerOptions);
+async function invokeHttpWith(
+  implementation,
+  {
+    args = evidenceArgs(),
+    execute,
+    ledgerOptions,
+    authorization = `Bearer ${ADMIN_TOKEN}`,
+    path: requestPath = "/tools/execute",
+  } = {},
+) {
+  const ledger = createLedger(args, ledgerOptions, implementation);
   let providerCalls = 0;
-  const { createHttpApp } = loadImplementation();
-  const app = createHttpApp(
+  const app = implementation.createHttpApp(
     runtimeConfig(),
     { async resolve() { return {}; } },
     ledger,
@@ -319,6 +328,10 @@ async function invokeHttp({
   }
 }
 
+function invokeHttp(options) {
+  return invokeHttpWith(loadCurrentImplementation(), options);
+}
+
 function parseHttpProviderFailure(result) {
   const message = result.body?.error?.message;
   assert.equal(typeof message, "string");
@@ -332,7 +345,7 @@ function assertReconciliationSummary(summary, expectedOutcome, expectedRetryable
   assert.equal(summary.retryable, expectedRetryable);
   assert.equal(summary.automaticRetryAllowed, false);
   assert.match(summary.payloadHash, /^[a-f0-9]{64}$/);
-  assert.match(summary.evidencePolicy, /^privacy_safe_summary_only_v[12]$/);
+  assert.equal(summary.evidencePolicy, "privacy_safe_summary_only_v1");
 }
 
 module.exports = {
@@ -343,10 +356,12 @@ module.exports = {
   assertReconciliationSummary,
   createLedger,
   evidenceArgs,
-  historical: HISTORICAL,
   invokeHttp,
+  invokeHttpWith,
   invokeMcp,
-  loadImplementation,
+  invokeMcpWith,
+  loadCurrentImplementation,
+  loadHistoricalImplementation,
   memoryConfig,
   parseHttpProviderFailure,
   parseMcpFailure,

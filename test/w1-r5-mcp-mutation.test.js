@@ -14,32 +14,27 @@ function deeplyNested(depth) {
   return value;
 }
 
-test("W1-R5 MCP outer-envelope overflow preserves confirmed provider success", async () => {
-  const nearBoundaryResult = {
-    left: "x".repeat(225000),
-    right: "y".repeat(225000),
-  };
+test("W1-R5 MCP result headroom prevents a later outer-envelope unsafe failure", async () => {
+  const escapeHeavy = { payload: '\\\\"'.repeat(28000) };
   let providerCalls = 0;
   const { ledger, response } = await invokeMcp({
     execute: async () => {
       providerCalls += 1;
-      return nearBoundaryResult;
+      return escapeHeavy;
     },
   });
   assert.equal(providerCalls, 1);
-  const failure = parseMcpFailure(response);
-  assert.equal(failure.providerOutcome, "succeeded");
-  assert.equal(failure.mutationState, "PROVIDER_SUCCEEDED_LOCAL_FINALIZATION_FAILED");
-  assert.equal(failure.retryable, false);
-  assert.equal(failure.reconciliationRequired, true);
+  assert.equal(response.statusCode, 200);
   assert.equal(ledger.finishInputs.length, 1);
   assert.equal(ledger.finishInputs[0].status, "completed");
-  assertReconciliationSummary(ledger.finishInputs[0].resultSummary, "succeeded");
+  assert.equal(ledger.finishInputs[0].resultSummary.providerOutcome, "succeeded");
+  assert.equal(ledger.finishInputs[0].resultSummary.retryable, false);
 });
 
 test("W1-R5 MCP generic 409 after dispatch is ambiguous and reconciled", async () => {
   let sideEffects = 0;
   const { ledger, response } = await invokeMcp({
+    args: { namespace: "real_life" },
     execute: async () => {
       sideEffects += 1;
       throw Object.assign(new Error("private conflict detail after write"), {
@@ -61,8 +56,8 @@ test("W1-R5 MCP generic 409 after dispatch is ambiguous and reconciled", async (
 for (const [label, resultFactory] of [
   ["cyclic serialization", () => { const value = { safe: true }; value.self = value; return value; }],
   ["non-plain result validation", () => new Date("2026-08-19T00:00:00.000Z")],
-  ["excessive nesting", () => deeplyNested(18)],
-  ["oversize result", () => Array.from({ length: 401 }, (_, index) => ({ index }))],
+  ["excessive nesting", () => deeplyNested(22)],
+  ["oversize result", () => Array.from({ length: 501 }, (_, index) => ({ index }))],
 ]) {
   test(`W1-R5 MCP provider success plus ${label} completes reconciliation`, async () => {
     let providerCalls = 0;

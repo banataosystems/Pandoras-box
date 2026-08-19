@@ -17,8 +17,8 @@ function deeplyNested(depth) {
 for (const [label, resultFactory] of [
   ["cyclic serialization", () => { const value = { safe: true }; value.self = value; return value; }],
   ["non-plain result validation", () => new Date("2026-08-19T00:00:00.000Z")],
-  ["excessive nesting", () => deeplyNested(18)],
-  ["oversize result", () => Array.from({ length: 401 }, (_, index) => ({ index }))],
+  ["excessive nesting", () => deeplyNested(22)],
+  ["oversize result", () => Array.from({ length: 501 }, (_, index) => ({ index }))],
 ]) {
   test(`W1-R5 HTTP provider success plus ${label} completes reconciliation`, async () => {
     const result = await invokeHttp({ execute: async () => resultFactory() });
@@ -53,6 +53,7 @@ test("W1-R5 HTTP durable completion failure does not fall back to failed", async
 test("W1-R5 HTTP generic 409 after write is ambiguous and not durably failed", async () => {
   let sideEffects = 0;
   const result = await invokeHttp({
+    args: { namespace: "real_life" },
     execute: async () => {
       sideEffects += 1;
       throw Object.assign(new Error("private HTTP conflict after write"), {
@@ -73,7 +74,10 @@ test("W1-R5 HTTP generic 409 after write is ambiguous and not durably failed", a
 
 test("W1-R5 HTTP connection-like failure after dispatch is ambiguous and redacted", async () => {
   const secret = "private-provider-socket-detail-after-dispatch";
-  const result = await invokeHttp({ execute: async () => { throw new Error(secret); } });
+  const result = await invokeHttp({
+    args: { namespace: "real_life" },
+    execute: async () => { throw new Error(secret); },
+  });
   const failure = parseHttpProviderFailure(result);
   assert.equal(failure.providerOutcome, "ambiguous");
   assert.equal(failure.retryable, false);
@@ -86,6 +90,7 @@ test("W1-R5 HTTP connection-like failure after dispatch is ambiguous and redacte
 test("W1-R5 deprecated HTTP /tools alias has the same mutation state machine", async () => {
   const result = await invokeHttp({
     path: "/tools",
+    args: { namespace: "real_life" },
     execute: async () => { throw new Error("unknown after dispatch"); },
   });
   const failure = parseHttpProviderFailure(result);
