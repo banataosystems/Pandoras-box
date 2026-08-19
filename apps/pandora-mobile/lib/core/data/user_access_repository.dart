@@ -13,9 +13,9 @@ enum PandoraMemberRole {
   final String label;
 
   static PandoraMemberRole fromWire(Object? value) => values.firstWhere(
-    (item) => item.wireValue == value,
-    orElse: () => throw const FormatException('Unknown member role.'),
-  );
+        (item) => item.wireValue == value,
+        orElse: () => throw const FormatException('Unknown member role.'),
+      );
 }
 
 enum MembershipAccessStatus {
@@ -29,9 +29,9 @@ enum MembershipAccessStatus {
   final String label;
 
   static MembershipAccessStatus fromWire(Object? value) => values.firstWhere(
-    (item) => item.wireValue == value,
-    orElse: () => throw const FormatException('Unknown membership status.'),
-  );
+        (item) => item.wireValue == value,
+        orElse: () => throw const FormatException('Unknown membership status.'),
+      );
 }
 
 enum MembershipAccessMode {
@@ -43,9 +43,9 @@ enum MembershipAccessMode {
   final String label;
 
   static MembershipAccessMode fromWire(Object? value) => values.firstWhere(
-    (item) => item.wireValue == value,
-    orElse: () => throw const FormatException('Unknown access mode.'),
-  );
+        (item) => item.wireValue == value,
+        orElse: () => throw const FormatException('Unknown access mode.'),
+      );
 }
 
 enum MembershipProjectScope {
@@ -58,9 +58,9 @@ enum MembershipProjectScope {
   final String label;
 
   static MembershipProjectScope fromWire(Object? value) => values.firstWhere(
-    (item) => item.wireValue == value,
-    orElse: () => throw const FormatException('Unknown project scope.'),
-  );
+        (item) => item.wireValue == value,
+        orElse: () => throw const FormatException('Unknown project scope.'),
+      );
 }
 
 enum UserAccessPermission {
@@ -125,42 +125,42 @@ enum UserAccessPermission {
   final bool highRisk;
 
   static UserAccessPermission fromWire(Object? value) => values.firstWhere(
-    (item) => item.wireValue == value,
-    orElse: () => throw const FormatException('Unknown permission.'),
-  );
+        (item) => item.wireValue == value,
+        orElse: () => throw const FormatException('Unknown permission.'),
+      );
 }
 
 Set<UserAccessPermission> roleTemplatePermissions(PandoraMemberRole role) {
   final all = UserAccessPermission.values.toSet();
   return switch (role) {
     PandoraMemberRole.owner => all,
-    PandoraMemberRole.admin =>
-      all..remove(UserAccessPermission.releaseProduction),
+    PandoraMemberRole.admin => all
+      ..remove(UserAccessPermission.releaseProduction),
     PandoraMemberRole.operator => <UserAccessPermission>{
-      UserAccessPermission.projectsView,
-      UserAccessPermission.projectsEdit,
-      UserAccessPermission.approvalsView,
-      UserAccessPermission.activityView,
-      UserAccessPermission.intelligenceView,
-      UserAccessPermission.autopilotView,
-      UserAccessPermission.autopilotRun,
-      UserAccessPermission.releaseCenterView,
-      UserAccessPermission.connectionsView,
-      UserAccessPermission.safetyView,
-      UserAccessPermission.memoryView,
-    },
+        UserAccessPermission.projectsView,
+        UserAccessPermission.projectsEdit,
+        UserAccessPermission.approvalsView,
+        UserAccessPermission.activityView,
+        UserAccessPermission.intelligenceView,
+        UserAccessPermission.autopilotView,
+        UserAccessPermission.autopilotRun,
+        UserAccessPermission.releaseCenterView,
+        UserAccessPermission.connectionsView,
+        UserAccessPermission.safetyView,
+        UserAccessPermission.memoryView,
+      },
     PandoraMemberRole.member => <UserAccessPermission>{
-      UserAccessPermission.projectsView,
-      UserAccessPermission.projectsEdit,
-      UserAccessPermission.activityView,
-      UserAccessPermission.intelligenceView,
-      UserAccessPermission.memoryView,
-    },
+        UserAccessPermission.projectsView,
+        UserAccessPermission.projectsEdit,
+        UserAccessPermission.activityView,
+        UserAccessPermission.intelligenceView,
+        UserAccessPermission.memoryView,
+      },
     PandoraMemberRole.viewer => <UserAccessPermission>{
-      UserAccessPermission.projectsView,
-      UserAccessPermission.activityView,
-      UserAccessPermission.intelligenceView,
-    },
+        UserAccessPermission.projectsView,
+        UserAccessPermission.activityView,
+        UserAccessPermission.intelligenceView,
+      },
   };
 }
 
@@ -195,8 +195,8 @@ class UserAccessMember {
 
   Set<UserAccessPermission> get effectivePermissions =>
       accessMode == MembershipAccessMode.custom
-      ? permissions
-      : roleTemplatePermissions(role);
+          ? permissions
+          : roleTemplatePermissions(role);
 
   factory UserAccessMember.fromJson(Object? value) {
     final json = _requiredMap(value, 'member');
@@ -244,13 +244,14 @@ class UserAccessDraft {
   final List<String> projectIds;
 
   Map<String, Object?> toJson() => <String, Object?>{
-    'role': role.wireValue,
-    'status': status.wireValue,
-    'accessMode': accessMode.wireValue,
-    'projectScope': projectScope.wireValue,
-    'permissions': permissions.map((item) => item.wireValue).toList()..sort(),
-    'projectIds': List<String>.from(projectIds)..sort(),
-  };
+        'role': role.wireValue,
+        'status': status.wireValue,
+        'accessMode': accessMode.wireValue,
+        'projectScope': projectScope.wireValue,
+        'permissions': permissions.map((item) => item.wireValue).toList()
+          ..sort(),
+        'projectIds': List<String>.from(projectIds)..sort(),
+      };
 }
 
 abstract interface class UserAccessRepository {
@@ -270,7 +271,7 @@ abstract interface class UserAccessRepository {
 
 class RemoteUserAccessRepository implements UserAccessRepository {
   const RemoteUserAccessRepository({required PandoraApiClient client})
-    : _client = client;
+      : _client = client;
   final PandoraApiClient _client;
 
   @override
