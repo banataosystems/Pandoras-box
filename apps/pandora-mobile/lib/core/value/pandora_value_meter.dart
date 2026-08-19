@@ -42,12 +42,14 @@ class PandoraValueMeterSnapshot {
     final rawScore = jsonDouble(
       firstJsonValue(meter, const <String>['index', 'score', 'valueIndex']),
     );
-    final validScore = rawScore != null &&
-            rawScore.isFinite &&
-            rawScore >= 0 &&
-            rawScore <= 100
-        ? rawScore
-        : null;
+    double? validScore;
+    if (rawScore != null &&
+        rawScore.isFinite &&
+        rawScore >= 0 &&
+        rawScore <= 100) {
+      validScore = rawScore;
+    }
+
     final freshness = FreshnessInfo.fromJson(meter, now: observedNow);
     final lastVerifiedAt = freshness.lastVerifiedAt;
     final staleAfter = freshness.staleAfter;
@@ -71,23 +73,29 @@ class PandoraValueMeterSnapshot {
     );
   }
 
-  Map<String, Object?> toPlatformMessage() => <String, Object?>{
-        'verified': verified,
-        if (score != null) 'score': score,
-        'freshnessState': freshness.name,
-        if (lastVerifiedAt != null)
-          'lastVerifiedAtEpochMs':
-              lastVerifiedAt!.toUtc().millisecondsSinceEpoch,
-        if (staleAfter != null)
-          'staleAfterEpochMs': staleAfter!.toUtc().millisecondsSinceEpoch,
-      };
+  Map<String, Object?> toPlatformMessage() {
+    final message = <String, Object?>{
+      'verified': verified,
+      'freshnessState': freshness.name,
+    };
+    if (score != null) {
+      message['score'] = score;
+    }
+    if (lastVerifiedAt != null) {
+      message['lastVerifiedAtEpochMs'] =
+          lastVerifiedAt!.toUtc().millisecondsSinceEpoch;
+    }
+    if (staleAfter != null) {
+      message['staleAfterEpochMs'] = staleAfter!.toUtc().millisecondsSinceEpoch;
+    }
+    return message;
+  }
 }
 
 class PandoraValueMeterSync {
   PandoraValueMeterSync({required PandoraApiClient client}) : _client = client;
 
-  static const channelName =
-      'com.banataosystems.pandora_mobile/value_widget';
+  static const channelName = 'com.banataosystems.pandora_mobile/value_widget';
   static const MethodChannel _channel = MethodChannel(channelName);
 
   final PandoraApiClient _client;
