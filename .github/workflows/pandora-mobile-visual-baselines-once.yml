@@ -104,6 +104,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          install -d "$(dirname "$MANIFEST_PATH")"
           {
             echo 'candidate_status=unreviewed'
             echo 'visual_acceptance=false'
