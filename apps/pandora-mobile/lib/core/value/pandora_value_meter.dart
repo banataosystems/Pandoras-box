@@ -25,7 +25,10 @@ class PandoraValueMeterSnapshot {
   final DateTime? lastVerifiedAt;
   final DateTime? staleAfter;
 
-  factory PandoraValueMeterSnapshot.fromOwnerHome(Object? raw) {
+  factory PandoraValueMeterSnapshot.fromOwnerHome(
+    Object? raw, {
+    DateTime? now,
+  }) {
     final root = asJsonMap(raw);
     final meter = asJsonMap(root['valueMeter']);
     if (meter.isEmpty) {
@@ -35,6 +38,7 @@ class PandoraValueMeterSnapshot {
       );
     }
 
+    final observedNow = now ?? DateTime.now();
     final rawScore = jsonDouble(
       firstJsonValue(meter, const <String>['index', 'score', 'valueIndex']),
     );
@@ -44,16 +48,26 @@ class PandoraValueMeterSnapshot {
             rawScore <= 100
         ? rawScore
         : null;
-    final freshness = FreshnessInfo.fromJson(meter);
-    final verified =
-        meter['verified'] == true && validScore != null && freshness.isFresh;
+    final freshness = FreshnessInfo.fromJson(meter, now: observedNow);
+    final lastVerifiedAt = freshness.lastVerifiedAt;
+    final staleAfter = freshness.staleAfter;
+    final boundedClock = lastVerifiedAt != null &&
+        !lastVerifiedAt.isAfter(observedNow.add(const Duration(minutes: 5)));
+    final boundedExpiry = staleAfter != null &&
+        staleAfter.isAfter(observedNow) &&
+        !staleAfter.isAfter(observedNow.add(const Duration(days: 30)));
+    final verified = meter['verified'] == true &&
+        validScore != null &&
+        freshness.isFresh &&
+        boundedClock &&
+        boundedExpiry;
 
     return PandoraValueMeterSnapshot(
       verified: verified,
       score: verified ? validScore.round() : null,
       freshness: freshness.state,
-      lastVerifiedAt: freshness.lastVerifiedAt,
-      staleAfter: freshness.staleAfter,
+      lastVerifiedAt: lastVerifiedAt,
+      staleAfter: staleAfter,
     );
   }
 
