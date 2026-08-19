@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/app/pandora_dependencies.dart';
 import 'package:pandora_mobile/core/data/pandora_repository.dart';
@@ -34,6 +36,66 @@ const _renderFrames = <Duration>[
   Duration(milliseconds: 200),
   Duration(milliseconds: 500),
 ];
+
+
+const _visualFontFamily = 'Roboto';
+bool _visualFontLoaded = false;
+
+Future<void> _loadVisualFont() async {
+  if (_visualFontLoaded) return;
+  final separator = Platform.pathSeparator;
+  final roots = <String>{};
+  final configuredRoot = Platform.environment['FLUTTER_ROOT'];
+  if (configuredRoot != null && configuredRoot.isNotEmpty) {
+    roots.add(configuredRoot);
+  }
+  var cursor = File(Platform.resolvedExecutable).parent;
+  for (var depth = 0; depth < 12; depth++) {
+    roots.add(cursor.path);
+    final parent = cursor.parent;
+    if (parent.path == cursor.path) break;
+    cursor = parent;
+  }
+  File? font;
+  for (final root in roots) {
+    final candidate = File(
+      '$root${separator}bin${separator}cache${separator}artifacts'
+      '${separator}material_fonts${separator}Roboto-Regular.ttf',
+    );
+    if (candidate.existsSync()) {
+      font = candidate;
+      break;
+    }
+  }
+  if (font == null) {
+    throw StateError(
+      'Pinned Flutter SDK Roboto-Regular.ttf was not found; readable '
+      'visual evidence cannot be generated.',
+    );
+  }
+  final bytes = await font.readAsBytes();
+  final loader = FontLoader(_visualFontFamily)
+    ..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
+  await loader.load();
+  _visualFontLoaded = true;
+}
+
+Widget _withVisualFont(Widget child) => Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        return Theme(
+          data: theme.copyWith(
+            textTheme: theme.textTheme.apply(
+              fontFamily: _visualFontFamily,
+            ),
+            primaryTextTheme: theme.primaryTextTheme.apply(
+              fontFamily: _visualFontFamily,
+            ),
+          ),
+          child: child,
+        );
+      },
+    );
 
 class _VisualCase {
   const _VisualCase({
@@ -203,6 +265,7 @@ class _FixtureRepository implements PandoraRepository {
 }
 
 Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
+  await _loadVisualFont();
   await setTestSurface(tester, logicalSize: visual.logicalSize);
   final repository = _FixtureRepository(
     failing: visual.failing,
@@ -219,7 +282,9 @@ Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
         child: testApp(
           themeMode: visual.themeMode,
           textScaler: visual.textScaler,
-          child: RepaintBoundary(key: _surfaceKey, child: visual.build()),
+          child: _withVisualFont(
+          RepaintBoundary(key: _surfaceKey, child: visual.build()),
+        ),
         ),
       ),
     );
