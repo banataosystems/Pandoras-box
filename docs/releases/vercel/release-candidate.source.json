@@ -1,0 +1,69 @@
+{
+  "schema_version": "2.0.0",
+  "kind": "source_controlled_release_candidate",
+  "repository": "banataosystems/Pandoras-box",
+  "pull_request": 58,
+  "branch": "release/vercel-promotion-recovery-20260819",
+  "base_sha": "c2cc635383b78d457d1731294a6f5b306d85f6be",
+  "release_scope": "release_infrastructure_only",
+  "production_mutation_allowed": false,
+  "production_authorization_present": false,
+  "canonical_targets": {
+    "mcpmaster": {
+      "repository": "banataosystems/Pandoras-box",
+      "vercel_project_id": "prj_Y5rZVcq8xJVzHVt4uvfmg9wPvXMk",
+      "production_branch": "main",
+      "production_alias": "https://mcpmaster.vercel.app",
+      "rehearsal_rollback_alias": "https://mcpmaster-mbanatao-dc676069.vercel.app"
+    },
+    "memory": {
+      "repository": "banataosystems/pandoras-box-memory",
+      "vercel_project_id": "prj_brg3BJDcHfSftHH84NhnFtDJAnDO",
+      "production_branch": "main",
+      "production_alias": "https://pandorasbox-memory.vercel.app",
+      "rehearsal_rollback_alias": "https://memory-mbanatao-dc676069.vercel.app"
+    }
+  },
+  "critical_routes": [
+    {
+      "route": "/health",
+      "methods": ["GET"],
+      "expected_status": [200],
+      "semantic_contract": "healthy_json"
+    },
+    {
+      "route": "/mcp",
+      "methods": ["GET", "POST"],
+      "expected_status": [401],
+      "semantic_contract": "unauthenticated_bearer_boundary"
+    },
+    {
+      "route": "/.well-known/oauth-protected-resource/mcp",
+      "methods": ["GET"],
+      "expected_status": [200],
+      "semantic_contract": "oauth_resource_metadata"
+    }
+  ],
+  "stateful_components": [
+    "database",
+    "edge_functions",
+    "auth",
+    "secrets_config",
+    "jobs_queues",
+    "other_provider_state"
+  ],
+  "required_external_origins": [
+    "GITHUB_PROVIDER",
+    "VERCEL_PROVIDER",
+    "SUPABASE_PROVIDER",
+    "INDEPENDENT_REVIEWER",
+    "OWNER_AUTHORIZATION"
+  ],
+  "allowed_changed_path_prefixes": [
+    ".github/workflows/vercel-release-evidence.yml",
+    "docs/releases/vercel/",
+    "scripts/collect-github-release-evidence.mjs",
+    "scripts/verify-vercel-release-evidence.mjs",
+    "test/vercel-release-evidence.test.js"
+  ]
+}
