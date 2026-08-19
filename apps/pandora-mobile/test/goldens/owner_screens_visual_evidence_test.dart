@@ -209,7 +209,7 @@ Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
     pending: visual.pending,
   );
   Object? frameworkException;
-  File? output;
+  late final File output;
   try {
     await tester.pumpWidget(
       PandoraDependencies(
@@ -271,7 +271,7 @@ Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
   }
 
   if (frameworkException != null) {
-    if (output != null && output.existsSync()) {
+    if (output.existsSync()) {
       final failure = File('test/failures/owner_screens/${visual.name}.png');
       failure.parent.createSync(recursive: true);
       output.copySync(failure.path);
