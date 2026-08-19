@@ -12,6 +12,6 @@ test('Pandora skill registry is complete, acyclic, content-addressed, and not fa
     skills: 51,
     capabilities: 57,
     evals: 16,
-    manifestFiles: 67,
+    manifestFiles: 71,
   });
 });

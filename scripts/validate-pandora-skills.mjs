@@ -123,7 +123,20 @@ export function validatePandoraSkills({ rootDir = process.cwd(), verifyManifest 
   for (const skill of registry.skills) for (const capability of skill.capabilities) assert(capabilityIds.has(capability), `${skill.id}: unknown capability ${capability}`);
   assert(registry.capability_count === capabilityIds.size, 'registry capability_count mismatch');
 
-  assert(evals.status === 'specified_not_run', 'v1 evals must not claim execution');
+  // Evals may claim execution only with a real, checkable execution record. This
+  // keeps the original honesty guard: a status string alone never proves a run.
+  assert(
+    evals.status === 'specified_not_run' || evals.status === 'executed',
+    `unknown eval status: ${evals.status}`,
+  );
+  if (evals.status === 'executed') {
+    const run = evals.execution;
+    assert(run && typeof run === 'object', 'executed evals must record an execution block');
+    assert(fs.existsSync(path.join(rootDir, run.harness)), `eval harness missing: ${run.harness}`);
+    assert(fs.existsSync(path.join(rootDir, run.runtime)), `eval runtime missing: ${run.runtime}`);
+    assert(run.cases_total === evals.cases.length, 'eval execution total does not match the case denominator');
+    assert(run.cases_passed === run.cases_total, 'executed evals must pass every case');
+  }
   const evalIds = new Set();
   for (const item of evals.cases) {
     assert(!evalIds.has(item.id), `duplicate eval ${item.id}`);
@@ -156,13 +169,30 @@ export function validatePandoraSkills({ rootDir = process.cwd(), verifyManifest 
       '.agents/AGENTS.md','.agents/skills/README.md','.agents/skills/registry.json','.agents/skills/registry.schema.json','.agents/skills/registry-shard.schema.json',
       ...registry.shards,
       'docs/skills/PANDORA_SKILL_SYSTEM.md','docs/skills/PANDORA_SKILL_COVERAGE.json','docs/skills/PANDORA_SKILL_EVALS.json',
-      'scripts/validate-pandora-skills.mjs','test/pandora-skills-registry.test.js',
+      'docs/skills/PANDORA_SKILL_ACTIVATION.json',
+      '.agents/runtime/GOVERNANCE_BLOCK.md','.agents/runtime/pandora-skill-runtime.mjs',
+      'scripts/validate-pandora-skills.mjs','test/pandora-skills-registry.test.js','test/pandora-skills-runtime.test.js',
       ...registry.skills.map((s) => s.entrypoint),
     ].sort();
     assert(expectedPaths.length === seen.size, `manifest path count mismatch: expected ${expectedPaths.length}, got ${seen.size}`);
     for (const relative of expectedPaths) assert(seen.has(relative), `manifest omits ${relative}`);
     manifestFiles = seen.size;
   }
+  // Every skill must embed exactly one identical copy of the canonical governance
+  // block, so a runtime that loads a skill in isolation still receives the contract.
+  const canonicalBlock = fs.readFileSync(path.join(rootDir, '.agents/runtime/GOVERNANCE_BLOCK.md'), 'utf8').trim();
+  const marker = '## Pandora governance contract (canonical, embedded)';
+  const variants = new Set();
+  for (const skill of registry.skills) {
+    const body = fs.readFileSync(path.join(rootDir, skill.entrypoint), 'utf8');
+    const at = body.indexOf(marker);
+    assert(at !== -1, `skill omits embedded governance contract: ${skill.id}`);
+    assert(body.indexOf(marker, at + 1) === -1, `skill embeds the governance contract twice: ${skill.id}`);
+    variants.add(body.slice(at).trim());
+  }
+  assert(variants.size === 1, `conflicting governance contract variants: ${variants.size}`);
+  assert([...variants][0] === canonicalBlock, 'embedded governance contract diverges from .agents/runtime/GOVERNANCE_BLOCK.md');
+
   return { skills: registry.skills.length, capabilities: capabilityIds.size, evals: evalIds.size, manifestFiles };
 }
 
