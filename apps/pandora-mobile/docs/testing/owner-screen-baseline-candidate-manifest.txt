@@ -1,6 +1,7 @@
 candidate_status=unreviewed
 visual_acceptance=false
 source_sha=8441128d48e2d56a4fe69eceb0d378763d29c5a3
+baseline_commit=cfbd3e650cb40cd41349ae0dfdf8adf95d9c12b5
 repository=banataosystems/Pandoras-box
 branch=integration/pandora-mobile-p1-current-main-20260819
 workflow_run=32248881113
