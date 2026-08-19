@@ -16,7 +16,7 @@ Use the app as an owner, not as a developer. Begin at Home, then inspect Project
 
 ## Candidate evidence discipline
 
-The Owner Test candidate is accepted only from one exact source head. Its production-screen evidence must use the pinned Flutter toolchain, load the real Material icon font, decode the exact checked-in transparent Pandora mark through Flutter’s image engine, seed it under the production `AssetImage` cache key, and complete inside a bounded widget-test clock. Package-scoped formatting, security scanning, tests, visual evidence, web build, and Android build must all execute before the APK hash is recorded.
+The Owner Test candidate is accepted only from one exact source head. Its production-screen evidence must use the pinned Flutter toolchain, load the real Material icon font, decode the exact checked-in transparent Pandora mark through Flutter’s image engine, seed it under the production `AssetImage` cache key, and complete inside a bounded widget-test clock. Package-scoped formatting, security scanning, warning-free static analysis with fatal infos, tests, visual evidence, web build, and Android build must all execute before the APK hash is recorded.
 
 ## Ten product questions
 
