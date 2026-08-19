@@ -15,6 +15,7 @@ const MAX_TOOL_RESULT_OBJECT_KEYS = 500;
 const MAX_TOOL_RESULT_DEPTH = 20;
 const MAX_TOOL_RESULT_NODES = 20_000;
 const MAX_TOOL_RESULT_STRING_CHARS = 256 * 1024;
+const MAX_SAFE_AUDIT_ERROR_BYTES = 1000;
 const PROVIDER_OUTCOMES = new Set([
   "not_executed",
   "failed_before_side_effects",
@@ -22,13 +23,26 @@ const PROVIDER_OUTCOMES = new Set([
   "succeeded",
 ]);
 const SAFE_TOKEN = /^[a-z0-9][a-z0-9._:-]{0,79}$/;
+const SAFE_CORRELATION_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
 function safeToken(value, fallback) {
   return typeof value === "string" && SAFE_TOKEN.test(value) ? value : fallback;
 }
 
+function safeCorrelationId(value) {
+  return typeof value === "string" && SAFE_CORRELATION_ID.test(value) ? value : null;
+}
+
 function finiteStatus(value, fallback) {
   return Number.isInteger(value) && value >= 400 && value <= 599 ? value : fallback;
+}
+
+function safeHttpStatus(value) {
+  return Number.isInteger(value) && value >= 100 && value <= 599 ? value : null;
+}
+
+function safeRetryAfterMs(value) {
+  return Number.isInteger(value) && value >= 0 && value <= 86_400_000 ? value : null;
 }
 
 function identityHash(value) {
@@ -137,6 +151,24 @@ function prepareProviderResult(value) {
   }
 }
 
+function safeProviderMetadata(failure) {
+  if (!failure || typeof failure !== "object" || Array.isArray(failure)) return {};
+  const provider = safeToken(failure.provider, null);
+  const operation = safeToken(failure.operation, null);
+  const correlationId = safeCorrelationId(failure.correlationId);
+  const privacyScanVersion = safeToken(failure.privacyScanVersion, null);
+  const httpStatus = safeHttpStatus(failure.httpStatus);
+  const retryAfterMs = safeRetryAfterMs(failure.retryAfterMs);
+  return {
+    ...(provider ? { provider } : {}),
+    ...(operation ? { operation } : {}),
+    ...(httpStatus === null ? {} : { httpStatus }),
+    ...(correlationId ? { correlationId } : {}),
+    ...(privacyScanVersion ? { privacyScanVersion } : {}),
+    ...(retryAfterMs === null ? {} : { retryAfterMs }),
+  };
+}
+
 class ProviderExecutionOutcomeError extends Error {
   constructor(input) {
     const providerOutcome = PROVIDER_OUTCOMES.has(input.providerOutcome)
@@ -157,6 +189,7 @@ class ProviderExecutionOutcomeError extends Error {
       payloadHash: input.identity?.payloadHash || null,
       idempotencyIdentityHash: input.identity?.idempotencyIdentityHash || null,
       planId: input.planId || null,
+      ...safeProviderMetadata(input.providerFailure),
       timestamp: new Date().toISOString(),
     });
     super(JSON.stringify(failure));
@@ -174,6 +207,35 @@ exports.ProviderExecutionOutcomeError = ProviderExecutionOutcomeError;
 function explicitOutcome(error) {
   const value = error?.providerOutcome ?? error?.failure?.providerOutcome;
   return PROVIDER_OUTCOMES.has(value) ? value : undefined;
+}
+
+function preservableStructuredFailure(error) {
+  if (!error || typeof error !== "object" || !error.failure || typeof error.failure !== "object") {
+    return false;
+  }
+  try {
+    const serialized = JSON.stringify(error.failure);
+    return serialized === error.message
+      && Buffer.byteLength(serialized, "utf8") <= MAX_SAFE_AUDIT_ERROR_BYTES;
+  } catch {
+    return false;
+  }
+}
+
+function annotateProviderOutcome(error, providerOutcome) {
+  if (!error || typeof error !== "object" || !PROVIDER_OUTCOMES.has(providerOutcome)) return error;
+  if (explicitOutcome(error)) return error;
+  try {
+    Object.defineProperty(error, "providerOutcome", {
+      value: providerOutcome,
+      enumerable: false,
+      configurable: false,
+      writable: false,
+    });
+  } catch {
+    return error;
+  }
+  return error;
 }
 
 function normalizedProviderError(error, identity) {
@@ -205,6 +267,11 @@ function normalizedProviderError(error, identity) {
 
   const reconciliationRequired = providerOutcome === "ambiguous" || providerOutcome === "succeeded";
   if (reconciliationRequired && !identity.providerIdempotencySupported) retryable = false;
+
+  if (!reconciliationRequired && preservableStructuredFailure(error)) {
+    return annotateProviderOutcome(error, providerOutcome);
+  }
+
   return new ProviderExecutionOutcomeError({
     providerOutcome,
     downstreamProcessingOutcome: providerOutcome === "succeeded" ? "failed" : "not_started",
@@ -214,6 +281,7 @@ function normalizedProviderError(error, identity) {
     reconciliationRequired,
     status,
     identity,
+    providerFailure: failure,
     summary: reconciliationRequired
       ? "Provider execution outcome requires reconciliation before any retry"
       : "Provider execution stopped before a side effect was accepted",
@@ -230,7 +298,7 @@ function resultProcessingError(contractError, identity) {
     reconciliationRequired: true,
     status: 502,
     identity,
-    summary: "Provider mutation succeeded but its response could not be safely validated or serialized",
+    summary: "Provider response contract is invalid after successful provider execution; reconciliation is required",
   });
 }
 
@@ -247,6 +315,7 @@ function reconciliationSummary(execution, failure) {
     providerIdempotencySupported: execution.identity.providerIdempotencySupported,
     payloadHash: execution.identity.payloadHash,
     idempotencyIdentityHash: execution.identity.idempotencyIdentityHash,
+    ...safeProviderMetadata(failure),
     evidencePolicy: "privacy_safe_summary_only_v1",
   });
 }
@@ -265,6 +334,13 @@ function completionSummary(input, execution) {
   };
 }
 
+function preserveCanonicalMemorySummary(input) {
+  const summary = input?.resultSummary;
+  return summary?.type === "memory_evidence_candidate"
+    && typeof summary.candidateId === "string"
+    && typeof summary.reviewItemId === "string";
+}
+
 function finalizationAmbiguity(error, execution, planId) {
   return new ProviderExecutionOutcomeError({
     providerOutcome: execution?.providerOutcome || "ambiguous",
@@ -276,6 +352,7 @@ function finalizationAmbiguity(error, execution, planId) {
     status: 503,
     identity: execution?.identity,
     planId,
+    providerFailure: execution?.error?.failure,
     summary: "Provider outcome is known or ambiguous but durable completion requires reconciliation",
   });
 }
@@ -305,7 +382,7 @@ function createProviderExecutionStateMachine(options) {
     } catch (error) {
       const guarded = normalizedProviderError(error, identity);
       if (context && !context.execution) {
-        context.execution = { providerOutcome: guarded.providerOutcome, identity, error: guarded };
+        context.execution = { providerOutcome: explicitOutcome(guarded) || "ambiguous", identity, error: guarded };
       }
       throw guarded;
     }
@@ -322,11 +399,11 @@ function createProviderExecutionStateMachine(options) {
         if (!execution) return target.finishPlan(token, input);
 
         if (input.status === "completed") {
+          const finalizationInput = preserveCanonicalMemorySummary(input)
+            ? input
+            : { ...input, resultSummary: completionSummary(input, execution) };
           try {
-            return await target.finishPlan(token, {
-              ...input,
-              resultSummary: completionSummary(input, execution),
-            });
+            return await target.finishPlan(token, finalizationInput);
           } catch (error) {
             throw finalizationAmbiguity(error, execution, input.planId);
           }
