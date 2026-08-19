@@ -1,0 +1,58 @@
+name: Pandora mobile formatter evidence once
+
+on:
+  push:
+    branches:
+      - 'integration/pandora-mobile-p1-current-main-20260819'
+    paths:
+      - '.github/workflows/pandora-mobile-format-evidence-once.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  formatter-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOURCE_SHA: ${{ github.sha }}
+      TARGET: apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - name: Verify exact source checkout
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+      - name: Install pinned Flutter formatter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+      - name: Produce immutable formatter evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/formatter-evidence
+          before=$(sha256sum "$TARGET" | cut -d ' ' -f1)
+          dart format "$TARGET"
+          after=$(sha256sum "$TARGET" | cut -d ' ' -f1)
+          cp "$TARGET" build/formatter-evidence/formatted.dart
+          git diff -- "$TARGET" > build/formatter-evidence/formatter.patch
+          test -s build/formatter-evidence/formatter.patch
+          {
+            echo "source_sha=$SOURCE_SHA"
+            echo "target=$TARGET"
+            echo "before_sha256=$before"
+            echo "after_sha256=$after"
+            echo "formatter=$(dart --version 2>&1)"
+            echo "mutation_capability=none"
+          } > build/formatter-evidence/manifest.txt
+      - name: Upload exact formatter evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pandora-mobile-dart-format-evidence
+          path: build/formatter-evidence
+          if-no-files-found: error
+          include-hidden-files: true
