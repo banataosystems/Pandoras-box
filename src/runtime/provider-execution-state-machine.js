@@ -93,7 +93,7 @@ function createProviderExecutionStateMachine(options) {
         execution.error = localPostSuccessError(
           error,
           identity,
-          "provider_result_processing_failed",
+          "failed",
           "provider_result_contract_error",
         );
         throw execution.error;
