@@ -54,6 +54,11 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get --enforce-lockfile
+          # Flutter may modernize analysis_options.yaml as a tooling side effect.
+          # Restore it to the exact trigger head so this helper cannot mutate
+          # package policy while applying the already-proven formatter bytes.
+          git restore --source="$SOURCE_SHA" -- analysis_options.yaml
+          test -z "$(git diff --name-only -- analysis_options.yaml)"
           dart format "$TARGET"
       - name: Verify bounded two-path mutation and prepare evidence
         shell: bash
