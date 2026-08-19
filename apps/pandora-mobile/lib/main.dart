@@ -9,6 +9,8 @@ import 'core/diagnostics/diagnostics_store.dart';
 import 'core/network/pandora_api_client.dart';
 import 'core/network/session_token_provider.dart';
 import 'core/security/pandora_auth.dart';
+import 'core/value/pandora_value_meter.dart';
+import 'core/value/value_widget_sync_repository.dart';
 import 'core/widgets/pandora_error_boundary.dart';
 import 'pandora_config.dart';
 
@@ -50,7 +52,11 @@ Future<void> main() async {
     sessionTokenProvider: SupabaseSessionTokenProvider(supabase),
     diagnostics: diagnostics,
   );
-  final repository = RemotePandoraRepository(client: apiClient);
+  final remoteRepository = RemotePandoraRepository(client: apiClient);
+  final repository = ValueWidgetSyncRepository(
+    delegate: remoteRepository,
+    valueMeterSync: PandoraValueMeterSync(client: apiClient),
+  );
 
   runApp(
     PandoraApp(

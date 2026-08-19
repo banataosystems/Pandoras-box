@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="pandora_value_widget_surface">#FF222329</color>
+    <color name="pandora_value_widget_text">#FFF6F5F2</color>
+    <color name="pandora_value_widget_text_secondary">#FFC9C9D0</color>
+    <color name="pandora_value_widget_verified">#FF67D7A3</color>
+    <color name="pandora_value_widget_track">#FF3B3C44</color>
+    <color name="pandora_value_widget_outline">#FF3B3C44</color>
+</resources>

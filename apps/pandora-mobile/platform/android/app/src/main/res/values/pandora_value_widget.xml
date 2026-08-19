@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="pandora_value_widget_surface">#FFFFFFFF</color>
+    <color name="pandora_value_widget_text">#FF121317</color>
+    <color name="pandora_value_widget_text_secondary">#FF5F6068</color>
+    <color name="pandora_value_widget_verified">#FF0B6B45</color>
+    <color name="pandora_value_widget_track">#FFD9DAE2</color>
+    <color name="pandora_value_widget_outline">#FFD9DAE2</color>
+
+    <string name="pandora_value_widget_name">Pandora Value</string>
+    <string name="pandora_value_widget_description">Verified Pandora customer-value meter</string>
+</resources>
