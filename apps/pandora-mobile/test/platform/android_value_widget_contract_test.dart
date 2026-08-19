@@ -9,19 +9,14 @@ void main() {
     return file.readAsStringSync();
   }
 
-  test('widget receiver is registered as non-exported', () {
-    final configurator = read('tool/configure_owner_test_android.py');
+  test('materialized widget receiver is registered as non-exported', () {
+    final manifest = read('android/app/src/main/AndroidManifest.xml');
+    expect(manifest, contains('android:name=".PandoraValueWidget"'));
+    expect(manifest, contains('android:exported="false"'));
+    expect(manifest, contains('android.appwidget.action.APPWIDGET_UPDATE'));
     expect(
-      configurator,
-      contains('android:name=\\".PandoraValueWidget\\"'),
-    );
-    expect(
-      configurator,
-      contains('android:exported=\\"false\\"'),
-    );
-    expect(
-      configurator,
-      contains('android.appwidget.action.APPWIDGET_UPDATE'),
+      manifest,
+      contains('android:resource="@xml/pandora_value_widget_info"'),
     );
   });
 
