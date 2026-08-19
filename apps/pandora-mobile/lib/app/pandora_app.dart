@@ -15,13 +15,13 @@ class PandoraApp extends StatefulWidget {
     required this.auth,
     required this.repository,
     required this.diagnostics,
-    required this.userAccessRepository,
+    this.userAccessRepository,
   });
 
   final PandoraAuth auth;
   final PandoraRepository repository;
   final DiagnosticsStore diagnostics;
-  final UserAccessRepository userAccessRepository;
+  final UserAccessRepository? userAccessRepository;
 
   @override
   State<PandoraApp> createState() => _PandoraAppState();
@@ -30,7 +30,7 @@ class PandoraApp extends StatefulWidget {
 class _PandoraAppState extends State<PandoraApp> {
   @override
   void dispose() {
-    widget.userAccessRepository.dispose();
+    widget.userAccessRepository?.dispose();
     widget.repository.dispose();
     super.dispose();
   }
