@@ -1,0 +1,35 @@
+name: Pandora format diagnostic
+
+on:
+  push:
+    branches:
+      - 'feat/pandora-users-access-v1-20260820'
+
+permissions:
+  contents: read
+
+jobs:
+  format-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+      - name: Emit canonical Dart-format diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          dart format \
+            apps/pandora-mobile/lib/core/data/user_access_repository.dart \
+            apps/pandora-mobile/lib/features/users_access/users_access_screen.dart
+          git diff -- \
+            apps/pandora-mobile/lib/core/data/user_access_repository.dart \
+            apps/pandora-mobile/lib/features/users_access/users_access_screen.dart
