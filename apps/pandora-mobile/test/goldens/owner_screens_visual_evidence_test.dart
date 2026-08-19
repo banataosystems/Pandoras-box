@@ -37,7 +37,6 @@ const _renderFrames = <Duration>[
   Duration(milliseconds: 500),
 ];
 
-
 const _visualFontFamily = 'Roboto';
 bool _visualFontLoaded = false;
 
@@ -283,8 +282,8 @@ Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
           themeMode: visual.themeMode,
           textScaler: visual.textScaler,
           child: _withVisualFont(
-          RepaintBoundary(key: _surfaceKey, child: visual.build()),
-        ),
+            RepaintBoundary(key: _surfaceKey, child: visual.build()),
+          ),
         ),
       ),
     );
