@@ -7,7 +7,7 @@ class PandoraConfig {
   );
 
   // Public/publishable client key from the canonical operator config. Never put
-  // service-role, PAT, Vercel, or other server credentials in this app.
+  // privileged server, PAT, Vercel, or other server credentials in this app.
   static const supabasePublishableKey = String.fromEnvironment(
     'PANDORA_SUPABASE_PUBLISHABLE_KEY',
     defaultValue: 'sb_publishable_LGu6ncwUVEYI5THBjSV-3g_71AInQZt',
@@ -24,8 +24,8 @@ class PandoraConfig {
 
   // User administration is isolated behind its own least-privilege Edge
   // Function. The function authenticates the signed-in user, then performs only
-  // audited membership/access mutations. Service-role credentials never enter
-  // the mobile app.
+  // audited membership/access mutations. Privileged server credentials never
+  // enter the mobile app.
   static const userAccessApiBaseUrl = String.fromEnvironment(
     'PANDORA_USER_ACCESS_API_BASE_URL',
     defaultValue:
