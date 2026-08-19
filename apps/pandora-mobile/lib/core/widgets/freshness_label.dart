@@ -55,7 +55,7 @@ String _displayLabel(
 ) {
   final relative = _relativeTime(verifiedAt, now);
   return switch (freshness.state) {
-    FreshnessState.fresh => relative,
+    FreshnessState.fresh => 'Verified $relative',
     FreshnessState.stale => 'Stale · $relative',
     FreshnessState.notChecked => 'Not checked · $relative',
   };
@@ -64,16 +64,16 @@ String _displayLabel(
 String _relativeTime(DateTime value, DateTime now) {
   final difference = now.difference(value);
   if (difference.isNegative || difference.inMinutes < 1) {
-    return 'Verified just now';
+    return 'just now';
   }
   if (difference.inMinutes < 60) {
-    return 'Verified ${difference.inMinutes}m ago';
+    return '${difference.inMinutes}m ago';
   }
   if (difference.inHours < 24) {
-    return 'Verified ${difference.inHours}h ago';
+    return '${difference.inHours}h ago';
   }
   if (difference.inDays < 7) {
-    return 'Verified ${difference.inDays}d ago';
+    return '${difference.inDays}d ago';
   }
-  return 'Verified ${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+  return '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 }
