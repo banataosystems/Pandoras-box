@@ -14,6 +14,10 @@ A build, passing CI, or provider `READY` state must never be presented as Produc
 
 Use the app as an owner, not as a developer. Begin at Home, then inspect Projects, Activity, Approvals, Command, Memory, Connections, Safety, and Settings. Missing backend capabilities must appear as honest degraded or unavailable states rather than invented success.
 
+## Candidate evidence discipline
+
+The Owner Test candidate is accepted only from one exact source head. Its production-screen evidence must use the pinned Flutter toolchain, load the real Material icon font, wait for the transparent Pandora mark with a finite ceiling, and complete inside a bounded widget-test clock. Package-scoped formatting, security scanning, tests, visual evidence, web build, and Android build must all execute before the APK hash is recorded.
+
 ## Ten product questions
 
 1. Within five seconds of opening Home, can you tell what is happening and what needs your attention?
