@@ -23,3 +23,5 @@ The Android artifact is built in release mode with the Android debug key and is 
 ## Visual evidence contract
 
 Foundation goldens use the reviewed transparent Pandora mark with no matte rectangle. Production-screen evidence must include all 15 declared owner-screen cases, including compact-phone, dark, degraded, loading, and 1.6× text states. Capture-only evidence is not sufficient for final visual-regression acceptance; reviewed production baselines must be committed and required by CI.
+
+Production-screen captures load `Roboto-Regular.ttf` from the pinned Flutter SDK and fail closed if that font is unavailable. This keeps screenshot text readable without committing or distributing a separate font file and leaves production application source unchanged.
