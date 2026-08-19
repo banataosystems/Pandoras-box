@@ -1,0 +1,55 @@
+name: Pandora mobile visual font format once
+
+on:
+  push:
+    branches:
+      - integration/pandora-mobile-p1-current-main-20260819
+    paths:
+      - '.github/pandora-mobile-visual-font-format-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Apply exact formatter-equivalent spacing and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart')
+          text = path.read_text()
+          replacements = {
+              "];\n\n\nconst _visualFontFamily": "];\n\nconst _visualFontFamily",
+              "child: _withVisualFont(\n          RepaintBoundary(key: _surfaceKey, child: visual.build()),\n        ),": "child: _withVisualFont(\n            RepaintBoundary(key: _surfaceKey, child: visual.build()),\n          ),",
+          }
+          for old, new in replacements.items():
+              if text.count(old) != 1:
+                  raise SystemExit(f'Expected exactly one formatter target: {old!r}')
+              text = text.replace(old, new)
+          path.write_text(text)
+          Path('.github/workflows/pandora-mobile-visual-font-format-once.yml').unlink()
+          Path('.github/pandora-mobile-visual-font-format-trigger').unlink()
+          PY
+          git diff --check
+      - name: Commit formatting and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Pandora Mobile Worker 5'
+          git config user.email 'lawbatalla@gmail.com'
+          git add apps/pandora-mobile/test/goldens/owner_screens_visual_evidence_test.dart \
+            .github/workflows/pandora-mobile-visual-font-format-once.yml \
+            .github/pandora-mobile-visual-font-format-trigger
+          test "$(git diff --cached --name-only | wc -l)" -eq 3
+          git commit -m 'style(mobile): format readable visual harness'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
