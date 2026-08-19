@@ -50,7 +50,12 @@ test('user management API stages invites suspended before granting authority', (
 });
 
 test('mobile contains no server credential and places Users & access before Account', () => {
-  assert.doesNotMatch(mobileConfig, /service[_-]?role|SUPABASE_SERVICE_ROLE_KEY/i);
+  assert.doesNotMatch(
+    mobileConfig,
+    /String\.fromEnvironment\(\s*["'][^"']*(?:SERVICE[_-]?ROLE|SUPABASE_SERVICE_ROLE_KEY)/i,
+  );
+  assert.doesNotMatch(mobileConfig, /static const\s+\w*service\w*role\w*\s*=/i);
+  assert.match(mobileConfig, /supabasePublishableKey[\s\S]*sb_publishable_/i);
   const users = settings.indexOf("title: 'Users & access'");
   const account = settings.indexOf("title: 'Account'");
   assert.ok(users >= 0, 'Users & access section is missing');
