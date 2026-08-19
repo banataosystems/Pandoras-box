@@ -244,9 +244,6 @@ async function authenticate(req: Request): Promise<UserContext> {
 
   const claims = bearerPayload(authorization);
   const role = String(memberships[0].role);
-  if (!new Set(["owner", "admin"]).has(role)) {
-    throw new Error("OWNER_ROLE_REQUIRED");
-  }
   return {
     userId: authData.user.id,
     organizationId: String(memberships[0].organization_id),
@@ -272,6 +269,37 @@ async function enforceRateLimit(context: UserContext, method: string) {
   });
   if (error) throw new Error("RATE_LIMIT_UNAVAILABLE");
   if (asRecord(data).allowed !== true) throw new Error("RATE_LIMITED");
+}
+
+async function hasSurfacePermission(
+  context: UserContext,
+  permissionKey: string,
+) {
+  const { data, error } = await context.client.rpc("pandora_authorize_surface", {
+    p_organization_id: context.organizationId,
+    p_permission_key: permissionKey,
+  });
+  if (error) throw new Error("AUTHORIZATION_UNAVAILABLE");
+  return data === true;
+}
+
+async function requireSurfacePermission(
+  context: UserContext,
+  permissionKey: string,
+) {
+  if (!await hasSurfacePermission(context, permissionKey)) {
+    throw new Error("PERMISSION_REQUIRED");
+  }
+}
+
+async function anySurfacePermission(
+  context: UserContext,
+  permissionKeys: string[],
+) {
+  for (const permissionKey of permissionKeys) {
+    if (await hasSurfacePermission(context, permissionKey)) return true;
+  }
+  return false;
 }
 
 function projectSummary(value: unknown) {
@@ -517,6 +545,18 @@ function approvalSummary(value: unknown, riskCode = "") {
 }
 
 async function home(context: UserContext) {
+  const [canProjects, canApprovals, canActivity, canConnections, canSafety] =
+    await Promise.all([
+      anySurfacePermission(context, ["projects.view", "intelligence.view"]),
+      hasSurfacePermission(context, "approvals.view"),
+      hasSurfacePermission(context, "activity.view"),
+      hasSurfacePermission(context, "connections.view"),
+      hasSurfacePermission(context, "safety.view"),
+    ]);
+  const fallbackSafety = {
+    state: "not_checked",
+    plainStatus: "Not available for this access profile",
+  };
   const [
     projectItems,
     approvalItems,
@@ -524,19 +564,18 @@ async function home(context: UserContext) {
     connectionItems,
     safetyItem,
   ] = await Promise.all([
-    loadProjectSummaries(context),
-    approvals(context, 10),
-    activity(context, 5),
-    connections(context),
-    safety(context),
+    canProjects ? loadProjectSummaries(context) : Promise.resolve([]),
+    canApprovals ? approvals(context, 10) : Promise.resolve([]),
+    canActivity ? activity(context, 5) : Promise.resolve([]),
+    canConnections ? connections(context) : Promise.resolve([]),
+    canSafety ? safety(context) : Promise.resolve(fallbackSafety),
   ]);
   const blocked = projectItems.filter((item) =>
     item.plainStatus.toLowerCase() === "blocked"
   ).length;
-  const connectionProblems =
-    connectionItems.filter((item) =>
-      item.state === "problem" || item.state === "needs_permission"
-    ).length;
+  const connectionProblems = connectionItems.filter((item) =>
+    item.state === "problem" || item.state === "needs_permission"
+  ).length;
   const needsAttention = blocked + connectionProblems;
   const notChecked =
     projectItems.some((item) => item.dataFreshness !== "fresh") ||
@@ -596,34 +635,23 @@ async function project(context: UserContext, identifier: string) {
     "organization_id",
     context.organizationId,
   );
-  query = uuid
-    ? query.eq("id", identifier)
-    : query.eq("project_key", identifier);
+  query = uuid ? query.eq("id", identifier) : query.eq("project_key", identifier);
   const { data: projectRow, error } = await query.maybeSingle();
   if (error) throw new Error("BACKEND_READ_FAILED");
   if (!projectRow) throw new Error("PROJECT_NOT_FOUND");
   const [phases, tasks, evidence, projection] = await Promise.all([
     context.client.from("projectos_phases").select(
       "id, phase_key, name, sequence, status, exit_criteria, started_at, completed_at",
-    )
-      .eq("organization_id", context.organizationId).eq(
-        "project_id",
-        projectRow.id,
-      ).order("sequence"),
+    ).eq("organization_id", context.organizationId).eq("project_id", projectRow.id)
+      .order("sequence"),
     context.client.from("projectos_tasks").select(
       "id, task_key, title, description, sequence, priority, status, risk_class, completion_criteria, current_head_sha, result_summary, updated_at",
-    )
-      .eq("organization_id", context.organizationId).eq(
-        "project_id",
-        projectRow.id,
-      ).order("sequence"),
+    ).eq("organization_id", context.organizationId).eq("project_id", projectRow.id)
+      .order("sequence"),
     context.client.from("projectos_evidence").select(
       "id, task_id, evidence_type, provider, external_id, status, verdict, source_url, head_sha, payload_redacted, observed_at",
-    )
-      .eq("organization_id", context.organizationId).eq(
-        "project_id",
-        projectRow.id,
-      ).is("invalidated_at", null).order("observed_at", { ascending: false })
+    ).eq("organization_id", context.organizationId).eq("project_id", projectRow.id)
+      .is("invalidated_at", null).order("observed_at", { ascending: false })
       .limit(50),
     context.client.from("projectos_projections")
       .select("projection, computed_at, stale_after")
@@ -659,14 +687,12 @@ async function connections(
   context: UserContext,
 ): Promise<ReturnType<typeof connectionSummary>[]> {
   const [connectionsResult, healthResult] = await Promise.all([
-    context.client.from("connector_installations")
-      .select(
-        "id, provider, display_name, status, scopes, last_health_check_at, updated_at",
-      )
-      .eq("organization_id", context.organizationId).order("provider"),
-    context.client.from("projectos_integration_health")
-      .select("provider, status, last_success_at, stale_after, updated_at")
-      .eq("organization_id", context.organizationId),
+    context.client.from("connector_installations").select(
+      "id, provider, display_name, status, scopes, last_health_check_at, updated_at",
+    ).eq("organization_id", context.organizationId).order("provider"),
+    context.client.from("projectos_integration_health").select(
+      "provider, status, last_success_at, stale_after, updated_at",
+    ).eq("organization_id", context.organizationId),
   ]);
   if (connectionsResult.error || healthResult.error) {
     throw new Error("BACKEND_READ_FAILED");
@@ -685,10 +711,7 @@ async function connectionAction(
 ) {
   type GovernedConnectionAction = Exclude<OwnerConnectionAction, "view">;
   const allowedActions = new Set<GovernedConnectionAction>([
-    "connect",
-    "reconnect",
-    "test",
-    "disconnect",
+    "connect", "reconnect", "test", "disconnect",
   ]);
   if (!allowedActions.has(requestedAction as GovernedConnectionAction)) {
     throw new Error("CONNECTION_ACTION_NOT_FOUND");
@@ -743,10 +766,8 @@ async function approvals(context: UserContext, limit: number) {
   let risks = new Map<string, string>();
   if (stepIds.length) {
     const { data: steps, error: stepsError } = await context.client
-      .from("workflow_steps")
-      .select("id, risk")
-      .eq("organization_id", context.organizationId)
-      .in("id", stepIds);
+      .from("workflow_steps").select("id, risk")
+      .eq("organization_id", context.organizationId).in("id", stepIds);
     if (stepsError) throw new Error("BACKEND_READ_FAILED");
     risks = new Map(
       ((steps || []) as JsonRecord[]).map((step) => [
@@ -757,8 +778,7 @@ async function approvals(context: UserContext, limit: number) {
   }
   return rows.filter((row) => {
     const risk = risks.get(textValue(row.step_id));
-    return !(["R3", "R4"].includes(risk || "") &&
-      row.requested_by === context.userId);
+    return !(["R3", "R4"].includes(risk || "") && row.requested_by === context.userId);
   }).map((row) => approvalSummary(row, risks.get(textValue(row.step_id))));
 }
 
@@ -788,10 +808,7 @@ async function activity(context: UserContext, limit: number) {
   }));
 }
 
-async function resolveMemoryProject(
-  context: UserContext,
-  identifier: string,
-) {
+async function resolveMemoryProject(context: UserContext, identifier: string) {
   if (!identifier) return null;
   const uuid =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -819,27 +836,19 @@ async function memory(
   let decisionsQuery = context.client.from("projectos_decisions")
     .select("id, project_id, statement, rationale, confidence, created_at")
     .eq("organization_id", context.organizationId)
-    .order("created_at", { ascending: false })
-    .limit(50);
+    .order("created_at", { ascending: false }).limit(50);
   let tasksQuery = context.client.from("projectos_tasks")
     .select("id, project_id, title, description, status, updated_at")
     .eq("organization_id", context.organizationId)
-    .order("updated_at", { ascending: false })
-    .limit(50);
+    .order("updated_at", { ascending: false }).limit(50);
   let lessonsQuery = context.client.from("projectos_lessons")
     .select("id, project_id, category, lesson, status, confidence, updated_at")
-    .eq("organization_id", context.organizationId)
-    .eq("status", "active")
-    .order("updated_at", { ascending: false })
-    .limit(50);
+    .eq("organization_id", context.organizationId).eq("status", "active")
+    .order("updated_at", { ascending: false }).limit(50);
   let evidenceQuery = context.client.from("projectos_evidence")
-    .select(
-      "id, project_id, evidence_type, provider, status, verdict, observed_at",
-    )
-    .eq("organization_id", context.organizationId)
-    .is("invalidated_at", null)
-    .order("observed_at", { ascending: false })
-    .limit(50);
+    .select("id, project_id, evidence_type, provider, status, verdict, observed_at")
+    .eq("organization_id", context.organizationId).is("invalidated_at", null)
+    .order("observed_at", { ascending: false }).limit(50);
   if (projectId) {
     decisionsQuery = decisionsQuery.eq("project_id", projectId);
     tasksQuery = tasksQuery.eq("project_id", projectId);
@@ -847,10 +856,7 @@ async function memory(
     evidenceQuery = evidenceQuery.eq("project_id", projectId);
   }
   const [decisions, tasks, lessons, evidence] = await Promise.all([
-    decisionsQuery,
-    tasksQuery,
-    lessonsQuery,
-    evidenceQuery,
+    decisionsQuery, tasksQuery, lessonsQuery, evidenceQuery,
   ]);
   if (decisions.error || tasks.error || lessons.error || evidence.error) {
     throw new Error("BACKEND_READ_FAILED");
@@ -863,9 +869,7 @@ async function memory(
       kind: "Decision",
       title: textValue(item.statement, "Recorded decision"),
       summary: textValue(item.rationale, "No reason was recorded."),
-      plainStatus: Number(item.confidence) >= 0.8
-        ? "High-confidence record"
-        : "Recorded",
+      plainStatus: Number(item.confidence) >= 0.8 ? "High-confidence record" : "Recorded",
       happenedAt: item.created_at ?? null,
     })),
     ...((tasks.data || []) as JsonRecord[]).map((item) => ({
@@ -874,42 +878,27 @@ async function memory(
       kind: "Work",
       title: textValue(item.title, "Project work"),
       summary: textValue(item.description, "No summary was recorded."),
-      plainStatus: textValue(item.status, "Not checked yet").replace(
-        /[._-]+/g,
-        " ",
-      ),
+      plainStatus: textValue(item.status, "Not checked yet").replace(/[._-]+/g, " "),
       happenedAt: item.updated_at ?? null,
     })),
     ...((lessons.data || []) as JsonRecord[]).map((item) => ({
       id: textValue(item.id),
       projectId: textValue(item.project_id) || null,
       kind: "Lesson",
-      title: textValue(item.category, "What Pandora learned").replace(
-        /[._-]+/g,
-        " ",
-      ),
+      title: textValue(item.category, "What Pandora learned").replace(/[._-]+/g, " "),
       summary: textValue(item.lesson, "No summary was recorded."),
-      plainStatus: Number(item.confidence) >= 0.8
-        ? "High-confidence record"
-        : "Recorded",
+      plainStatus: Number(item.confidence) >= 0.8 ? "High-confidence record" : "Recorded",
       happenedAt: item.updated_at ?? null,
     })),
     ...((evidence.data || []) as JsonRecord[]).map((item) => ({
       id: textValue(item.id),
       projectId: textValue(item.project_id) || null,
       kind: "Proof",
-      title: textValue(item.evidence_type, "Project proof").replace(
-        /[._-]+/g,
-        " ",
-      ),
+      title: textValue(item.evidence_type, "Project proof").replace(/[._-]+/g, " "),
       summary: `${textValue(item.provider, "Recorded service")}: ${
-        textValue(item.verdict, textValue(item.status, "not checked yet"))
-          .replace(/[._-]+/g, " ")
+        textValue(item.verdict, textValue(item.status, "not checked yet")).replace(/[._-]+/g, " ")
       }`,
-      plainStatus: textValue(item.status, "Not checked yet").replace(
-        /[._-]+/g,
-        " ",
-      ),
+      plainStatus: textValue(item.status, "Not checked yet").replace(/[._-]+/g, " "),
       happenedAt: item.observed_at ?? null,
     })),
   ];
@@ -922,8 +911,7 @@ async function memory(
     )
     : items;
   filtered.sort((left, right) =>
-    Date.parse(String(right.happenedAt || "")) -
-    Date.parse(String(left.happenedAt || ""))
+    Date.parse(String(right.happenedAt || "")) - Date.parse(String(left.happenedAt || ""))
   );
   return {
     query: queryText,
@@ -940,13 +928,11 @@ async function safety(context: UserContext) {
   });
   const [policy, health, audit] = await Promise.all([
     context.client.from("projectos_policies").select("*").eq(
-      "organization_id",
-      context.organizationId,
+      "organization_id", context.organizationId,
     ).maybeSingle(),
     context.client.from("projectos_integration_health").select(
       "project_id, provider, status, last_event_at, last_success_at, stale_after, details, updated_at",
-    )
-      .eq("organization_id", context.organizationId).order("provider"),
+    ).eq("organization_id", context.organizationId).order("provider"),
     admin.rpc("verify_execution_audit_chain", {
       p_organization_id: context.organizationId,
     }),
@@ -958,12 +944,9 @@ async function safety(context: UserContext) {
   const healthRows = (health.data || []) as JsonRecord[];
   const auditIntegrity = asRecord(audit.data);
   const policyRecord = asRecord(policy.data);
-  const hasProblem = auditIntegrity.valid !== true ||
-    healthRows.some((item) =>
-      ["error", "failed", "degraded"].includes(
-        textValue(item.status).toLowerCase(),
-      )
-    );
+  const hasProblem = auditIntegrity.valid !== true || healthRows.some((item) =>
+    ["error", "failed", "degraded"].includes(textValue(item.status).toLowerCase())
+  );
   const allFresh = healthRows.length > 0 && healthRows.every((item) => {
     const staleAfter = textValue(item.stale_after);
     const lastSuccessAt = textValue(item.last_success_at);
@@ -983,8 +966,7 @@ async function safety(context: UserContext) {
     policy: policy.data,
     integrations: healthRows.map((item) => ({
       ...item,
-      freshness: textValue(item.stale_after) &&
-          Date.parse(textValue(item.stale_after)) > now
+      freshness: textValue(item.stale_after) && Date.parse(textValue(item.stale_after)) > now
         ? "fresh"
         : "not_checked",
     })),
@@ -1015,22 +997,16 @@ async function acceptIntake(
     const uuid =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
         .test(requestedProject);
-    let query = context.client.from("projectos_projects")
-      .select("project_key")
+    let query = context.client.from("projectos_projects").select("project_key")
       .eq("organization_id", context.organizationId);
-    query = uuid
-      ? query.eq("id", requestedProject)
-      : query.eq("project_key", requestedProject);
+    query = uuid ? query.eq("id", requestedProject) : query.eq("project_key", requestedProject);
     const { data: projectRow, error: projectError } = await query.maybeSingle();
     if (projectError) throw new Error("BACKEND_READ_FAILED");
     if (!projectRow) throw new Error("PROJECT_NOT_FOUND");
     projectKey = textValue(projectRow.project_key) || null;
   }
   const providedKey = textValue(idempotencyKey);
-  if (
-    providedKey &&
-    (providedKey.length > 200 || !/^[A-Za-z0-9._:-]+$/.test(providedKey))
-  ) {
+  if (providedKey && (providedKey.length > 200 || !/^[A-Za-z0-9._:-]+$/.test(providedKey))) {
     throw new Error("INVALID_IDEMPOTENCY_KEY");
   }
   const automaticFingerprint = await sha256Hex(
@@ -1045,6 +1021,9 @@ async function acceptIntake(
   const idempotency = await sha256Hex(
     `${context.organizationId}:${context.userId}:${actionKey}`,
   );
+  const requestType = operationName.startsWith("connection:")
+    ? "control_change"
+    : "work";
   const { data, error } = await context.client.rpc("projectos_accept_intake", {
     p_organization_id: context.organizationId,
     p_requester_id: context.userId,
@@ -1052,17 +1031,20 @@ async function acceptIntake(
     p_project_key: projectKey,
     p_project_name: null,
     p_repository: null,
-    p_request_type: "work",
+    p_request_type: requestType,
     p_source: "flutterflow_owner_app",
     p_idempotency_key: idempotency,
   });
-  if (error) throw new Error("INTAKE_FAILED");
+  if (error) {
+    const errorMessage = String(error.message || "").toLowerCase();
+    if (errorMessage.includes("permission")) throw new Error("PERMISSION_REQUIRED");
+    throw new Error("INTAKE_FAILED");
+  }
   const result = asRecord(data);
   const intake = asRecord(result.intake);
   const acceptedProject = asRecord(result.project);
   return {
-    reply:
-      "I saved that request and sent it into Pandora's governed planning flow.",
+    reply: "I saved that request and sent it into Pandora's governed planning flow.",
     needsApproval: false,
     actionId: textValue(intake.id) || null,
     approvalId: null,
@@ -1070,8 +1052,7 @@ async function acceptIntake(
       whatChanged: "Your request was recorded.",
       whereWeAre: "Pandora is preparing a safe plan.",
       whatIsDone: "The request is in the project record.",
-      whatIsHappeningNow:
-        "Current state and required approvals will be checked next.",
+      whatIsHappeningNow: "Current state and required approvals will be checked next.",
       whatIsStoppingUs: null,
       whatIWillDoNext: "Show you the plan before any protected change runs.",
     },
@@ -1079,9 +1060,7 @@ async function acceptIntake(
       intakeId: intake.id ?? null,
       projectKey: acceptedProject.project_key ?? null,
       idempotencyKey: idempotency,
-      duplicateProtection: providedKey
-        ? "client_key"
-        : "ten_minute_retry_window",
+      duplicateProtection: providedKey ? "client_key" : "ten_minute_retry_window",
     },
   };
 }
@@ -1131,11 +1110,7 @@ Deno.serve(async (req: Request) => {
     failure(status, code, plainMessage, requestId, corsOrigin);
 
   if (requestOrigin && !corsOrigin) {
-    return reject(
-      403,
-      "ORIGIN_NOT_ALLOWED",
-      "That app is not allowed to use this service.",
-    );
+    return reject(403, "ORIGIN_NOT_ALLOWED", "That app is not allowed to use this service.");
   }
   if (req.method === "OPTIONS") return send(null, 204);
   if (req.method !== "GET" && req.method !== "POST") {
@@ -1152,142 +1127,124 @@ Deno.serve(async (req: Request) => {
       return send(await home(context));
     }
     if (req.method === "GET" && route === "/projects") {
+      if (!await anySurfacePermission(context, ["projects.view", "intelligence.view"])) {
+        throw new Error("PERMISSION_REQUIRED");
+      }
       return send(await projects(context));
     }
     if (req.method === "GET" && /^\/projects\/[^/]+$/.test(route)) {
-      return send(
-        await project(context, decodeURIComponent(route.split("/")[2])),
-      );
+      await requireSurfacePermission(context, "projects.view");
+      return send(await project(context, decodeURIComponent(route.split("/")[2])));
     }
     if (req.method === "GET" && route === "/connections") {
+      await requireSurfacePermission(context, "connections.view");
       return send(await connections(context));
     }
     if (req.method === "GET" && route === "/memory") {
-      return send(
-        await memory(
-          context,
-          "",
-          textValue(url.searchParams.get("projectId")),
-          intValue(url.searchParams.get("limit"), 20, 50),
-        ),
-      );
+      await requireSurfacePermission(context, "memory.view");
+      return send(await memory(
+        context,
+        "",
+        textValue(url.searchParams.get("projectId")),
+        intValue(url.searchParams.get("limit"), 20, 50),
+      ));
     }
     if (req.method === "GET" && route === "/approvals") {
-      return send(
-        await approvals(
-          context,
-          intValue(url.searchParams.get("limit"), 50, 100),
-        ),
-      );
+      await requireSurfacePermission(context, "approvals.view");
+      return send(await approvals(
+        context,
+        intValue(url.searchParams.get("limit"), 50, 100),
+      ));
     }
     if (req.method === "GET" && route === "/activity") {
-      return send(
-        await activity(
-          context,
-          intValue(url.searchParams.get("limit"), 50, 100),
-        ),
-      );
+      await requireSurfacePermission(context, "activity.view");
+      return send(await activity(
+        context,
+        intValue(url.searchParams.get("limit"), 50, 100),
+      ));
     }
     if (req.method === "GET" && route === "/safety") {
+      await requireSurfacePermission(context, "safety.view");
       return send(await safety(context));
     }
     if (req.method === "GET" && route === "/actions") {
-      return send(
-        Object.entries(ACTION_CATALOG).map(([id, action]) => ({
-          id,
-          ...action,
-          extraIdentityCheckRequired: action.risk === "CRITICAL" ||
-            id === "pause-service" || id === "apply-approved-code-change",
-          executionMode: "plan_first",
-        })),
-      );
+      await requireSurfacePermission(context, "autopilot.view");
+      return send(Object.entries(ACTION_CATALOG).map(([id, action]) => ({
+        id,
+        ...action,
+        extraIdentityCheckRequired: action.risk === "CRITICAL" ||
+          id === "pause-service" || id === "apply-approved-code-change",
+        executionMode: "plan_first",
+      })));
     }
     if (req.method === "POST" && route === "/ask") {
-      return send(
-        await acceptIntake(
-          context,
-          await bodyJson(req),
-          undefined,
-          req.headers.get("idempotency-key"),
-          "ask",
-        ),
-        202,
-      );
+      await requireSurfacePermission(context, "autopilot.run");
+      return send(await acceptIntake(
+        context,
+        await bodyJson(req),
+        undefined,
+        req.headers.get("idempotency-key"),
+        "ask",
+      ), 202);
     }
     if (req.method === "POST" && route === "/memory/search") {
+      await requireSurfacePermission(context, "memory.view");
       const body = await bodyJson(req);
-      return send(
-        await memory(
-          context,
-          textValue(body.query),
-          textValue(body.projectId ?? body.projectKey),
-          20,
-        ),
-      );
+      return send(await memory(
+        context,
+        textValue(body.query),
+        textValue(body.projectId ?? body.projectKey),
+        20,
+      ));
     }
     if (
       req.method === "POST" &&
       /^\/connections\/[^/]+\/actions\/[^/]+$/.test(route)
     ) {
+      await requireSurfacePermission(context, "connections.manage");
       const segments = route.split("/");
-      return send(
-        await connectionAction(
-          context,
-          decodeURIComponent(segments[2]),
-          decodeURIComponent(segments[4]),
-          req.headers.get("idempotency-key"),
-        ),
-        202,
-      );
+      return send(await connectionAction(
+        context,
+        decodeURIComponent(segments[2]),
+        decodeURIComponent(segments[4]),
+        req.headers.get("idempotency-key"),
+      ), 202);
     }
     if (req.method === "POST" && /^\/actions\/[^/]+\/run$/.test(route)) {
+      await requireSurfacePermission(context, "autopilot.run");
       const actionId = decodeURIComponent(route.split("/")[2]);
       const action = ACTION_CATALOG[actionId as keyof typeof ACTION_CATALOG];
       if (!action) throw new Error("ACTION_NOT_FOUND");
       if (
         (action.risk === "CRITICAL" || actionId === "pause-service" ||
           actionId === "apply-approved-code-change") && context.aal !== "aal2"
-      ) {
-        throw new Error("AAL2_REQUIRED");
-      }
+      ) throw new Error("AAL2_REQUIRED");
       const body = await bodyJson(req);
       const projectId = textValue(body.projectId ?? body.projectKey) || null;
       const ownerOutcome = textValue(body.message);
-      return send(
-        await acceptIntake(
-          context,
-          {
-            ...body,
-            projectId,
-            message: `${action.request}${
-              projectId ? ` Project: ${projectId}.` : ""
-            }${
-              ownerOutcome
-                ? ` The owner described this outcome: ${ownerOutcome}`
-                : ""
-            }`,
-          },
-          undefined,
-          req.headers.get("idempotency-key"),
-          `action:${actionId}`,
-        ),
-        202,
-      );
+      return send(await acceptIntake(
+        context,
+        {
+          ...body,
+          projectId,
+          message: `${action.request}${projectId ? ` Project: ${projectId}.` : ""}${
+            ownerOutcome ? ` The owner described this outcome: ${ownerOutcome}` : ""
+          }`,
+        },
+        undefined,
+        req.headers.get("idempotency-key"),
+        `action:${actionId}`,
+      ), 202);
     }
     if (req.method === "POST" && /^\/approvals\/[^/]+\/decide$/.test(route)) {
-      return send(
-        await decide(
-          context,
-          decodeURIComponent(route.split("/")[2]),
-          await bodyJson(req),
-        ),
-      );
+      await requireSurfacePermission(context, "approvals.decide");
+      return send(await decide(
+        context,
+        decodeURIComponent(route.split("/")[2]),
+        await bodyJson(req),
+      ));
     }
-    return reject(
-      404,
-      "OWNER_ROUTE_NOT_FOUND",
-      "That Pandora page is not available yet.",
-    );
+    return reject(404, "OWNER_ROUTE_NOT_FOUND", "That Pandora page is not available yet.");
   } catch (error) {
     const code = error instanceof Error ? error.message : "OWNER_API_ERROR";
     if (code === "SIGN_IN_REQUIRED") {
@@ -1298,6 +1255,7 @@ Deno.serve(async (req: Request) => {
         "ORGANIZATION_ACCESS_REQUIRED",
         "PERMANENT_ACCOUNT_REQUIRED",
         "OWNER_ROLE_REQUIRED",
+        "PERMISSION_REQUIRED",
         "APPROVAL_FORBIDDEN",
       ].includes(code)
     ) {
@@ -1307,11 +1265,7 @@ Deno.serve(async (req: Request) => {
       return reject(409, code, "Choose which organization you want to use.");
     }
     if (code === "AAL2_REQUIRED") {
-      return reject(
-        403,
-        code,
-        "Please complete the extra identity check before continuing.",
-      );
+      return reject(403, code, "Please complete the extra identity check before continuing.");
     }
     if (code === "RATE_LIMITED") {
       return reject(429, code, "Please wait a moment before trying again.");
@@ -1324,8 +1278,7 @@ Deno.serve(async (req: Request) => {
         "INVALID_IDEMPOTENCY_KEY",
         "INVALID_QUERY",
         "BODY_TOO_LARGE",
-      ]
-        .includes(code)
+      ].includes(code)
     ) {
       return reject(400, code, "Please check that information and try again.");
     }
@@ -1344,17 +1297,9 @@ Deno.serve(async (req: Request) => {
       return reject(409, code, "That approval is no longer available.");
     }
     if (code === "CONNECTION_ACTION_NOT_AVAILABLE") {
-      return reject(
-        409,
-        code,
-        "That connection action is not available in its current state.",
-      );
+      return reject(409, code, "That connection action is not available in its current state.");
     }
     console.error(JSON.stringify({ requestId, code }));
-    return reject(
-      503,
-      "PANDORA_UNAVAILABLE",
-      "Pandora cannot reach that service right now.",
-    );
+    return reject(503, "PANDORA_UNAVAILABLE", "Pandora cannot reach that service right now.");
   }
 });
