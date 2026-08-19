@@ -1,0 +1,90 @@
+name: Pandora mobile foundation baseline refresh once
+
+on:
+  push:
+    branches:
+      - integration/pandora-mobile-p1-current-main-20260819
+    paths:
+      - '.github/pandora-mobile-foundation-baseline-refresh-trigger'
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: pandora-mobile-foundation-baseline-refresh-once
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: commit reviewed transparent-mark baselines
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out exact trigger head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Verify source lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git merge-base --is-ancestor 5535294ceb05cad4801636f199f82e3c9bc42bc1 HEAD
+
+      - name: Download reviewed exact-head golden evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf .foundation-golden-evidence
+          mkdir .foundation-golden-evidence
+          gh run download 32200380628 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name pandora-mobile-golden-failures \
+            --dir .foundation-golden-evidence
+
+      - name: Verify and install only reviewed foundation baselines
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dir=.foundation-golden-evidence/goldens/failures
+          target_dir=apps/pandora-mobile/test/goldens/baselines
+          test -f "$source_dir/foundation_graphite_360x800_testImage.png"
+          test -f "$source_dir/foundation_porcelain_2x_text_testImage.png"
+          test -f "$source_dir/foundation_porcelain_320x800_testImage.png"
+          test -f "$source_dir/foundation_porcelain_360x800_testImage.png"
+          printf '%s  %s\n' \
+            '61f5b5a2bfaaee1564c9fe36aff462c8012a5dd4f4edc74f40167c2e614bf540' "$source_dir/foundation_graphite_360x800_testImage.png" \
+            'd51e87c4855c31785ee779e0aea96829d00216b8a2e669d307a0842c7f1dda37' "$source_dir/foundation_porcelain_2x_text_testImage.png" \
+            'e89c56d1f51cfd849acf24df0b64dedd52273c84aca3a4f3ad2329d71db0bc88' "$source_dir/foundation_porcelain_320x800_testImage.png" \
+            '2b051e43827c9b49b7f7963175acd99efeef592ce8cb8b5289dc199a139d8a17' "$source_dir/foundation_porcelain_360x800_testImage.png" \
+            | sha256sum --check --strict
+          cp "$source_dir/foundation_graphite_360x800_testImage.png" "$target_dir/foundation_graphite_360x800.png"
+          cp "$source_dir/foundation_porcelain_2x_text_testImage.png" "$target_dir/foundation_porcelain_2x_text.png"
+          cp "$source_dir/foundation_porcelain_320x800_testImage.png" "$target_dir/foundation_porcelain_320x800.png"
+          cp "$source_dir/foundation_porcelain_360x800_testImage.png" "$target_dir/foundation_porcelain_360x800.png"
+          rm -rf .foundation-golden-evidence
+          rm .github/pandora-mobile-foundation-baseline-refresh-trigger
+          rm .github/workflows/pandora-mobile-foundation-baseline-refresh-once.yml
+
+      - name: Commit exact reviewed baselines and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Pandora Mobile Worker 5'
+          git config user.email 'lawbatalla@gmail.com'
+          git add \
+            apps/pandora-mobile/test/goldens/baselines/foundation_graphite_360x800.png \
+            apps/pandora-mobile/test/goldens/baselines/foundation_porcelain_2x_text.png \
+            apps/pandora-mobile/test/goldens/baselines/foundation_porcelain_320x800.png \
+            apps/pandora-mobile/test/goldens/baselines/foundation_porcelain_360x800.png \
+            .github/pandora-mobile-foundation-baseline-refresh-trigger \
+            .github/workflows/pandora-mobile-foundation-baseline-refresh-once.yml
+          test "$(git diff --cached --name-only | wc -l)" -eq 6
+          git commit -m 'test(mobile): accept reviewed transparent-mark goldens'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
