@@ -131,7 +131,9 @@ jobs:
           rm -rf "$APP_DIR/.dart_tool" "$APP_DIR/build"
           git restore -- "$APP_DIR/analysis_options.yaml"
           git diff --check
-          mapfile -t changed < <(git status --short | sed -E 's/^.. //' | sort)
+          mapfile -t changed < <(
+            git status --short --untracked-files=all | sed -E 's/^.. //' | sort
+          )
           allowed_prefix="$BASELINE_DIR/"
           for path in "${changed[@]}"; do
             if [[ "$path" == "$MANIFEST_PATH" || "$path" == "$WORKFLOW_PATH" || "$path" == "$allowed_prefix"* ]]; then
