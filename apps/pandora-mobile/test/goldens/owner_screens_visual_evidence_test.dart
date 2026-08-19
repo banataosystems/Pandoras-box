@@ -208,59 +208,83 @@ Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
     failing: visual.failing,
     pending: visual.pending,
   );
-  await tester.pumpWidget(
-    PandoraDependencies(
-      auth: const FakeAuth(),
-      repository: repository,
-      diagnostics: DiagnosticsStore(),
-      child: testApp(
-        themeMode: visual.themeMode,
-        textScaler: visual.textScaler,
-        child: RepaintBoundary(key: _surfaceKey, child: visual.build()),
+  Object? frameworkException;
+  File? output;
+  try {
+    await tester.pumpWidget(
+      PandoraDependencies(
+        auth: const FakeAuth(),
+        repository: repository,
+        diagnostics: DiagnosticsStore(),
+        child: testApp(
+          themeMode: visual.themeMode,
+          textScaler: visual.textScaler,
+          child: RepaintBoundary(key: _surfaceKey, child: visual.build()),
+        ),
       ),
-    ),
-  );
+    );
 
-  // Keep image decoding, repository microtasks, and visual state changes inside
-  // the widget-test clock. Every case receives the same finite frame budget, so
-  // no screenshot can conceal later CI stages behind an unbounded settle or
-  // an out-of-clock async image-cache wait.
-  for (final frame in _renderFrames) {
-    await tester.pump(frame);
+    // Keep repository microtasks and visual state changes inside the finite
+    // widget-test clock. No case can hide later CI stages behind an unbounded
+    // settle.
+    for (final frame in _renderFrames) {
+      await tester.pump(frame);
+    }
+    frameworkException = tester.takeException();
+
+    final boundary = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(_surfaceKey),
+    );
+    // Raster readback is real asynchronous engine work rather than a fake-clock
+    // animation. Isolate only that bounded operation with runAsync; asset
+    // precaching and state progression remain in the widget-test clock.
+    final pngBytes = await tester.runAsync(() async {
+      final image = await boundary.toImage();
+      try {
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        return bytes?.buffer.asUint8List(
+          bytes.offsetInBytes,
+          bytes.lengthInBytes,
+        );
+      } finally {
+        image.dispose();
+      }
+    });
+    expect(pngBytes, isNotNull);
+
+    output = File('build/owner-screen-evidence/${visual.name}.png');
+    output.parent.createSync(recursive: true);
+    output.writeAsBytesSync(pngBytes!);
+    expect(output.lengthSync(), greaterThan(0));
+
+    final baseline = File('test/goldens/owner_screens/${visual.name}.png');
+    if (baseline.existsSync()) {
+      await expectLater(
+        find.byKey(_surfaceKey),
+        matchesGoldenFile(baseline.path),
+      );
+    }
+  } finally {
+    repository.completePendingHome();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
   }
 
+  if (frameworkException != null) {
+    if (output != null && output.existsSync()) {
+      final failure = File('test/failures/owner_screens/${visual.name}.png');
+      failure.parent.createSync(recursive: true);
+      output.copySync(failure.path);
+    }
+    if (frameworkException is FlutterError) {
+      debugPrint(frameworkException.toStringDeep());
+    }
+  }
   expect(
-    tester.takeException(),
+    frameworkException,
     isNull,
     reason: '${visual.name} raised a framework exception.',
   );
-
-  final boundary = tester.renderObject<RenderRepaintBoundary>(
-    find.byKey(_surfaceKey),
-  );
-  final image = await boundary.toImage();
-  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-  expect(bytes, isNotNull);
-
-  final output = File('build/owner-screen-evidence/${visual.name}.png');
-  output.parent.createSync(recursive: true);
-  output.writeAsBytesSync(
-    bytes!.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
-  );
-  image.dispose();
-  expect(output.lengthSync(), greaterThan(0));
-
-  final baseline = File('test/goldens/owner_screens/${visual.name}.png');
-  if (baseline.existsSync()) {
-    await expectLater(
-      find.byKey(_surfaceKey),
-      matchesGoldenFile(baseline.path),
-    );
-  }
-
-  repository.completePendingHome();
-  await tester.pumpWidget(const SizedBox.shrink());
-  await tester.pump();
 }
 
 void main() {
@@ -340,6 +364,7 @@ void main() {
     testWidgets(
       'captures ${visual.name}',
       (tester) => _captureScreen(tester, visual),
+      timeout: const Timeout(Duration(seconds: 30)),
     );
   }
 }
