@@ -66,6 +66,7 @@ test('active Supabase history preserves the captured 52-file recovery chain and 
   const postCheckpointFiles = [
     '20260820000500_pandora_member_access_control.sql',
     '20260820000600_pandora_approval_permission_compat.sql',
+    '20260820000700_harden_root_permission_delegation.sql',
   ];
   const replayCheckpointFiles = [
     ...capturedFiles,
