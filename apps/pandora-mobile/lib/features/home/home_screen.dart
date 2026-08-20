@@ -175,7 +175,8 @@ class _AskPandoraCard extends StatelessWidget {
             Text(
               'Build Credits: not estimated · Runtime Credits: not estimated until Pandora understands the plan.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
           ],
         ),
@@ -223,13 +224,17 @@ class _HomeContent extends StatelessWidget {
           title: needsDecision
               ? meaningfulPriority?.action ??
                   '${summary.approvalCount} owner decision${summary.approvalCount == 1 ? '' : 's'} waiting'
-              : 'Nothing currently requires your decision',
+              : !summary.countersVerified
+                  ? 'Owner decision state is not verified'
+                  : 'Nothing currently requires your decision',
           message: needsDecision
               ? meaningfulPriority?.reason ??
                   'Pandora has protected work that cannot continue without an owner decision.'
-              : working == null
-                  ? 'No verified execution is running. Pandora will not imply active work without evidence.'
-                  : 'Pandora has verified work in motion and will surface only decisions that require you.',
+              : !summary.countersVerified
+                  ? 'Pandora cannot verify whether an owner decision is waiting. The last usable screen remains visible without claiming zero or no action.'
+                  : working == null
+                      ? 'No verified execution is running. Pandora will not imply active work without evidence.'
+                      : 'Pandora has verified work in motion and will surface only decisions that require you.',
           icon: needsDecision
               ? Icons.priority_high_rounded
               : Icons.auto_awesome_rounded,
@@ -269,11 +274,18 @@ class _HomeContent extends StatelessWidget {
             ),
             OwnerMetric(
               label: 'Working now',
-              value: working == null ? '0' : '1+',
+              value: working != null
+                  ? '1+'
+                  : summary.countersVerified
+                      ? '0'
+                      : '—',
               icon: Icons.play_circle_outline_rounded,
               tone: working == null
                   ? PandoraStatusTone.neutral
                   : PandoraStatusTone.informative,
+              semanticLabel: working == null && !summary.countersVerified
+                  ? 'Working now: not verified'
+                  : null,
             ),
             OwnerMetric(
               label: 'Portfolio attention',
