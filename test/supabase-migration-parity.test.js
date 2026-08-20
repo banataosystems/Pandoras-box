@@ -57,6 +57,21 @@ test('active Supabase history preserves the captured 52-file recovery chain and 
   ].sort();
   const capturedSet = new Set(capturedFiles);
   const appendedFiles = files.filter((filename) => !capturedSet.has(filename));
+  const replayCheckpointAppendedFiles = [
+    '20260817130000_projectos_memory_full_capacity_context_gate.sql',
+    '20260817145550_add_vercel_control_adapter.sql',
+    '20260817145659_add_vercel_git_binding_clear.sql',
+    '20260817145929_add_vercel_async_git_link_queue.sql',
+  ];
+  const postCheckpointFiles = [
+    '20260820000500_pandora_member_access_control.sql',
+    '20260820000600_pandora_approval_permission_compat.sql',
+    '20260820000700_harden_root_permission_delegation.sql',
+  ];
+  const replayCheckpointFiles = [
+    ...capturedFiles,
+    ...replayCheckpointAppendedFiles,
+  ].sort();
 
   assert.equal(manifest.invariants.historical_identity_count, 50);
   assert.equal(manifest.invariants.active_file_count, 52);
@@ -70,15 +85,16 @@ test('active Supabase history preserves the captured 52-file recovery chain and 
   assert.equal(new Set(capturedFiles).size, manifest.invariants.active_file_count);
   assert.ok(capturedFiles.every((filename) => files.includes(filename)));
   assert.deepEqual(appendedFiles, [
-    '20260817130000_projectos_memory_full_capacity_context_gate.sql',
-    '20260817145550_add_vercel_control_adapter.sql',
-    '20260817145659_add_vercel_git_binding_clear.sql',
-    '20260817145929_add_vercel_async_git_link_queue.sql',
+    ...replayCheckpointAppendedFiles,
+    ...postCheckpointFiles,
   ]);
-  assert.equal(files.length, currentReplayResult.migration_count);
   assert.equal(
     currentReplayResult.migration_count,
-    recoveryReplayResult.migration_count + appendedFiles.length,
+    recoveryReplayResult.migration_count + replayCheckpointAppendedFiles.length,
+  );
+  assert.equal(
+    files.length,
+    currentReplayResult.migration_count + postCheckpointFiles.length,
   );
   assert.equal(manifest.live_chain.first, '20260724010000');
   assert.equal(manifest.live_chain.last, '20260813105011');
@@ -122,7 +138,7 @@ test('active Supabase history preserves the captured 52-file recovery chain and 
 
   assert.equal(recoveryReplayResult.migration_count, manifest.invariants.active_file_count);
   assert.equal(chainSha256(capturedFiles), recoveryReplayResult.chain_sha256);
-  assert.equal(chainSha256(files), currentReplayResult.chain_sha256);
+  assert.equal(chainSha256(replayCheckpointFiles), currentReplayResult.chain_sha256);
   assert.equal(currentReplayResult.provider_equivalence, false);
   assert.equal(manifest.validation.authorization_smoke, 'pass');
   assert.deepEqual(currentReplayResult.assertions.authorization_smoke, {

@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/pandora_app.dart';
 import 'core/data/remote_pandora_repository.dart';
+import 'core/data/user_access_repository.dart';
 import 'core/diagnostics/diagnostic_event.dart';
 import 'core/diagnostics/diagnostics_store.dart';
 import 'core/network/pandora_api_client.dart';
@@ -44,19 +45,29 @@ Future<void> main() async {
     ),
   );
 
+  final tokenProvider = SupabaseSessionTokenProvider(supabase);
   final apiClient = PandoraApiClient(
     baseUri: Uri.parse(PandoraConfig.ownerApiBaseUrl),
     organizationId: PandoraConfig.organizationId,
-    sessionTokenProvider: SupabaseSessionTokenProvider(supabase),
+    sessionTokenProvider: tokenProvider,
+    diagnostics: diagnostics,
+  );
+  final userAccessApiClient = PandoraApiClient(
+    baseUri: Uri.parse(PandoraConfig.userAccessApiBaseUrl),
+    organizationId: PandoraConfig.organizationId,
+    sessionTokenProvider: tokenProvider,
     diagnostics: diagnostics,
   );
   final repository = RemotePandoraRepository(client: apiClient);
+  final userAccessRepository =
+      RemoteUserAccessRepository(client: userAccessApiClient);
 
   runApp(
     PandoraApp(
       auth: SupabasePandoraAuth(supabase),
       repository: repository,
       diagnostics: diagnostics,
+      userAccessRepository: userAccessRepository,
     ),
   );
 }

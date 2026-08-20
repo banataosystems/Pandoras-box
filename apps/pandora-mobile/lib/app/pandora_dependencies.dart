@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../core/data/pandora_repository.dart';
+import '../core/data/user_access_repository.dart';
 import '../core/diagnostics/diagnostics_store.dart';
 import '../core/security/pandora_auth.dart';
 
@@ -10,12 +11,14 @@ class PandoraDependencies extends InheritedWidget {
     required this.auth,
     required this.repository,
     required this.diagnostics,
+    this.userAccessRepository,
     required super.child,
   });
 
   final PandoraAuth auth;
   final PandoraRepository repository;
   final DiagnosticsStore diagnostics;
+  final UserAccessRepository? userAccessRepository;
 
   static PandoraDependencies of(BuildContext context) {
     final result =
@@ -28,5 +31,6 @@ class PandoraDependencies extends InheritedWidget {
   bool updateShouldNotify(PandoraDependencies oldWidget) =>
       auth != oldWidget.auth ||
       repository != oldWidget.repository ||
-      diagnostics != oldWidget.diagnostics;
+      diagnostics != oldWidget.diagnostics ||
+      userAccessRepository != oldWidget.userAccessRepository;
 }
