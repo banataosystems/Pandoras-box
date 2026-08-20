@@ -3,11 +3,6 @@
 const express = require("express");
 const { createProjectOsContainerApp } = require("./src/projectos-container-server.js");
 const { handleProjectOsMcp } = require("./src/projectos-mcp-handler.js");
-const {
-  enforceVercelVaultFirstGitHubConfiguration,
-} = require("./src/runtime/vercel-github-credential-policy.js");
-
-enforceVercelVaultFirstGitHubConfiguration();
 
 function createVercelEntrypoint() {
   const app = express();
