@@ -63,9 +63,10 @@ class _ConnectionsScreenState extends State<ConnectionsScreen>
       );
       return;
     }
+    final providerRepository = repository as ProviderConnectionRepository;
     setState(() => _connectingSupabase = true);
     try {
-      final launch = await repository.beginSupabaseOAuth();
+      final launch = await providerRepository.beginSupabaseOAuth();
       final opened = await launchUrl(
         launch.authorizeUri,
         mode: LaunchMode.externalApplication,
