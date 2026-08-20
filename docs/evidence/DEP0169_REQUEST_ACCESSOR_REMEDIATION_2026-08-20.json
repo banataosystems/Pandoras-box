@@ -1,0 +1,129 @@
+{
+  "schema_version": "1.0.0",
+  "evidence_id": "pandora-dep0169-request-accessor-remediation-2026-08-20",
+  "repository": "banataosystems/Pandoras-box",
+  "authoritative_master_memory_record": "86997f11-1df9-488b-bd41-58e9ce5ce215",
+  "phase": "Phase 0 - Recovery and Truth Baseline",
+  "canonical_base": {
+    "branch": "main",
+    "head_sha": "d0b0ec4533410faab4ec59095b5b674c794c1ef7",
+    "tree_sha": "7d24043fe2e176459581c8ce3b02f6e01cfccc32"
+  },
+  "production_baseline": {
+    "deployment_id": "dpl_EJ1ifAHkrvfxhysAGQcu6xNmTi8h",
+    "source_sha": "d0b0ec4533410faab4ec59095b5b674c794c1ef7",
+    "dep0169_reproduced": true,
+    "surface": "POST /mcp",
+    "observed_at": "2026-08-20T06:38:58Z"
+  },
+  "diagnosis": {
+    "diagnostic_source_sha": "ee4646d655a086b52f9e4016fe58877bf651c290",
+    "preview_deployment_id": "dpl_FLjU4F8xwgs1uxwkLDft1Ts4xz62",
+    "warning_code": "DEP0169",
+    "runtime_origin": "/opt/rust/nodejs.js:2:9873",
+    "runtime_getter": "/opt/rust/nodejs.js:2:11886",
+    "pandora_trigger_frame": "src/projectos-mcp-handler.js:69:27",
+    "trigger": "metadataSelector read the Vercel request.query accessor",
+    "npm_dependency_attribution": false,
+    "classification": "Vercel serverless Node bootstrap accessor behavior"
+  },
+  "remediation_contract": {
+    "verified_source_commit": "169c86bb12ca3397c6af64316c780910649f5747",
+    "source_blob": "86a7b53b00349f7e2e3100403f146b0fc2a6f6f9",
+    "test_commit": "f0e902b7654aa8b3bef4d6271ca186ffece5a84f",
+    "test_blob": "7dbe66843d8192d8a2f9d568e908152a9fc7c2fb",
+    "changed_source": "src/projectos-mcp-handler.js",
+    "new_test": "test/projectos-mcp-request-accessor.test.js",
+    "request_query_accessor_removed": true,
+    "direct_request_url_accessor_removed": true,
+    "own_data_property_original_url_preferred": true,
+    "own_data_property_url_fallback": true,
+    "repeated_metadata_values_fail_closed": true,
+    "missing_own_url_data_fails_closed": true,
+    "database_change": false,
+    "dependency_change": false,
+    "secret_change": false
+  },
+  "source_test_evidence": {
+    "verified_source_sha": "169c86bb12ca3397c6af64316c780910649f5747",
+    "workflow_run_id": 32351321850,
+    "workflow_job_id": 96371238612,
+    "build": "passed",
+    "focused_accessor_tests": "passed",
+    "existing_oauth_and_entrypoint_tests": "passed",
+    "complete_repository_test_suite": "passed",
+    "temporary_write_helper_removed": true
+  },
+  "preview_absence_proof": {
+    "trace_source_sha": "0f93274192f1b5a7aa532b7cea3808380b9c4474",
+    "trace_source_parent": "169c86bb12ca3397c6af64316c780910649f5747",
+    "deployment_id": "dpl_GmwjtNSJdSsC6JMtbZLpV5wnxjt3",
+    "environment": "preview",
+    "node_options": "--trace-deprecation",
+    "probes": [
+      {
+        "method": "GET",
+        "path": "/.well-known/oauth-protected-resource",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/.well-known/oauth-protected-resource/mcp",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/mcp",
+        "authentication": "intentionally absent",
+        "status": 401
+      },
+      {
+        "method": "POST",
+        "path": "/api/mcp",
+        "authentication": "intentionally absent",
+        "status": 401
+      },
+      {
+        "method": "GET",
+        "path": "/health",
+        "status": 200
+      }
+    ],
+    "dep0169_log_entries": 0,
+    "provider_mutation": false,
+    "production_mutation": false,
+    "credentials_used": false
+  },
+  "proof_state": {
+    "documented": true,
+    "implemented": true,
+    "source_tested": true,
+    "public_and_unauthenticated_preview_tested": true,
+    "authenticated_owner_preview_tested": false,
+    "independently_reviewed": false,
+    "merged": false,
+    "production_deployed": false,
+    "production_verified": false
+  },
+  "blocked_proof": {
+    "gate": "authenticated owner and ProjectOS/Memory preview journey",
+    "reason": "No approved test identity or access token is present in the authorized Vault inventory. No identity was created and no production authentication state was changed."
+  },
+  "remaining_gates": [
+    "clean reconstructed exact-head workflows pass",
+    "different-vendor independent review approves the exact clean head",
+    "approved owner identity completes the authenticated preview journey",
+    "separate merge authorization",
+    "separate production deployment authorization",
+    "exact production metadata, unauthenticated, authenticated, ProjectOS, and Memory route verification",
+    "production DEP0169 absence proof",
+    "rollback evidence"
+  ],
+  "rollback": {
+    "source": "revert or abandon the clean candidate commit before merge",
+    "database": "not applicable",
+    "dependency": "not applicable",
+    "preview_trace_configuration_included_in_clean_candidate": false,
+    "production_exercised": false
+  }
+}
