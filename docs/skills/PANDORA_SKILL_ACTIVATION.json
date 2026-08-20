@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0.0",
+  "catalog_version": "1.1.0",
+  "note": "Repository presence is never runtime activation. Each stage below is proven separately and must not be collapsed.",
+  "stages": {
+    "sandbox_enabled": {
+      "state": true,
+      "evidence": "test/pandora-skills-runtime.test.js executes discovery, routing, kill switch, and mutation-boundary proofs against the governed runtime."
+    },
+    "canonical_source_enabled": {
+      "state": true,
+      "evidence": ".agents/runtime/pandora-skill-runtime.mjs plus the 51-skill registry are committed on the PR #68 lineage and validated in CI."
+    },
+    "deployed": {
+      "state": false,
+      "evidence": "No deployment binds this catalog to a running Pandora runtime."
+    },
+    "production_authorized": {
+      "state": false,
+      "evidence": "Merge and production activation remain separately owner-authorized."
+    },
+    "production_verified": {
+      "state": false,
+      "evidence": "No production runtime has discovered, routed, and executed a governed skill."
+    }
+  },
+  "kill_switch": {
+    "variable": "PANDORA_SKILLS_ENABLED",
+    "disable_value": "false",
+    "behaviour": "Skill routing and loading raise SkillsDisabledError. No ungoverned fallback path exists.",
+    "rollback": "Setting the variable to false restores pre-activation behaviour without deleting the catalog or any historical evidence."
+  },
+  "mutation_authority": {
+    "grants_mutation": false,
+    "path": "ProjectOS plan -> approval where required -> execute -> provider readback -> evidence -> proof-stage update"
+  }
+}
