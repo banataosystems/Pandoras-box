@@ -148,9 +148,12 @@ async function jsonBody(request) {
 }
 
 function toolResult(value) {
+    const structuredContent = value && typeof value === "object" && !Array.isArray(value)
+        ? value
+        : { result: value };
     return {
         content: [{ type: "text", text: JSON.stringify(value) }],
-        structuredContent: value,
+        structuredContent,
     };
 }
 
