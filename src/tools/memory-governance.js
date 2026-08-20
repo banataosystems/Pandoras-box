@@ -136,13 +136,17 @@ function evaluateCanonicalContext(response, options = {}) {
     if (approved.length === 0) {
         degradedReasons.push('No approved canonical records were returned for this project.');
     }
+    const maxAgeMs = options.maxAgeMs ?? 86_400_000;
     const timestamps = approved
         .map((record) => (record.updatedAt ? Date.parse(record.updatedAt) : Number.NaN))
         .filter((value) => Number.isFinite(value));
     const freshest = timestamps.length > 0 ? Math.max(...timestamps) : null;
-    if (options.maxAgeMs !== undefined && freshest !== null) {
+    if (approved.length > 0 && timestamps.length !== approved.length) {
+        degradedReasons.push('One or more approved canonical records do not have a usable freshness timestamp.');
+    }
+    if (freshest !== null) {
         const now = (options.now ?? Date.now)();
-        if (now - freshest > options.maxAgeMs) {
+        if (now - freshest > maxAgeMs) {
             degradedReasons.push('The most recent approved record is older than the configured freshness window.');
         }
     }
