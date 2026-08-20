@@ -37,6 +37,39 @@ const _renderFrames = <Duration>[
   Duration(milliseconds: 500),
 ];
 
+// The committed production-screen baselines were captured by exact workflow
+// run 32248881113, which started at this instant. Production widgets correctly
+// render owner-relative time from DateTime.now(), so fixed fixture timestamps
+// would otherwise drift by one day whenever CI crosses a calendar boundary.
+// Rebase only the test fixture timeline into the reviewed temporal window. The
+// production clock, widgets, PNG baselines, comparator, and tolerances remain
+// untouched.
+final DateTime _reviewedVisualReference = DateTime.utc(2026, 8, 19, 11, 42, 6);
+final DateTime _visualRunReference = DateTime.now().toUtc();
+final Duration _fixtureTimelineOffset =
+    _visualRunReference.difference(_reviewedVisualReference);
+final RegExp _fixtureTimestampPattern = RegExp(
+  r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$',
+);
+
+Object? _shiftFixtureTimeline(Object? value) {
+  if (value is String && _fixtureTimestampPattern.hasMatch(value)) {
+    return DateTime.parse(value)
+        .toUtc()
+        .add(_fixtureTimelineOffset)
+        .toIso8601String();
+  }
+  if (value is List<Object?>) {
+    return value.map(_shiftFixtureTimeline).toList(growable: false);
+  }
+  if (value is Map<String, Object?>) {
+    return value.map<String, Object?>(
+      (key, item) => MapEntry(key, _shiftFixtureTimeline(item)),
+    );
+  }
+  return value;
+}
+
 const _visualFontFamily = 'Roboto';
 const _visualIconFontFamily = 'MaterialIcons';
 bool _visualFontLoaded = false;
@@ -208,12 +241,14 @@ class _FixtureRepository implements PandoraRepository {
   final bool failing;
   final bool pending;
   Completer<RepositorySnapshot<HomeSummary>>? _pendingHome;
-  static final DateTime _verifiedAt = DateTime.utc(2026, 8, 14, 1);
-  static final DateTime _staleAfter = DateTime.utc(2030, 8, 14, 1);
+  static final DateTime _verifiedAt =
+      DateTime.utc(2026, 8, 14, 1).add(_fixtureTimelineOffset);
+  static final DateTime _staleAfter =
+      DateTime.utc(2030, 8, 14, 1).add(_fixtureTimelineOffset);
 
   Object? _read(String name) {
     final file = File('test/fixtures/owner_api/$name');
-    return jsonDecode(file.readAsStringSync());
+    return _shiftFixtureTimeline(jsonDecode(file.readAsStringSync()));
   }
 
   void _guard() {
@@ -445,6 +480,20 @@ Future<void> _captureScreen(WidgetTester tester, _VisualCase visual) async {
 }
 
 void main() {
+  test('visual fixture timeline stays inside reviewed day buckets', () {
+    expect(
+      _visualRunReference.difference(_FixtureRepository._verifiedAt).inDays,
+      5,
+    );
+    final approval = ApprovalSummary.fromJson(
+      asJsonList(_FixtureRepository()._read('approvals.json')).single,
+    );
+    expect(
+      approval.expiresAt!.difference(_visualRunReference).inDays,
+      1455,
+    );
+  });
+
   final screens = <_VisualCase>[
     _VisualCase(
       name: 'home_attention_porcelain_390x844',
