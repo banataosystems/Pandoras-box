@@ -222,7 +222,9 @@ class _CommandScreenState extends State<CommandScreen> {
                           )
                         : const Icon(Icons.arrow_forward_rounded),
                     label: Text(
-                      _submitting ? 'Submitting safely…' : 'Prepare the request',
+                      _submitting
+                          ? 'Submitting safely…'
+                          : 'Prepare the request',
                     ),
                   ),
                   const SizedBox(height: PandoraSpacing.xs),
