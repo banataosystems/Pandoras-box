@@ -233,3 +233,65 @@ test("verified identity-only bearer and exact organization membership reach MCP 
   assert.equal(response.body.result.protocolVersion, "2025-06-18");
   assert.equal(response.headers["www-authenticate"], undefined);
 });
+
+
+test("MCP structuredContent stays object-shaped when a read tool returns an array", async () => {
+  const accessToken = "verified-array-result-token-material";
+  const accounts = [
+    {
+      id: "battle-realmatch",
+      label: "Battle / RealMatch",
+      authMode: "personal_access_token",
+      allowMutations: false,
+      allowedOrganizationSlugs: [],
+      allowedProjectRefs: [],
+      credentialConfigured: true,
+    },
+  ];
+  const handler = createProjectOsMcpHandler({
+    organizationId: ORGANIZATION_ID,
+    authenticator: {
+      async authenticate(authorization) {
+        assert.equal(authorization, `Bearer ${accessToken}`);
+        return {
+          userId: USER_ID,
+          accessToken,
+          scopes: IDENTITY_SCOPES,
+          scopeClaimsPresent: true,
+          aal: "aal1",
+        };
+      },
+    },
+    membershipResolver: {
+      async resolve() {
+        return { organizationId: ORGANIZATION_ID, userId: USER_ID, role: "owner" };
+      },
+    },
+    ledger: {
+      async listPlans() { return []; },
+    },
+    workloadToken: () => "server-side-workload-token",
+    toolConfiguration() { return { fixture: true }; },
+    async execute(name, args, configuration) {
+      assert.equal(name, "supabase.list-accounts");
+      assert.deepEqual(args, {});
+      assert.deepEqual(configuration, { fixture: true });
+      return accounts;
+    },
+  });
+
+  const response = await invoke(handler, {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}` },
+    body: {
+      jsonrpc: "2.0",
+      id: 10,
+      method: "tools/call",
+      params: { name: "supabase.list-accounts", arguments: {} },
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body.result.structuredContent, { result: accounts });
+  assert.deepEqual(JSON.parse(response.body.result.content[0].text), accounts);
+});
