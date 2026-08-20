@@ -4,41 +4,50 @@ import 'package:pandora_mobile/core/models/pandora_models.dart';
 
 void main() {
   group('owner project truth resolver', () {
-    test('uses owner action > blocked > executing > monitoring > idle > archived', () {
-      final blockedProject = _project(status: 'active', blocker: 'Waiting for API');
-      final workingTask = _task(ProjectTaskState.inProgress);
-      final approvalTask = _task(ProjectTaskState.waitingApproval);
+    test(
+      'uses owner action > blocked > executing > monitoring > idle > archived',
+      () {
+        final blockedProject = _project(
+          status: 'active',
+          blocker: 'Waiting for API',
+        );
+        final workingTask = _task(ProjectTaskState.inProgress);
+        final approvalTask = _task(ProjectTaskState.waitingApproval);
 
-      expect(
-        resolveOwnerProjectState(
-          blockedProject,
-          tasks: [workingTask, approvalTask],
-        ),
-        OwnerProjectState.ownerActionRequired,
-      );
-      expect(
-        resolveOwnerProjectState(blockedProject, tasks: [workingTask]),
-        OwnerProjectState.blocked,
-      );
-      expect(
-        resolveOwnerProjectState(_project(status: 'active'), tasks: [workingTask]),
-        OwnerProjectState.executing,
-      );
-      expect(
-        resolveOwnerProjectState(_project(status: 'active')),
-        OwnerProjectState.monitoring,
-      );
-      expect(
-        resolveOwnerProjectState(
-          _project(status: 'active', freshness: FreshnessState.stale),
-        ),
-        OwnerProjectState.idle,
-      );
-      expect(
-        resolveOwnerProjectState(_project(status: 'archived')),
-        OwnerProjectState.archived,
-      );
-    });
+        expect(
+          resolveOwnerProjectState(
+            blockedProject,
+            tasks: [workingTask, approvalTask],
+          ),
+          OwnerProjectState.ownerActionRequired,
+        );
+        expect(
+          resolveOwnerProjectState(blockedProject, tasks: [workingTask]),
+          OwnerProjectState.blocked,
+        );
+        expect(
+          resolveOwnerProjectState(
+            _project(status: 'active'),
+            tasks: [workingTask],
+          ),
+          OwnerProjectState.executing,
+        );
+        expect(
+          resolveOwnerProjectState(_project(status: 'active')),
+          OwnerProjectState.monitoring,
+        );
+        expect(
+          resolveOwnerProjectState(
+            _project(status: 'active', freshness: FreshnessState.stale),
+          ),
+          OwnerProjectState.idle,
+        );
+        expect(
+          resolveOwnerProjectState(_project(status: 'archived')),
+          OwnerProjectState.archived,
+        );
+      },
+    );
 
     test('phase not verified never becomes the primary owner state', () {
       final project = _project(status: 'active', phase: 'Phase not verified');
@@ -71,9 +80,7 @@ void main() {
         ProviderTruthState.down,
       );
       expect(
-        providerTruthState(
-          _connection(state: 'degraded', status: 'Degraded'),
-        ),
+        providerTruthState(_connection(state: 'degraded', status: 'Degraded')),
         ProviderTruthState.degraded,
       );
       expect(
@@ -112,16 +119,16 @@ void main() {
     expect(compactProofSummary(project), '2 of 5 verified · Tested missing');
   });
 
-  test('internal recovery and ingestion records are hidden only from owner view', () {
-    expect(
-      isOwnerVisibleProject(_project(name: 'Pandora recovery workboard')),
-      isFalse,
-    );
-    expect(
-      isOwnerVisibleProject(_project(name: "Pandora's Box")),
-      isTrue,
-    );
-  });
+  test(
+    'internal recovery and ingestion records are hidden only from owner view',
+    () {
+      expect(
+        isOwnerVisibleProject(_project(name: 'Pandora recovery workboard')),
+        isFalse,
+      );
+      expect(isOwnerVisibleProject(_project(name: "Pandora's Box")), isTrue);
+    },
+  );
 }
 
 ProjectSummary _project({
@@ -131,39 +138,37 @@ ProjectSummary _project({
   String? blocker,
   FreshnessState freshness = FreshnessState.fresh,
   List<EvidenceStageStatus> evidence = const [],
-}) =>
-    ProjectSummary(
-      id: 'pandoras-box',
-      name: name,
-      purpose: 'Turn intent into a trusted working result.',
-      phase: phase,
-      status: status,
-      progressVerified: false,
-      freshness: FreshnessInfo(state: freshness),
-      evidenceStages: evidence,
-      blocker: blocker,
-    );
+}) => ProjectSummary(
+  id: 'pandoras-box',
+  name: name,
+  purpose: 'Turn intent into a trusted working result.',
+  phase: phase,
+  status: status,
+  progressVerified: false,
+  freshness: FreshnessInfo(state: freshness),
+  evidenceStages: evidence,
+  blocker: blocker,
+);
 
 ProjectTask _task(ProjectTaskState state) => ProjectTask(
-      id: 'task',
-      title: 'Task',
-      status: state.name,
-      state: state,
-      risk: ActionRisk.low,
-    );
+  id: 'task',
+  title: 'Task',
+  status: state.name,
+  state: state,
+  risk: ActionRisk.low,
+);
 
 ConnectionSummary _connection({
   required String state,
   required String status,
   FreshnessState freshness = FreshnessState.fresh,
-}) =>
-    ConnectionSummary(
-      id: 'provider',
-      name: 'Provider',
-      purpose: 'Provider health',
-      state: state,
-      status: status,
-      canRead: true,
-      canChange: false,
-      freshness: FreshnessInfo(state: freshness),
-    );
+}) => ConnectionSummary(
+  id: 'provider',
+  name: 'Provider',
+  purpose: 'Provider health',
+  state: state,
+  status: status,
+  canRead: true,
+  canChange: false,
+  freshness: FreshnessInfo(state: freshness),
+);

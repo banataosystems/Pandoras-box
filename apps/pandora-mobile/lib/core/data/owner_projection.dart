@@ -11,13 +11,13 @@ enum OwnerProjectState {
 
 extension OwnerProjectStateLabel on OwnerProjectState {
   String get label => switch (this) {
-        OwnerProjectState.ownerActionRequired => 'Owner action required',
-        OwnerProjectState.blocked => 'Blocked',
-        OwnerProjectState.executing => 'Working now',
-        OwnerProjectState.monitoring => 'Monitoring',
-        OwnerProjectState.idle => 'Idle',
-        OwnerProjectState.archived => 'Archived',
-      };
+    OwnerProjectState.ownerActionRequired => 'Owner action required',
+    OwnerProjectState.blocked => 'Blocked',
+    OwnerProjectState.executing => 'Working now',
+    OwnerProjectState.monitoring => 'Monitoring',
+    OwnerProjectState.idle => 'Idle',
+    OwnerProjectState.archived => 'Archived',
+  };
 }
 
 enum ProviderTruthState {
@@ -31,13 +31,13 @@ enum ProviderTruthState {
 
 extension ProviderTruthStateLabel on ProviderTruthState {
   String get label => switch (this) {
-        ProviderTruthState.healthy => 'Healthy',
-        ProviderTruthState.degraded => 'Degraded',
-        ProviderTruthState.down => 'Down',
-        ProviderTruthState.stale => 'Stale',
-        ProviderTruthState.unknown => 'Unknown',
-        ProviderTruthState.notConfigured => 'Not configured',
-      };
+    ProviderTruthState.healthy => 'Healthy',
+    ProviderTruthState.degraded => 'Degraded',
+    ProviderTruthState.down => 'Down',
+    ProviderTruthState.stale => 'Stale',
+    ProviderTruthState.unknown => 'Unknown',
+    ProviderTruthState.notConfigured => 'Not configured',
+  };
 }
 
 List<ConnectionSummary> deduplicateConnections(
@@ -55,8 +55,9 @@ List<ConnectionSummary> deduplicateConnections(
   }
   final result = unique.values.toList(growable: true)
     ..sort(
-      (left, right) => connectionAttentionRank(right)
-          .compareTo(connectionAttentionRank(left)),
+      (left, right) =>
+          connectionAttentionRank(right)
+              .compareTo(connectionAttentionRank(left)),
     );
   return List<ConnectionSummary>.unmodifiable(result);
 }
@@ -125,10 +126,12 @@ OwnerProjectState resolveOwnerProjectState(
       status.contains('blocked')) {
     return OwnerProjectState.blocked;
   }
-  if (taskList.any((task) =>
-          task.state == ProjectTaskState.inProgress ||
-          task.state == ProjectTaskState.ready ||
-          task.state == ProjectTaskState.waitingReview) ||
+  if (taskList.any(
+        (task) =>
+            task.state == ProjectTaskState.inProgress ||
+            task.state == ProjectTaskState.ready ||
+            task.state == ProjectTaskState.waitingReview,
+      ) ||
       status.contains('executing') ||
       status.contains('running') ||
       status.contains('in progress') ||
@@ -157,8 +160,9 @@ String compactProofSummary(ProjectSummary project) {
     EvidenceStage.productionVerified,
   ];
   final verified = ordered
-      .where((stage) =>
-          project.evidenceState(stage) == EvidenceClaimState.verified)
+      .where(
+        (stage) => project.evidenceState(stage) == EvidenceClaimState.verified,
+      )
       .length;
   EvidenceStage? firstMissing;
   for (final stage in ordered) {
@@ -174,9 +178,8 @@ String compactProofSummary(ProjectSummary project) {
 }
 
 bool isOwnerVisibleProject(ProjectSummary project) {
-  final words =
-      '${project.name} ${project.purpose} ${project.repository ?? ''}'
-          .toLowerCase();
+  final words = '${project.name} ${project.purpose} ${project.repository ?? ''}'
+      .toLowerCase();
   const internalMarkers = <String>[
     'recovery',
     'workboard',
@@ -191,10 +194,9 @@ bool isOwnerVisibleProject(ProjectSummary project) {
 }
 
 String canonicalOwnerProjectLabel(ProjectSummary project) {
-  final words =
-      '${project.name} ${project.repository ?? ''}'
-          .toLowerCase()
-          .replaceAll('_', '-');
+  final words = '${project.name} ${project.repository ?? ''}'
+      .toLowerCase()
+      .replaceAll('_', '-');
   if (words.contains('pandoras-box') ||
       words.contains("pandora's box") ||
       words.contains('mcpmaster-pandoras-box')) {

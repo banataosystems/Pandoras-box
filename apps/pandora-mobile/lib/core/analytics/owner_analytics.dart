@@ -24,20 +24,21 @@ enum OwnerAnalyticsEvent {
 }
 
 class OwnerAnalytics {
-  OwnerAnalytics({
-    http.Client? client,
-    DateTime Function()? clock,
-  })  : _client = client ?? http.Client(),
-        _clock = clock ?? DateTime.now,
-        _sessionId = 'pm-${(clock ?? DateTime.now)().microsecondsSinceEpoch}';
+  OwnerAnalytics({http.Client? client, DateTime Function()? clock})
+    : _client = client ?? http.Client(),
+      _clock = clock ?? DateTime.now,
+      _sessionId = 'pm-${(clock ?? DateTime.now)().microsecondsSinceEpoch}';
 
   static final OwnerAnalytics shared = OwnerAnalytics();
 
   static const _host = String.fromEnvironment('PANDORA_POSTHOG_HOST');
-  static const _projectKey =
-      String.fromEnvironment('PANDORA_POSTHOG_PROJECT_KEY');
-  static const _releaseSha =
-      String.fromEnvironment('PANDORA_RELEASE_SHA', defaultValue: 'unverified');
+  static const _projectKey = String.fromEnvironment(
+    'PANDORA_POSTHOG_PROJECT_KEY',
+  );
+  static const _releaseSha = String.fromEnvironment(
+    'PANDORA_RELEASE_SHA',
+    defaultValue: 'unverified',
+  );
   static const _appVersion = String.fromEnvironment(
     'PANDORA_APP_VERSION',
     defaultValue: 'unverified',

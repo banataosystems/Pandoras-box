@@ -35,9 +35,14 @@ class OwnerBriefingHero extends StatelessWidget {
       PandoraStatusTone.verified => (palette.verified, palette.onVerified),
       PandoraStatusTone.attention => (palette.attention, palette.onAttention),
       PandoraStatusTone.critical => (palette.critical, palette.onCritical),
-      PandoraStatusTone.informative => (palette.informative, palette.onInformative),
-      PandoraStatusTone.neutral =>
-        (scheme.surfaceContainerHighest, scheme.onSurfaceVariant),
+      PandoraStatusTone.informative => (
+        palette.informative,
+        palette.onInformative,
+      ),
+      PandoraStatusTone.neutral => (
+        scheme.surfaceContainerHighest,
+        scheme.onSurfaceVariant,
+      ),
     };
     return Semantics(
       container: true,
@@ -67,7 +72,8 @@ class OwnerBriefingHero extends StatelessWidget {
                       children: [
                         Text(
                           eyebrow.toUpperCase(),
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
                                 color: scheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.9,
@@ -76,7 +82,8 @@ class OwnerBriefingHero extends StatelessWidget {
                         const SizedBox(height: PandoraSpacing.xxs),
                         Text(
                           title,
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: -0.4,
                               ),
@@ -96,7 +103,11 @@ class OwnerBriefingHero extends StatelessWidget {
                   runSpacing: PandoraSpacing.sm,
                   children: [
                     if (statusLabel != null)
-                      StatusBadge(label: statusLabel!, tone: tone, compact: true),
+                      StatusBadge(
+                        label: statusLabel!,
+                        tone: tone,
+                        compact: true,
+                      ),
                     if (footer != null) footer!,
                   ],
                 ),
@@ -154,7 +165,10 @@ class OwnerMetricGrid extends StatelessWidget {
             if (title != null) ...[
               Semantics(
                 header: true,
-                child: Text(title!, style: Theme.of(context).textTheme.titleSmall),
+                child: Text(
+                  title!,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
               ),
               const SizedBox(height: PandoraSpacing.sm),
             ],
@@ -163,11 +177,14 @@ class OwnerMetricGrid extends StatelessWidget {
                 final scaler = MediaQuery.textScalerOf(context);
                 final scaled = scaler.scale(16) / 16;
                 final minimumCellWidth = scaled >= 1.5 ? 168.0 : 136.0;
-                final byWidth = ((constraints.maxWidth + PandoraSpacing.xs) /
-                        (minimumCellWidth + PandoraSpacing.xs))
-                    .floor()
-                    .clamp(1, 4);
-                final columns = metrics.length < byWidth ? metrics.length : byWidth;
+                final byWidth =
+                    ((constraints.maxWidth + PandoraSpacing.xs) /
+                            (minimumCellWidth + PandoraSpacing.xs))
+                        .floor()
+                        .clamp(1, 4);
+                final columns = metrics.length < byWidth
+                    ? metrics.length
+                    : byWidth;
                 final gap = PandoraSpacing.xs * (columns - 1);
                 final width = (constraints.maxWidth - gap) / columns;
                 return Wrap(
@@ -175,7 +192,10 @@ class OwnerMetricGrid extends StatelessWidget {
                   runSpacing: PandoraSpacing.xs,
                   children: [
                     for (final metric in metrics)
-                      SizedBox(width: width, child: _MetricCell(metric: metric)),
+                      SizedBox(
+                        width: width,
+                        child: _MetricCell(metric: metric),
+                      ),
                   ],
                 );
               },
@@ -222,17 +242,14 @@ class _MetricCell extends StatelessWidget {
             const SizedBox(height: PandoraSpacing.sm),
             Text(
               metric.value,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.4,
-                  ),
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.4),
             ),
             const SizedBox(height: PandoraSpacing.xxs),
             Text(
               metric.label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+              style: Theme.of(context).textTheme.labelSmall
+                  ?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -267,8 +284,8 @@ class OwnerSectionHeading extends StatelessWidget {
           Text(
             subtitle!,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ],
@@ -346,9 +363,9 @@ class OwnerSignal extends StatelessWidget {
                 Text(
                   label,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: PandoraSpacing.xxs),
                 Text(value),
