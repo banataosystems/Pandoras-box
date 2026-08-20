@@ -237,6 +237,16 @@ abstract interface class PandoraRepository {
   void dispose();
 }
 
+class ProviderConnectLaunch {
+  const ProviderConnectLaunch({required this.authorizeUri, this.expiresAt});
+  final Uri authorizeUri;
+  final DateTime? expiresAt;
+}
+
+abstract interface class ProviderConnectionRepository {
+  Future<ProviderConnectLaunch> beginSupabaseOAuth();
+}
+
 abstract interface class AuthorizationInvalidationSource {
   Stream<AuthorizationInvalidation> get authorizationInvalidations;
 }

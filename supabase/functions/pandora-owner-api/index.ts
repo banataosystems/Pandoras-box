@@ -18,6 +18,10 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ALLOWED_ORIGINS = parseAllowedOrigins(
   Deno.env.get("PANDORA_ALLOWED_ORIGINS"),
 );
+const SUPABASE_OAUTH_CLIENT_ID = "d836261c-ffa5-409b-b614-927a40e30fad";
+const SUPABASE_OAUTH_REDIRECT_URI =
+  "https://jcyqixttuebxqqfkjonq.supabase.co/functions/v1/connect-supabase/oauth2/callback";
+const SUPABASE_OAUTH_AUTHORIZE_URI = "https://api.supabase.com/v1/oauth/authorize";
 
 const CORS_BASE_HEADERS = {
   "access-control-allow-headers":
@@ -403,7 +407,10 @@ async function loadProjectSummaries(context: UserContext) {
 
 function connectionSummary(value: unknown, healthRows: JsonRecord[] = []) {
   const connection = asRecord(value);
+  const configuration = asRecord(connection.configuration);
   const provider = textValue(connection.provider, "Service");
+  const authMode = textValue(configuration.auth_mode, "unknown").toLowerCase();
+  const recoveryOnly = provider.toLowerCase() === "supabase" && authMode !== "oauth";
   const status = textValue(connection.status, "not_checked").toLowerCase();
   const now = Date.now();
   const lastCheckedAt = textValue(connection.last_health_check_at);
@@ -453,6 +460,9 @@ function connectionSummary(value: unknown, healthRows: JsonRecord[] = []) {
   return {
     id: textValue(connection.id),
     name: textValue(connection.display_name, provider),
+    provider: provider.toLowerCase(),
+    authMode,
+    recoveryOnly,
     plainPurpose: purposes[provider.toLowerCase()] || "Connected service",
     state,
     plainStatus: ready
@@ -473,7 +483,7 @@ function connectionSummary(value: unknown, healthRows: JsonRecord[] = []) {
     canDisconnect: connectionActionAllowed("disconnect", state),
     needsOwnerApprovalForChanges: true,
     lastCheckedAt: connection.last_health_check_at ?? null,
-    advanced: { provider, scopes, observedStatus: status },
+    advanced: { provider, scopes, observedStatus: status, authMode, recoveryOnly },
   };
 }
 
@@ -661,7 +671,7 @@ async function connections(
   const [connectionsResult, healthResult] = await Promise.all([
     context.client.from("connector_installations")
       .select(
-        "id, provider, display_name, status, scopes, last_health_check_at, updated_at",
+        "id, provider, external_account_id, display_name, status, scopes, configuration, last_health_check_at, updated_at",
       )
       .eq("organization_id", context.organizationId).order("provider"),
     context.client.from("projectos_integration_health")
@@ -675,6 +685,34 @@ async function connections(
   return (connectionsResult.data || []).map((item: JsonRecord) =>
     connectionSummary(item, healthRows)
   );
+}
+
+async function beginSupabaseOAuth(context: UserContext) {
+  if (context.isAnonymous) throw new Error("PERMANENT_ACCOUNT_REQUIRED");
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await admin.rpc("begin_supabase_oauth_session", {
+    p_organization_id: context.organizationId,
+    p_user_id: context.userId,
+  });
+  if (error) throw new Error("SUPABASE_OAUTH_START_FAILED");
+  const launch = asRecord(data);
+  const state = textValue(launch.state);
+  const codeChallenge = textValue(launch.codeChallenge);
+  if (!state || !codeChallenge) throw new Error("SUPABASE_OAUTH_START_FAILED");
+  const authorize = new URL(SUPABASE_OAUTH_AUTHORIZE_URI);
+  authorize.searchParams.set("response_type", "code");
+  authorize.searchParams.set("client_id", SUPABASE_OAUTH_CLIENT_ID);
+  authorize.searchParams.set("redirect_uri", SUPABASE_OAUTH_REDIRECT_URI);
+  authorize.searchParams.set("state", state);
+  authorize.searchParams.set("code_challenge", codeChallenge);
+  authorize.searchParams.set("code_challenge_method", "S256");
+  return {
+    provider: "supabase",
+    authorizeUrl: authorize.toString(),
+    expiresAt: launch.expiresAt ?? null,
+  };
 }
 
 async function connectionAction(
@@ -1213,6 +1251,9 @@ Deno.serve(async (req: Request) => {
         ),
         202,
       );
+    }
+    if (req.method === "POST" && route === "/connections/supabase/oauth/start") {
+      return send(await beginSupabaseOAuth(context), 201);
     }
     if (req.method === "POST" && route === "/memory/search") {
       const body = await bodyJson(req);
