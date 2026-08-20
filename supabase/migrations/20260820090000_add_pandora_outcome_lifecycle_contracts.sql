@@ -1,6 +1,8 @@
 -- Pandora PostHog Phase 1: privacy-safe lifecycle contracts only.
 -- All new Pandora lifecycle contracts remain inactive. This migration does not enable PostHog capture,
 -- replay, autocapture, network payload capture, flags, experiments, or production use.
+-- Historical PostHog project 526760 is retained only as a paused legacy registry key because
+-- the schema requires a non-null project id; dashboard bindings stay cleared until scope is verified.
 
 DO $migration$
 DECLARE
@@ -52,10 +54,10 @@ BEGIN
     'Pandoras-Box / ProjectOS',
     'banataosystems/Pandoras-box',
     526760,
-    1934160,
-    'https://us.posthog.com/project/526760/dashboard/1934160',
+    NULL,
+    NULL,
     'jcyqixttuebxqqfkjonq',
-    'active',
+    'paused',
     'aggregate_only'
   )
   ON CONFLICT (organization_id, product_key) DO NOTHING;
@@ -77,7 +79,6 @@ BEGIN
       AND (
         repo_full_name IS DISTINCT FROM 'mbanatao/mcpmaster'
         AND repo_full_name IS DISTINCT FROM 'banataosystems/Pandoras-box'
-        OR posthog_project_id IS DISTINCT FROM 526760
         OR supabase_project_ref IS DISTINCT FROM 'jcyqixttuebxqqfkjonq'
       )
   ) THEN
@@ -86,10 +87,20 @@ BEGIN
 
   UPDATE private.projectos_product_registry
   SET repo_full_name = 'banataosystems/Pandoras-box',
+      posthog_dashboard_id = NULL,
+      posthog_dashboard_url = NULL,
+      status = 'paused',
+      data_classification = 'aggregate_only',
       updated_at = now()
   WHERE organization_id = v_organization_id
     AND product_key = 'pandoras_box'
-    AND repo_full_name IS DISTINCT FROM 'banataosystems/Pandoras-box';
+    AND (
+      repo_full_name IS DISTINCT FROM 'banataosystems/Pandoras-box'
+      OR posthog_dashboard_id IS NOT NULL
+      OR posthog_dashboard_url IS NOT NULL
+      OR status IS DISTINCT FROM 'paused'
+      OR data_classification IS DISTINCT FROM 'aggregate_only'
+    );
 
   INSERT INTO private.projectos_event_contracts (
     organization_id,
