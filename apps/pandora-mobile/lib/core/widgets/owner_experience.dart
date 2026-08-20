@@ -298,7 +298,7 @@ class OwnerSectionHeading extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final scaled = MediaQuery.textScalerOf(context).scale(16) / 16;
-        final stack = constraints.maxWidth < 390 || scaled >= 1.3;
+        final stack = constraints.maxWidth <= 430 || scaled >= 1.3;
         if (stack) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
