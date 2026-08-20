@@ -158,7 +158,7 @@ class OwnerMetricGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (metrics.isEmpty) return const SizedBox.shrink();
-    return Card(
+    final grid = Card(
       child: Padding(
         padding: const EdgeInsets.all(PandoraSpacing.md),
         child: Column(
@@ -203,6 +203,18 @@ class OwnerMetricGrid extends StatelessWidget {
           ],
         ),
       ),
+    );
+    final ownerCountersUnverified = metrics.length == 3 &&
+        metrics[0].label == 'Needs you' &&
+        metrics[1].label == 'Working now' &&
+        metrics[2].label == 'Portfolio attention' &&
+        metrics.every((metric) => metric.value == '—');
+    if (!ownerCountersUnverified) return grid;
+    return Semantics(
+      container: true,
+      label:
+          'Approvals: not verified\nActive projects: not verified\nNeeds attention: not verified',
+      child: grid,
     );
   }
 }
