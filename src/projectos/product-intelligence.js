@@ -38,8 +38,12 @@ const PRODUCT_ALIASES = {
     tessie: 'tessie',
 };
 const ALLOWED_PROPERTY_KEYS = new Set([
-    'product_key', 'app', 'environment', 'release_sha', 'app_version', 'product_version',
-    'deployment_id', 'event_schema_version', 'source_repo', 'privacy_tier', 'privacy_mode',
+    'product_key', 'app', 'environment', 'source_sha', 'release_sha', 'release_id',
+    'app_version', 'product_version', 'deployment_id', 'rollback_of_deployment_id',
+    'schema_version', 'event_schema_version', 'source_repo', 'privacy_tier', 'privacy_mode',
+    'proof_stage', 'organization_key', 'project_key', 'execution_id', 'failure_class',
+    'tool_class', 'model_provider', 'model_name', 'outcome_type', 'result', 'retry_count',
+    'input_tokens', 'output_tokens', 'total_cost_usd', 'evaluation_score', 'evidence_count',
     'route_group', 'screen', 'feature_key', 'experiment_key', 'variant', 'outcome', 'status',
     'success', 'error_code', 'duration_ms', 'latency_ms', 'metric_name', 'metric_value',
     'funnel_step', 'entrypoint', 'channel', 'device_type', 'browser', 'os', 'action_key',
@@ -49,6 +53,7 @@ const ALLOWED_PROPERTY_KEYS = new Set([
     '$web_vitals_TTFB_value', '$exception_type', '$exception_fingerprint', '$exception_level',
     '$mcp_tool_name', '$mcp_server_name', '$mcp_client_name', '$mcp_duration_ms', '$mcp_is_error',
 ]);
+const FORBIDDEN_KEY_EXCEPTIONS = new Set(['input_tokens', 'output_tokens']);
 const FORBIDDEN_KEY_PATTERN = /(^|_)(email|phone|full_?name|first_?name|last_?name|address|message|prompt|input|output|transcript|recording|audio|document|content|password|secret|token|authorization|cookie|card|account|beneficiary|client_?matter|case_?details|legal_?narrative)($|_)/i;
 const DIRECT_IDENTIFIER_PATTERN = /(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?\d[\d\s().-]{7,}\d)/i;
 const ENVIRONMENTS = new Set(['production', 'preview', 'staging', 'development', 'unknown']);
@@ -102,7 +107,8 @@ function canonicalProductKey(value) {
 function sanitizeProductProperties(input) {
     const output = {};
     for (const [key, rawValue] of Object.entries(input)) {
-        if (!ALLOWED_PROPERTY_KEYS.has(key) || FORBIDDEN_KEY_PATTERN.test(key))
+        if (!ALLOWED_PROPERTY_KEYS.has(key)
+            || (FORBIDDEN_KEY_PATTERN.test(key) && !FORBIDDEN_KEY_EXCEPTIONS.has(key)))
             continue;
         if (Array.isArray(rawValue)) {
             const sanitized = rawValue.slice(0, 20)
