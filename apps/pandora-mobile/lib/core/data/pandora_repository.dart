@@ -151,8 +151,9 @@ class SafetyOverview {
       return ProviderTruthState.notConfigured;
     }
     if (freshness == FreshnessState.stale) return ProviderTruthState.stale;
-    if (freshness == FreshnessState.notChecked)
+    if (freshness == FreshnessState.notChecked) {
       return ProviderTruthState.unknown;
+    }
     if (status.contains('down') ||
         status.contains('failed') ||
         status.contains('critical') ||
