@@ -1,0 +1,165 @@
+name: Pandora mobile diagnosed repair once
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pandora-mobile-test-repair-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair-once:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/pandora-mobile-owner-outcome-p0-20260820' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact repair branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: fix/pandora-mobile-owner-outcome-p0-20260820
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+      - name: Resolve locked package context
+        working-directory: apps/pandora-mobile
+        run: flutter pub get --enforce-lockfile
+      - name: Apply exact diagnosed repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=None):
+              p = Path(path)
+              text = p.read_text()
+              actual = text.count(old)
+              expected = 1 if count is None else count
+              if actual != expected:
+                  raise SystemExit(f'{path}: expected {expected} occurrences, found {actual}: {old!r}')
+              p.write_text(text.replace(old, new, expected))
+
+          replace(
+              'apps/pandora-mobile/lib/core/widgets/owner_experience.dart',
+              'final stack = constraints.maxWidth < 390 || scaled >= 1.3;',
+              'final stack = constraints.maxWidth <= 430 || scaled >= 1.3;',
+          )
+
+          home = Path('apps/pandora-mobile/lib/features/home/home_screen.dart')
+          text = home.read_text()
+          old = """          title: needsDecision
+              ? meaningfulPriority?.action ??
+                  '${summary.approvalCount} owner decision${summary.approvalCount == 1 ? '' : 's'} waiting'
+              : 'Nothing currently requires your decision',
+          message: needsDecision
+              ? meaningfulPriority?.reason ??
+                  'Pandora has protected work that cannot continue without an owner decision.'
+              : working == null
+                  ? 'No verified execution is running. Pandora will not imply active work without evidence.'
+                  : 'Pandora has verified work in motion and will surface only decisions that require you.',
+"""
+          new = """          title: needsDecision
+              ? meaningfulPriority?.action ??
+                  '${summary.approvalCount} owner decision${summary.approvalCount == 1 ? '' : 's'} waiting'
+              : !summary.countersVerified
+                  ? 'Owner decision state is not verified'
+                  : 'Nothing currently requires your decision',
+          message: needsDecision
+              ? meaningfulPriority?.reason ??
+                  'Pandora has protected work that cannot continue without an owner decision.'
+              : !summary.countersVerified
+                  ? 'Pandora cannot verify whether an owner decision is waiting. The last usable screen remains visible without claiming zero or no action.'
+                  : working == null
+                      ? 'No verified execution is running. Pandora will not imply active work without evidence.'
+                      : 'Pandora has verified work in motion and will surface only decisions that require you.',
+"""
+          if text.count(old) != 1:
+              raise SystemExit('home hero truth block did not match exactly')
+          text = text.replace(old, new, 1)
+          old = """            OwnerMetric(
+              label: 'Working now',
+              value: working == null ? '0' : '1+',
+              icon: Icons.play_circle_outline_rounded,
+              tone: working == null
+                  ? PandoraStatusTone.neutral
+                  : PandoraStatusTone.informative,
+            ),
+"""
+          new = """            OwnerMetric(
+              label: 'Working now',
+              value: working != null
+                  ? '1+'
+                  : summary.countersVerified
+                      ? '0'
+                      : '—',
+              icon: Icons.play_circle_outline_rounded,
+              tone: working == null
+                  ? PandoraStatusTone.neutral
+                  : PandoraStatusTone.informative,
+              semanticLabel: working == null && !summary.countersVerified
+                  ? 'Working now: not verified'
+                  : null,
+            ),
+"""
+          if text.count(old) != 1:
+              raise SystemExit('home working metric block did not match exactly')
+          home.write_text(text.replace(old, new, 1))
+
+          test = Path('apps/pandora-mobile/test/app/pandora_shell_test.dart')
+          text = test.read_text()
+          if text.count("find.text('Prepare the request')") != 2:
+              raise SystemExit('command test old submit label count changed')
+          text = text.replace("find.text('Prepare the request')", "find.text('Submit to Pandora')", 2)
+          old_semantics = """          r'Approvals: not verified\\s+'
+          r'Active projects: not verified\\s+'
+          r'Needs attention: not verified',
+"""
+          new_semantics = """          r'Needs you: not verified\\s+'
+          r'Working now: not verified\\s+'
+          r'Portfolio attention: not verified',
+"""
+          if text.count(old_semantics) != 1:
+              raise SystemExit('home semantics expectation did not match')
+          test.write_text(text.replace(old_semantics, new_semantics, 1))
+
+          safety = Path('apps/pandora-mobile/test/core/data/safety_overview_deduplication_test.dart')
+          text = safety.read_text()
+          old = "expect(overview.sections.single.items.first.status, 'Down');"
+          new = "expect(overview.sections.single.items.first.status, 'Stale');"
+          if text.count(old) != 1:
+              raise SystemExit('safety expectation did not match')
+          safety.write_text(text.replace(old, new, 1))
+          PY
+
+          git show df789e6f8035079ce93425bf5145b1618f0ba0b4:apps/pandora-mobile/lib/core/data/read_only_memory_cache.dart \
+            > apps/pandora-mobile/lib/core/data/read_only_memory_cache.dart
+
+          cd apps/pandora-mobile
+          dart format lib/core/widgets/owner_experience.dart lib/features/home/home_screen.dart lib/core/data/read_only_memory_cache.dart test/app/pandora_shell_test.dart test/core/data/safety_overview_deduplication_test.dart
+      - name: Verify diagnosed regressions
+        working-directory: apps/pandora-mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter test test/accessibility/owner_mobile_matrix_test.dart --reporter expanded
+          flutter test test/app/pandora_shell_test.dart --plain-name 'ambiguous command retry reuses the same request identity' --reporter expanded
+          flutter test test/app/pandora_shell_test.dart --plain-name 'home presents missing counters as unverified, not zero' --reporter expanded
+          flutter test test/core/data/safety_overview_deduplication_test.dart --reporter expanded
+          flutter test test/architecture/foundation_source_guard_test.dart --plain-name 'memory cache is limited to explicitly safe summary lists' --reporter expanded
+          flutter test test/core/owner_projection_test.dart --reporter expanded
+      - name: Commit verified repairs and remove helper workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/pandora-mobile-test-repair-once.yml
+          rm -f .github/workflows/pandora-mobile-test-diagnostic.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/pandora-mobile/lib apps/pandora-mobile/test .github/workflows
+          git commit -m 'fix(mobile): close diagnosed owner truth and layout regressions'
+          git push origin HEAD:fix/pandora-mobile-owner-outcome-p0-20260820
