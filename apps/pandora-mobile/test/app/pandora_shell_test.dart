@@ -616,7 +616,7 @@ void main() {
     expect(repository.idempotencyKeys, hasLength(2));
     expect(repository.idempotencyKeys.first, isNotNull);
     expect(repository.idempotencyKeys.last, repository.idempotencyKeys.first);
-    expect(find.text('Request recorded'), findsOneWidget);
+    expect(find.text('Request accepted'), findsOneWidget);
   });
 
   testWidgets('approval controls fail closed when expiry is not verified', (
