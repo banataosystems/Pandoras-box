@@ -20,6 +20,9 @@ jobs:
         with:
           flutter-version: '3.47.0'
           cache: true
+      - name: Resolve exact package context
+        working-directory: apps/pandora-mobile
+        run: flutter pub get --enforce-lockfile
       - name: Apply exact Dart formatter
         working-directory: apps/pandora-mobile
         run: |
