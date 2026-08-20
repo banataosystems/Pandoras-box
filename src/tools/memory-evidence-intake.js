@@ -1,11 +1,15 @@
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.EVIDENCE_CANDIDATE_SUBMIT_SCOPE = void 0;
 exports.submitEvidenceCandidate = submitEvidenceCandidate;
 
 const { z } = require("zod");
 const core = require("./memory-evidence-intake-core.js");
 const { markProviderOutcome } = require("../runtime/provider-execution-state-machine.js");
+
+const EVIDENCE_CANDIDATE_SUBMIT_SCOPE = "memory:evidence-candidate:submit";
+exports.EVIDENCE_CANDIDATE_SUBMIT_SCOPE = EVIDENCE_CANDIDATE_SUBMIT_SCOPE;
 
 // Keep the canonical entrypoint visibly bound to the backend summary limit.
 const OutcomeObservationArgsSchema = z.object({
@@ -141,6 +145,25 @@ async function responseOutcome(response) {
 }
 
 async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis.fetch) {
+  const grantedScopes = Array.isArray(configuration?.grantedScopes)
+    ? configuration.grantedScopes
+    : [];
+  if (!grantedScopes.includes(EVIDENCE_CANDIDATE_SUBMIT_SCOPE)) {
+    throw markProviderOutcome(
+      new Error("Pandora Memory evidence-candidate submit scope is not granted"),
+      "failed_before_side_effects",
+      "candidate_submit_scope_not_granted",
+    );
+  }
+
+  // The underlying core still contains the historical `memory:write` guard.
+  // Translate the narrowly authorized external capability only inside this
+  // candidate-only wrapper. Callers never need or receive generic write scope.
+  const scopedConfiguration = {
+    ...configuration,
+    grantedScopes: [...new Set([...grantedScopes, "memory:write"])],
+  };
+
   try {
     OutcomeObservationArgsSchema.parse(args);
   } catch (error) {
@@ -149,7 +172,7 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
 
   if (typeof fetchFn !== "function") {
     try {
-      return await core.submitEvidenceCandidate(args, configuration, fetchFn);
+      return await core.submitEvidenceCandidate(args, scopedConfiguration, fetchFn);
     } catch (error) {
       throw markProviderOutcome(error, "failed_before_side_effects", "fetch_unavailable_before_dispatch");
     }
@@ -170,7 +193,7 @@ async function submitEvidenceCandidate(args, configuration, fetchFn = globalThis
   };
 
   try {
-    return await core.submitEvidenceCandidate(args, configuration, observingFetch);
+    return await core.submitEvidenceCandidate(args, scopedConfiguration, observingFetch);
   } catch (error) {
     const resolved = observed || (dispatchStarted
       ? { outcome: "ambiguous", evidence: "dispatch_outcome_unobserved" }

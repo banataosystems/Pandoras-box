@@ -32,6 +32,13 @@ let transformed = fixtureBytes.toString("utf8");
 
 transformed = replaceExactlyOnce(
   transformed,
+  `  grantedScopes: ["memory:read", "memory:write"],`,
+  `  grantedScopes: ["memory:read", "memory:evidence-candidate:submit"],`,
+  "candidate-scoped Memory capability",
+);
+
+transformed = replaceExactlyOnce(
+  transformed,
 `  assert.deepEqual(finishInput.resultSummary, {
     type: "memory_evidence_candidate",
     candidateId: "22222222-2222-4222-8222-222222222222",

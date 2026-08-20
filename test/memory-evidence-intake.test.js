@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 
 const {
   EvidenceCandidateArgsSchema,
+  EVIDENCE_CANDIDATE_SUBMIT_SCOPE,
   submitEvidenceCandidate,
   IDEMPOTENCY_CONFLICT_CODE,
 } = require("../src/tools/memory-evidence-intake.js");
@@ -44,7 +45,7 @@ const config = {
   baseUrl: "https://pandorasbox-memory.vercel.app",
   oidcToken: "test-oidc-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
   allowedNamespaces: ["real_life"],
-  grantedScopes: ["memory:read", "memory:write"],
+  grantedScopes: ["memory:read", EVIDENCE_CANDIDATE_SUBMIT_SCOPE],
   allowMutations: true,
   timeoutMs: 1000,
   maxResponseBytes: 100000,
@@ -86,13 +87,14 @@ test("candidate schema requires a project identity and exact proof stage", () =>
   assert.throws(() => EvidenceCandidateArgsSchema.parse({ ...validArgs(), summary: "x".repeat(1801) }));
 });
 
-test("memory tool and manifest expose governed write semantics", () => {
+test("memory tool and manifest expose candidate-scoped governed write semantics", () => {
   assert.ok(memoryTools["memory.submitEvidenceCandidate"]);
   const manifest = getToolManifest("memory.submitEvidenceCandidate");
   assert.equal(manifest.provider, "memory");
   assert.equal(manifest.risk, "write");
   assert.equal(manifest.mutation, true);
-  assert.deepEqual(manifest.requiredProviderScopes, ["memory:write"]);
+  assert.equal(EVIDENCE_CANDIDATE_SUBMIT_SCOPE, "memory:evidence-candidate:submit");
+  assert.deepEqual(manifest.requiredProviderScopes, [EVIDENCE_CANDIDATE_SUBMIT_SCOPE]);
 });
 
 test("submission is bounded, OIDC-authenticated, and remains pending review", async () => {
@@ -270,12 +272,19 @@ test("privacy boundary rejects broader identifiers, secrets, nesting, and encode
   }
 });
 
-test("write scope is fail-closed and non-pending responses are rejected", async () => {
+test("candidate-submit scope is fail-closed and broad memory write alone is rejected", async () => {
   await assert.rejects(
     () => submitEvidenceCandidate(validArgs(), { ...config, grantedScopes: ["memory:read"] }, async () => {
       throw new Error("must not call");
     }),
-    /write scope is not granted/,
+    /evidence-candidate submit scope is not granted/,
+  );
+
+  await assert.rejects(
+    () => submitEvidenceCandidate(validArgs(), { ...config, grantedScopes: ["memory:write"] }, async () => {
+      throw new Error("must not call");
+    }),
+    /evidence-candidate submit scope is not granted/,
   );
 
   await assert.rejects(
@@ -285,7 +294,7 @@ test("write scope is fail-closed and non-pending responses are rejected", async 
   );
 });
 
-test("governed executeTool path is inert by default and works only with explicit mutation plus write scope", async () => {
+test("governed executeTool path requires explicit mutation plus candidate-submit scope", async () => {
   const toolConfig = { memory: { ...config } };
 
   await assert.rejects(
@@ -297,9 +306,9 @@ test("governed executeTool path is inert by default and works only with explicit
 
   await assert.rejects(
     () => executeTool("memory.submitEvidenceCandidate", validArgs(), {
-      memory: { ...config, grantedScopes: ["memory:read"] },
+      memory: { ...config, grantedScopes: ["memory:read", "memory:write"] },
     }),
-    /missing required scope.*memory:write/,
+    /missing required scope.*memory:evidence-candidate:submit/,
   );
 
   const originalFetch = globalThis.fetch;
