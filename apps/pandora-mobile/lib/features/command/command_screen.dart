@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/pandora_dependencies.dart';
+import '../../core/analytics/owner_analytics.dart';
 import '../../core/data/pandora_repository.dart';
 import '../../core/design/pandora_tokens.dart';
 import '../../core/models/pandora_models.dart';
@@ -43,6 +46,12 @@ class _CommandScreenState extends State<CommandScreen> {
       _objective.text = initial;
       _objective.selection = TextSelection.collapsed(offset: initial.length);
     }
+    unawaited(
+      OwnerAnalytics.shared.capture(
+        OwnerAnalyticsEvent.screenViewed,
+        resultClass: 'ask_pandora',
+      ),
+    );
   }
 
   @override
@@ -69,6 +78,13 @@ class _CommandScreenState extends State<CommandScreen> {
       setState(() => _error = 'Describe what you want Pandora to accomplish.');
       return;
     }
+    final timer = Stopwatch()..start();
+    unawaited(
+      OwnerAnalytics.shared.capture(
+        OwnerAnalyticsEvent.commandSubmitted,
+        resultClass: 'governed_intake',
+      ),
+    );
     setState(() {
       _submitting = true;
       _error = null;
@@ -79,6 +95,14 @@ class _CommandScreenState extends State<CommandScreen> {
       final receipt = await PandoraDependencies.of(context)
           .repository
           .ask(message: objective, idempotencyKey: _submissionKey);
+      timer.stop();
+      unawaited(
+        OwnerAnalytics.shared.capture(
+          OwnerAnalyticsEvent.commandSucceeded,
+          duration: timer.elapsed,
+          resultClass: 'accepted',
+        ),
+      );
       if (mounted) {
         setState(() {
           _receipt = receipt;
@@ -87,6 +111,20 @@ class _CommandScreenState extends State<CommandScreen> {
         });
       }
     } on PandoraRepositoryException catch (error) {
+      timer.stop();
+      final resultClass = error.outcomeMayBeUnknown
+          ? 'outcome_unknown'
+          : error.code == 'PANDORA_UNAVAILABLE'
+              ? 'service_unavailable'
+              : 'rejected';
+      unawaited(
+        OwnerAnalytics.shared.capture(
+          OwnerAnalyticsEvent.commandFailed,
+          duration: timer.elapsed,
+          resultClass: resultClass,
+          errorCode: error.code,
+        ),
+      );
       if (mounted) {
         setState(() {
           _outcomeUnknown = error.outcomeMayBeUnknown;
@@ -106,6 +144,15 @@ class _CommandScreenState extends State<CommandScreen> {
         });
       }
     } catch (_) {
+      timer.stop();
+      unawaited(
+        OwnerAnalytics.shared.capture(
+          OwnerAnalyticsEvent.commandFailed,
+          duration: timer.elapsed,
+          resultClass: 'outcome_unknown',
+          errorCode: 'UNEXPECTED_COMMAND_FAILURE',
+        ),
+      );
       if (mounted) {
         setState(() {
           _outcomeUnknown = true;
@@ -115,6 +162,7 @@ class _CommandScreenState extends State<CommandScreen> {
         });
       }
     } finally {
+      if (timer.isRunning) timer.stop();
       if (mounted) setState(() => _submitting = false);
     }
   }
@@ -147,7 +195,7 @@ class _CommandScreenState extends State<CommandScreen> {
             PandoraSurface(
               title: 'What should Pandora accomplish?',
               subtitle:
-                  'Use ordinary language. Raw prompts are never intended for product analytics.',
+                  'Use ordinary language. Raw prompts are never sent to product analytics.',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -247,19 +295,22 @@ class _GovernedFlow extends StatelessWidget {
             _FlowStep(
               number: '1',
               title: 'Understand',
-              message: 'Resolve the objective, project, baseline, risk, and expected result.',
+              message:
+                  'Resolve the objective, project, baseline, risk, and expected result.',
             ),
             Divider(),
             _FlowStep(
               number: '2',
               title: 'Plan and execute',
-              message: 'Show scope, proof, cost class, approvals, and reversible work before execution.',
+              message:
+                  'Show scope, proof, cost class, approvals, and reversible work before execution.',
             ),
             Divider(),
             _FlowStep(
               number: '3',
               title: 'Verify the working result',
-              message: 'Report what changed, tests, artifact or deployment, remaining gaps, cost, and rollback.',
+              message:
+                  'Report what changed, tests, artifact or deployment, remaining gaps, cost, and rollback.',
             ),
           ],
         ),
