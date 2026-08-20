@@ -224,7 +224,7 @@ class _CommandScreenState extends State<CommandScreen> {
                     label: Text(
                       _submitting
                           ? 'Submitting safely…'
-                          : 'Prepare the request',
+                          : 'Submit to Pandora',
                     ),
                   ),
                   const SizedBox(height: PandoraSpacing.xs),
