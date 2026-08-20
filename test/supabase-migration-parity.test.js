@@ -25,6 +25,12 @@ const currentReplayResult = JSON.parse(
     'utf8',
   ),
 );
+const LEGACY_REPLAY_FILENAMES = new Map([
+  [
+    '20260813014555_remove_projectos_approval_aal2.sql',
+    '20260812034825_remove_projectos_approval_aal2.sql',
+  ],
+]);
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -36,11 +42,14 @@ function migrationSource(version) {
   return readFileSync(join(repositoryRoot, entry.active.path), 'utf8');
 }
 
-function chainSha256(filenames) {
+function chainSha256(filenames, { legacyReplayIdentity = false } = {}) {
   const chain = filenames
     .map((filename) => {
       const source = readFileSync(join(migrationRoot, filename));
-      return `${filename}:${sha256(source)}`;
+      const identity = legacyReplayIdentity
+        ? LEGACY_REPLAY_FILENAMES.get(filename) ?? filename
+        : filename;
+      return `${identity}:${sha256(source)}`;
     })
     .join('\n') + '\n';
   return sha256(Buffer.from(chain));
@@ -91,8 +100,18 @@ test('active Supabase history preserves the captured 52-file recovery chain and 
   assert.equal(manifest.live_chain.last, '20260813105011');
   assert.equal(manifest.live_chain.historical_recovery_last, '20260810104737');
   assert.equal(manifest.live_chain.migration_count, 52);
-  assert.equal(manifest.pending_change.version, '20260812034825');
+  assert.equal(manifest.pending_change.version, '20260813014555');
   assert.equal(manifest.pending_change.provider_version, '20260813014555');
+  assert.equal(manifest.pending_change.legacy_local_version, '20260812034825');
+  assert.equal(manifest.pending_change.identity_repair, 'filename_only_exact_payload_match');
+  assert.equal(
+    manifest.validation.canonical_source_chain_sha256,
+    chainSha256(capturedFiles),
+  );
+  assert.equal(
+    manifest.validation.legacy_replay_chain_sha256,
+    recoveryReplayResult.chain_sha256,
+  );
   assert.equal(manifest.pending_change.live_at_capture, true);
   assert.equal(manifest.source_authority_change.version, '20260813105011');
   assert.equal(manifest.source_authority_change.provider_version, '20260813105011');
@@ -128,9 +147,12 @@ test('active Supabase history preserves the captured 52-file recovery chain and 
   );
 
   assert.equal(recoveryReplayResult.migration_count, manifest.invariants.active_file_count);
-  assert.equal(chainSha256(capturedFiles), recoveryReplayResult.chain_sha256);
   assert.equal(
-    chainSha256(historicalCurrentFiles),
+    chainSha256(capturedFiles, { legacyReplayIdentity: true }),
+    recoveryReplayResult.chain_sha256,
+  );
+  assert.equal(
+    chainSha256(historicalCurrentFiles, { legacyReplayIdentity: true }),
     currentReplayResult.chain_sha256,
   );
   assert.equal(currentReplayResult.provider_equivalence, false);
