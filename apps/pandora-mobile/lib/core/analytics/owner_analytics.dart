@@ -23,13 +23,6 @@ enum OwnerAnalyticsEvent {
   final String wireName;
 }
 
-/// Privacy-safe Pandora Mobile product telemetry.
-///
-/// This client is disabled unless a dedicated Pandora Mobile PostHog host and
-/// project key are supplied at build time. No prompt, message, secret,
-/// customer record, project content, email, or owner identifier is accepted by
-/// this API. Release/build configuration belongs in the governed secret/config
-/// path rather than source control.
 class OwnerAnalytics {
   OwnerAnalytics({
     http.Client? client,
@@ -37,6 +30,8 @@ class OwnerAnalytics {
   })  : _client = client ?? http.Client(),
         _clock = clock ?? DateTime.now,
         _sessionId = 'pm-${(clock ?? DateTime.now)().microsecondsSinceEpoch}';
+
+  static final OwnerAnalytics shared = OwnerAnalytics();
 
   static const _host = String.fromEnvironment('PANDORA_POSTHOG_HOST');
   static const _projectKey =
@@ -97,7 +92,7 @@ class OwnerAnalytics {
           )
           .timeout(const Duration(seconds: 3));
     } catch (_) {
-      // Analytics must never block or alter the owner journey.
+      // Analytics is non-authoritative and must never block the owner journey.
     }
   }
 
