@@ -1,0 +1,73 @@
+name: Pandora mobile owner-test handoff
+
+on:
+  push:
+    branches:
+      - ops/pandora-mobile-apk-handoff-20260820
+    paths:
+      - .github/workflows/pandora-mobile-owner-test-handoff.yml
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  handoff:
+    runs-on: ubuntu-24.04
+    env:
+      SOURCE_SHA: 6e2d39b60dd3507ce91c7f4be51455c59c488659
+      ARTIFACT_ID: '9391083736'
+      TAG: pandora-mobile-0.3.0-rc.2-owner-test-6e2d39b
+      APK_NAME: pandora-mobile-0.3.0-rc.2-owner-test.apk
+    steps:
+      - name: Download exact diagnostic artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifact
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > artifact.zip
+          unzip -q artifact.zip -d artifact
+          apk="$(find artifact -type f -name "$APK_NAME" -print -quit)"
+          manifest="$(find artifact -type f -name 'pandora-mobile-owner-test-diagnostic-manifest.txt' -print -quit)"
+          test -n "$apk" -a -f "$apk"
+          test -n "$manifest" -a -f "$manifest"
+          grep -Fq "source_sha=${SOURCE_SHA}" "$manifest"
+          grep -Fq 'artifact_class=owner-test-diagnostic-pre-release' "$manifest"
+          grep -Fq 'official_release_gate_passed=false' "$manifest"
+          cp "$apk" "$APK_NAME"
+          cp "$manifest" diagnostic-manifest.txt
+          sha256sum "$APK_NAME" > apk-sha256.txt
+      - name: Create private draft handoff
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > release-notes.txt <<EOF
+          Pandora Mobile 0.3.0-rc.2 owner-test diagnostic APK.
+
+          Exact source: ${SOURCE_SHA}
+          Artifact source: GitHub Actions artifact ${ARTIFACT_ID}
+          Official release gate passed: false
+          Production release: false
+          Physical-device verification: pending
+          Authenticated owner journey: pending
+
+          This draft exists only to provide the owner a direct APK download while the remaining test/golden failures are repaired. Publishing remains closed.
+          EOF
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --draft \
+              --prerelease \
+              --target "$SOURCE_SHA" \
+              --title 'Pandora Mobile 0.3.0-rc.2 Owner Test — diagnostic' \
+              --notes-file release-notes.txt
+          fi
+          gh release upload "$TAG" "$APK_NAME" diagnostic-manifest.txt apk-sha256.txt --clobber
+          gh release view "$TAG" --json url,isDraft,isPrerelease,tagName,assets
