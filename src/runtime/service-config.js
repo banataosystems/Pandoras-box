@@ -80,16 +80,20 @@ function buildGitHubEnvironmentConfiguration() {
     };
 }
 async function buildGitHubConfiguration(context) {
+    const requestOidcToken = context.vercelOidcToken?.trim();
+    if (requestOidcToken) {
+        return new github_control_resolver_js_1.GitHubControlResolver().resolve(requestOidcToken, process.env.MCPMASTER_GITHUB_ACCOUNT_ID);
+    }
     if (process.env.GITHUB_TOKEN?.trim()) {
         return buildGitHubEnvironmentConfiguration();
     }
-    const oidcToken = context.vercelOidcToken || process.env.VERCEL_OIDC_TOKEN;
-    if (!oidcToken) {
-        throw new MissingConfigurationError('github', [
-            'Vercel OIDC request token or GITHUB_TOKEN',
-        ]);
+    const environmentOidcToken = process.env.VERCEL_OIDC_TOKEN?.trim();
+    if (environmentOidcToken) {
+        return new github_control_resolver_js_1.GitHubControlResolver().resolve(environmentOidcToken, process.env.MCPMASTER_GITHUB_ACCOUNT_ID);
     }
-    return new github_control_resolver_js_1.GitHubControlResolver().resolve(oidcToken, process.env.MCPMASTER_GITHUB_ACCOUNT_ID);
+    throw new MissingConfigurationError('github', [
+        'Vercel OIDC request token or GITHUB_TOKEN',
+    ]);
 }
 function buildSupabaseEnvironmentConfiguration() {
     const raw = requiredEnvironmentValue('supabase', 'SUPABASE_ACCOUNTS_JSON');
