@@ -57,7 +57,8 @@ class _ConnectionsScreenState extends State<ConnectionsScreen>
     final repository = PandoraDependencies.of(context).repository;
     if (repository is! ProviderConnectionRepository) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Supabase OAuth is not available in this build.')),
+        const SnackBar(
+            content: Text('Supabase OAuth is not available in this build.')),
       );
       return;
     }
@@ -70,14 +71,16 @@ class _ConnectionsScreenState extends State<ConnectionsScreen>
       );
       if (!opened && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pandora could not open Supabase authorization.')),
+          const SnackBar(
+              content: Text('Pandora could not open Supabase authorization.')),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Pandora could not start Supabase authorization. No access was changed.'),
+            content: Text(
+                'Pandora could not start Supabase authorization. No access was changed.'),
           ),
         );
       }
@@ -127,7 +130,8 @@ class _ConnectionsScreenState extends State<ConnectionsScreen>
                     const SizedBox(height: PandoraSpacing.md),
                     const EmptyContent(
                       title: 'No connections returned',
-                      message: 'Pandora has not returned a verified connection list.',
+                      message:
+                          'Pandora has not returned a verified connection list.',
                     ),
                   ],
                 );
@@ -247,7 +251,8 @@ class _SupabaseOAuthCard extends StatelessWidget {
           children: [
             const OwnerSignal(
               label: 'Credential protection',
-              value: 'OAuth + PKCE · tokens remain server-side in Supabase Vault',
+              value:
+                  'OAuth + PKCE · tokens remain server-side in Supabase Vault',
               icon: Icons.lock_outline_rounded,
               tone: PandoraStatusTone.verified,
             ),

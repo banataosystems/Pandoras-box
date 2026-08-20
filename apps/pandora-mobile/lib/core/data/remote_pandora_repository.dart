@@ -178,7 +178,8 @@ class RemotePandoraRepository
       final rawExpiresAt = jsonText(json['expiresAt']);
       return ProviderConnectLaunch(
         authorizeUri: uri,
-        expiresAt: rawExpiresAt.isEmpty ? null : DateTime.tryParse(rawExpiresAt),
+        expiresAt:
+            rawExpiresAt.isEmpty ? null : DateTime.tryParse(rawExpiresAt),
       );
     });
   }
