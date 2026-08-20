@@ -11,7 +11,9 @@ import '../../core/widgets/pandora_surface.dart';
 import '../../core/widgets/status_badge.dart';
 
 class CommandScreen extends StatefulWidget {
-  const CommandScreen({super.key});
+  const CommandScreen({super.key, this.initialPrompt});
+
+  final String? initialPrompt;
 
   @override
   State<CommandScreen> createState() => _CommandScreenState();
@@ -19,10 +21,10 @@ class CommandScreen extends StatefulWidget {
 
 class _CommandScreenState extends State<CommandScreen> {
   static const _suggestions = <String>[
-    'Continue the highest-value safe work across my projects.',
-    'Review all blockers and prepare the safest next actions.',
-    'Check connected services and tell me what needs attention.',
-    'Prepare the next verified release gate without deploying.',
+    'Repair Pandora command connectivity and verify the owner journey.',
+    'Review every verified blocker and prepare the safest next action.',
+    'Prepare the safest next Android release without promoting production.',
+    'Check connected services and separate Down, Stale, and Unknown truth.',
   ];
 
   final _objective = TextEditingController();
@@ -32,6 +34,16 @@ class _CommandScreenState extends State<CommandScreen> {
   String? _submissionKey;
   IntakeReceipt? _receipt;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialPrompt?.trim();
+    if (initial != null && initial.isNotEmpty) {
+      _objective.text = initial;
+      _objective.selection = TextSelection.collapsed(offset: initial.length);
+    }
+  }
 
   @override
   void dispose() {
@@ -78,10 +90,18 @@ class _CommandScreenState extends State<CommandScreen> {
       if (mounted) {
         setState(() {
           _outcomeUnknown = error.outcomeMayBeUnknown;
-          _error = error.outcomeMayBeUnknown
-              ? '${error.message} Check Activity first. If it is not recorded, '
-                  'retry here; Pandora will reuse the same request identity.'
-              : error.message;
+          if (error.code == 'PANDORA_UNAVAILABLE') {
+            _error =
+                'Pandora cannot currently reach the governed command service. '
+                'No successful command is being claimed. Check service health '
+                'and retry after availability returns.';
+          } else if (error.outcomeMayBeUnknown) {
+            _error =
+                '${error.message} Check Activity before retrying. If the request '
+                'is absent, retry here; Pandora will reuse the same request identity.';
+          } else {
+            _error = error.message;
+          }
           if (!error.outcomeMayBeUnknown) _submissionKey = null;
         });
       }
@@ -91,8 +111,7 @@ class _CommandScreenState extends State<CommandScreen> {
           _outcomeUnknown = true;
           _error =
               'Pandora could not confirm whether that request was received. '
-              'Check Activity first. If it is not recorded, retry here with '
-              'the same request identity.';
+              'Check Activity before retrying; the same request identity will be reused.';
         });
       }
     } finally {
@@ -110,23 +129,67 @@ class _CommandScreenState extends State<CommandScreen> {
 
   @override
   Widget build(BuildContext context) => PandoraPage(
-        title: 'Command',
+        title: 'Ask Pandora',
         subtitle: 'State the outcome. Pandora governs the steps.',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const OwnerBriefingHero(
-              eyebrow: 'Natural-language control',
-              title: 'Describe the outcome, not the implementation',
+              eyebrow: 'Intent to result',
+              title: 'Describe the outcome, not the infrastructure',
               message:
-                  'Pandora interprets the objective, checks project truth, prepares a plan, and routes protected work for approval.',
+                  'Pandora resolves the project, explains the plan, executes safe work, verifies the result, and keeps protected changes behind approval gates.',
               icon: Icons.auto_awesome_rounded,
               tone: PandoraStatusTone.informative,
-              statusLabel: 'No protected change runs from this screen',
+              statusLabel: 'Submission does not equal execution',
             ),
             const SizedBox(height: PandoraSpacing.md),
             PandoraSurface(
-              title: 'Start from a common objective',
+              title: 'What should Pandora accomplish?',
+              subtitle:
+                  'Use ordinary language. Raw prompts are never intended for product analytics.',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _objective,
+                    readOnly: _outcomeUnknown,
+                    minLines: 4,
+                    maxLines: 8,
+                    maxLength: 4000,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      hintText:
+                          'For example: Repair Pandora command connectivity and verify the Android owner journey.',
+                      alignLabelWithHint: true,
+                    ),
+                  ),
+                  const SizedBox(height: PandoraSpacing.sm),
+                  FilledButton.icon(
+                    onPressed: _submitting || _outcomeUnknown ? null : _submit,
+                    icon: _submitting
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.arrow_forward_rounded),
+                    label: Text(
+                      _submitting ? 'Submitting safely…' : 'Submit to Pandora',
+                    ),
+                  ),
+                  const SizedBox(height: PandoraSpacing.xs),
+                  Text(
+                    'Build Credits: not estimated · Runtime Credits: not estimated · Risk and rollback are resolved before protected execution.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: PandoraSpacing.md),
+            PandoraSurface(
+              title: 'Common outcomes',
               subtitle: 'Tap one to edit it before submission.',
               child: Wrap(
                 spacing: PandoraSpacing.xs,
@@ -144,50 +207,11 @@ class _CommandScreenState extends State<CommandScreen> {
               ),
             ),
             const SizedBox(height: PandoraSpacing.md),
-            PandoraSurface(
-              title: 'What do you want Pandora to do?',
-              subtitle:
-                  'Use ordinary language. You will see the plan and required proof or approval separately.',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _objective,
-                    readOnly: _outcomeUnknown,
-                    minLines: 4,
-                    maxLines: 8,
-                    maxLength: 4000,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      hintText:
-                          'For example: Continue the highest-value safe work on Pandora Mobile.',
-                      alignLabelWithHint: true,
-                    ),
-                  ),
-                  const SizedBox(height: PandoraSpacing.sm),
-                  FilledButton.icon(
-                    onPressed: _submitting || _outcomeUnknown ? null : _submit,
-                    icon: _submitting
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.arrow_forward_rounded),
-                    label: Text(
-                      _submitting
-                          ? 'Recording request…'
-                          : 'Prepare the request',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: PandoraSpacing.md),
             const _GovernedFlow(),
             if (_error != null) ...[
               const SizedBox(height: PandoraSpacing.md),
               PandoraSurface(
-                title: 'Request needs attention',
+                title: 'Command not completed',
                 leading: Icon(
                   Icons.warning_amber_rounded,
                   color: context.pandoraPalette.attention,
@@ -217,26 +241,25 @@ class _GovernedFlow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PandoraSurface(
-        title: 'What happens next',
+        title: 'Outcome loop',
         child: Column(
           children: const [
             _FlowStep(
               number: '1',
-              title: 'Interpret',
-              message: 'Resolve the project, objective, constraints, and risk.',
+              title: 'Understand',
+              message: 'Resolve the objective, project, baseline, risk, and expected result.',
             ),
             Divider(),
             _FlowStep(
               number: '2',
-              title: 'Prepare proof',
-              message: 'Show what exists, what is missing, and how to recover.',
+              title: 'Plan and execute',
+              message: 'Show scope, proof, cost class, approvals, and reversible work before execution.',
             ),
             Divider(),
             _FlowStep(
               number: '3',
-              title: 'Govern execution',
-              message:
-                  'Create a plan. Approval and execution remain separate actions.',
+              title: 'Verify the working result',
+              message: 'Report what changed, tests, artifact or deployment, remaining gaps, cost, and rollback.',
             ),
           ],
         ),
@@ -255,11 +278,25 @@ class _FlowStep extends StatelessWidget {
   final String message;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: CircleAvatar(radius: 16, child: Text(number)),
-        title: Text(title),
-        subtitle: Text(message),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: PandoraSpacing.xs),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(radius: 16, child: Text(number)),
+            const SizedBox(width: PandoraSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: PandoraSpacing.xxs),
+                  Text(message),
+                ],
+              ),
+            ),
+          ],
+        ),
       );
 }
 
@@ -272,7 +309,7 @@ class _CommandReceiptCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = receipt.status;
     return PandoraSurface(
-      title: 'Request recorded',
+      title: 'Request accepted',
       leading: Icon(
         Icons.check_circle_outline_rounded,
         color: context.pandoraPalette.verified,
@@ -281,11 +318,15 @@ class _CommandReceiptCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(receipt.reply),
+          const SizedBox(height: PandoraSpacing.sm),
+          const Text(
+            'Accepted means Pandora recorded the intent. It does not claim that execution, deployment, or production verification has happened.',
+          ),
           const SizedBox(height: PandoraSpacing.md),
           StatusBadge(
             label: receipt.needsApproval
-                ? 'Approval will be required'
-                : 'Planning safely',
+                ? 'Owner approval required before protected work'
+                : 'Accepted for governed planning',
             tone: receipt.needsApproval
                 ? PandoraStatusTone.attention
                 : PandoraStatusTone.informative,
