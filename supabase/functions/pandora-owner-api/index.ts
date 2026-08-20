@@ -1053,7 +1053,7 @@ async function acceptIntake(
     p_project_name: null,
     p_repository: null,
     p_request_type: "work",
-    p_source: "flutterflow_owner_app",
+    p_source: "api",
     p_idempotency_key: idempotency,
   });
   if (error) throw new Error("INTAKE_FAILED");
