@@ -1,0 +1,71 @@
+name: Pandora mobile test diagnostic
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pandora-mobile-test-diagnostic.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/pandora-mobile-owner-outcome-p0-20260820' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+      - name: Resolve locked dependencies
+        working-directory: apps/pandora-mobile
+        run: flutter pub get --enforce-lockfile
+      - name: Capture full and focused test diagnostics
+        working-directory: apps/pandora-mobile
+        shell: bash
+        run: |
+          set -u
+          mkdir -p build/test-diagnostic
+
+          set +e
+          flutter test test/core/owner_projection_test.dart --reporter expanded \
+            > build/test-diagnostic/owner_projection.log 2>&1
+          echo "$?" > build/test-diagnostic/owner_projection.exit
+
+          flutter test test/accessibility/owner_mobile_matrix_test.dart --reporter expanded \
+            > build/test-diagnostic/owner_mobile_matrix.log 2>&1
+          echo "$?" > build/test-diagnostic/owner_mobile_matrix.exit
+
+          flutter test --reporter expanded \
+            > build/test-diagnostic/full.log 2>&1
+          full_exit="$?"
+          echo "$full_exit" > build/test-diagnostic/full.exit
+          set -e
+
+          {
+            echo "source_sha=${{ github.event.pull_request.head.sha }}"
+            echo "owner_projection_exit=$(cat build/test-diagnostic/owner_projection.exit)"
+            echo "owner_mobile_matrix_exit=$(cat build/test-diagnostic/owner_mobile_matrix.exit)"
+            echo "full_exit=$full_exit"
+            echo
+            echo '--- failure markers ---'
+            grep -nE -C 8 \
+              'Some tests failed|TestFailure|EXCEPTION CAUGHT|══╡|Expected:|Actual:|overflowed|FAILED|Error:' \
+              build/test-diagnostic/full.log || true
+          } > build/test-diagnostic/summary.txt
+
+          exit 0
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pandora-mobile-test-diagnostic
+          path: apps/pandora-mobile/build/test-diagnostic
+          if-no-files-found: error
+          include-hidden-files: true
