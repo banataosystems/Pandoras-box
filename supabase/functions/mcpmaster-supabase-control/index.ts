@@ -155,6 +155,83 @@ async function fetchRpc(
   return rpcResponse.json();
 }
 
+async function serviceRpc(
+  supabaseUrl: string,
+  key: string,
+  rpcName: string,
+  params: Record<string, unknown>,
+): Promise<unknown | undefined> {
+  const rpcResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/${rpcName}`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      authorization: `Bearer ${key}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(params),
+    redirect: "error",
+  });
+  if (!rpcResponse.ok) return undefined;
+  return rpcResponse.json();
+}
+
+async function refreshSupabaseOAuthAccounts(supabaseUrl: string, key: string) {
+  const candidateValue = await serviceRpc(
+    supabaseUrl,
+    key,
+    "get_supabase_oauth_refresh_accounts",
+    { p_organization_id: CONTROL_ORGANIZATION_ID },
+  );
+  if (candidateValue === undefined) throw new Error("oauth_refresh_catalog_failed");
+  if (!Array.isArray(candidateValue)) return;
+
+  for (const rawCandidate of candidateValue) {
+    if (!isRecord(rawCandidate)) throw new Error("oauth_refresh_candidate_invalid");
+    const installationId = requiredString(rawCandidate, "installationId");
+    const clientId = requiredString(rawCandidate, "clientId");
+    const clientSecret = requiredString(rawCandidate, "clientSecret");
+    const refreshToken = requiredString(rawCandidate, "refreshToken");
+    if (!installationId || !clientId || !clientSecret || !refreshToken) {
+      throw new Error("oauth_refresh_candidate_invalid");
+    }
+    const tokenResponse = await fetch("https://api.supabase.com/v1/oauth/token", {
+      method: "POST",
+      headers: {
+        authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+        "content-type": "application/x-www-form-urlencoded",
+        accept: "application/json",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      }),
+      redirect: "error",
+    });
+    if (!tokenResponse.ok) throw new Error("oauth_refresh_failed");
+    const refreshed = await tokenResponse.json();
+    if (!isRecord(refreshed)) throw new Error("oauth_refresh_invalid");
+    const accessToken = requiredString(refreshed, "access_token");
+    const nextRefreshToken = requiredString(refreshed, "refresh_token") || refreshToken;
+    const expiresIn = typeof refreshed.expires_in === "number" &&
+        Number.isFinite(refreshed.expires_in)
+      ? Math.max(60, Math.floor(refreshed.expires_in))
+      : 3600;
+    if (!accessToken) throw new Error("oauth_refresh_invalid");
+    const rotated = await serviceRpc(
+      supabaseUrl,
+      key,
+      "rotate_supabase_oauth_tokens",
+      {
+        p_installation_id: installationId,
+        p_access_token: accessToken,
+        p_refresh_token: nextRefreshToken,
+        p_expires_in: expiresIn,
+      },
+    );
+    if (rotated === undefined) throw new Error("oauth_refresh_rotation_failed");
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -450,6 +527,9 @@ Deno.serve(async (request: Request) => {
   if (!supabaseUrl || !key) return response(503, { ok: false, error: "control_database_not_configured" });
 
   try {
+    if (route.action === "catalog") {
+      await refreshSupabaseOAuthAccounts(supabaseUrl, key);
+    }
     const payload = await fetchRpc(supabaseUrl, key, route.rpc, route.params);
     if (payload === undefined) return response(502, { ok: false, error: "control_operation_unavailable" });
 

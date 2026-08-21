@@ -1,0 +1,142 @@
+name: Pandora mobile diagnostic APK
+
+on:
+  push:
+    branches:
+      - fix/pandora-mobile-owner-outcome-p0-20260820
+    paths:
+      - .github/workflows/pandora-mobile-diagnostic-apk.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      OWNER_TEST_FILENAME: pandora-mobile-0.3.0-rc.2-owner-test.apk
+      EXPECTED_APP_VERSION: 0.3.0-rc.2+5
+      SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify exact source checkout
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+          channel: stable
+      - name: Materialize disposable Flutter platforms
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .pandora-mobile-build
+          mkdir .pandora-mobile-build
+          cd .pandora-mobile-build
+          flutter create --platforms=android,web --org com.banataosystems --project-name pandora_mobile .
+          cp -R ../apps/pandora-mobile/platform/android/. ./android/
+          rm -rf lib test assets pubspec.yaml pubspec.lock analysis_options.yaml
+          cp -R ../apps/pandora-mobile/lib ./lib
+          cp -R ../apps/pandora-mobile/test ./test
+          cp -R ../apps/pandora-mobile/assets ./assets
+          cp -R ../apps/pandora-mobile/docs ./docs
+          cp -R ../apps/pandora-mobile/platform ./platform
+          cp ../apps/pandora-mobile/pubspec.yaml ./pubspec.yaml
+          cp ../apps/pandora-mobile/analysis_options.yaml ./analysis_options.yaml
+          test -f ../apps/pandora-mobile/pubspec.lock
+          cp ../apps/pandora-mobile/pubspec.lock ./pubspec.lock
+          python3 ../apps/pandora-mobile/tool/configure_owner_test_android.py android/app/src/main/AndroidManifest.xml
+      - name: Resolve dependencies without lock drift
+        working-directory: .pandora-mobile-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp pubspec.lock pubspec.lock.expected
+          flutter pub get --enforce-lockfile
+          cmp pubspec.lock.expected pubspec.lock
+          rm pubspec.lock.expected
+      - name: Check formatting
+        working-directory: .pandora-mobile-build
+        run: dart format --output=none --set-exit-if-changed lib test
+      - name: Analyze
+        working-directory: .pandora-mobile-build
+        run: flutter analyze
+      - name: Capture current test status
+        id: tests
+        working-directory: .pandora-mobile-build
+        shell: bash
+        run: |
+          set +e
+          flutter test --reporter expanded > diagnostic-test.log 2>&1
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          echo "Captured current test result: $code"
+      - name: Build Android Owner Test APK
+        working-directory: .pandora-mobile-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(awk '/^version:/{print $2; exit}' pubspec.yaml)" = "$EXPECTED_APP_VERSION"
+          flutter build apk --release \
+            --dart-define=PANDORA_SOURCE_REVISION=${SOURCE_SHA} \
+            --dart-define=PANDORA_RELEASE_SHA=${SOURCE_SHA} \
+            --dart-define=PANDORA_APP_VERSION=${EXPECTED_APP_VERSION}
+          cp build/app/outputs/flutter-apk/app-release.apk \
+            "build/app/outputs/flutter-apk/${OWNER_TEST_FILENAME}"
+      - name: Inspect Android identity and permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=".pandora-mobile-build/build/app/outputs/flutter-apk/${OWNER_TEST_FILENAME}"
+          evidence=.pandora-mobile-build/android-package-evidence
+          mkdir -p "$evidence"
+          aapt="$(find "${ANDROID_HOME:?}/build-tools" -type f -name aapt | sort -V | tail -1)"
+          test -x "$aapt"
+          "$aapt" dump badging "$apk" > "$evidence/badging.txt"
+          "$aapt" dump permissions "$apk" > "$evidence/permissions.txt"
+          grep -Fq "package: name='com.banataosystems.pandora_mobile'" "$evidence/badging.txt"
+          grep -Fq "versionCode='5'" "$evidence/badging.txt"
+          grep -Fq "versionName='0.3.0-rc.2'" "$evidence/badging.txt"
+          grep -Fq "application-label:'Pandora'" "$evidence/badging.txt"
+          if grep -Eiq 'ACCESS_(FINE|COARSE|BACKGROUND)_LOCATION|READ_CONTACTS|WRITE_CONTACTS|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|READ_MEDIA_|CAMERA|RECORD_AUDIO|BLUETOOTH_(SCAN|CONNECT|ADVERTISE)|QUERY_ALL_PACKAGES|REQUEST_INSTALL_PACKAGES|SYSTEM_ALERT_WINDOW' "$evidence/permissions.txt"; then
+            echo "Unexpected sensitive Android permission detected." >&2
+            exit 1
+          fi
+      - name: Write diagnostic artifact manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=".pandora-mobile-build/build/app/outputs/flutter-apk/${OWNER_TEST_FILENAME}"
+          manifest=.pandora-mobile-build/pandora-mobile-owner-test-diagnostic-manifest.txt
+          {
+            echo "source_sha=${SOURCE_SHA}"
+            echo "app_version=${EXPECTED_APP_VERSION}"
+            echo "artifact_class=owner-test-diagnostic-pre-release"
+            echo "official_release_gate_passed=false"
+            echo "tests_exit_code=${{ steps.tests.outputs.exit_code }}"
+            echo "production_release=false"
+            echo "physical_device_verified=false"
+            echo "authenticated_owner_journey_verified=false"
+            echo "store_release_eligible=false"
+            echo "apk_sha256=$(sha256sum "$apk" | cut -d ' ' -f1)"
+            echo "apk_size_bytes=$(stat -c %s "$apk")"
+            echo "lock_sha256=$(sha256sum .pandora-mobile-build/pubspec.lock | cut -d ' ' -f1)"
+          } > "$manifest"
+      - name: Upload Android Owner Test diagnostic artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pandora-mobile-0.3.0-rc.2-owner-test-diagnostic
+          path: |
+            .pandora-mobile-build/build/app/outputs/flutter-apk/pandora-mobile-0.3.0-rc.2-owner-test.apk
+            .pandora-mobile-build/pandora-mobile-owner-test-diagnostic-manifest.txt
+            .pandora-mobile-build/android-package-evidence
+            .pandora-mobile-build/diagnostic-test.log
+          if-no-files-found: error
+          include-hidden-files: true

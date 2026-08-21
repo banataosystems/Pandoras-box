@@ -7,3 +7,6 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Disposable Flutter platform materialization for Pandora Mobile
+.pandora-mobile-build/
