@@ -29,7 +29,7 @@ test('Pandora owner API uses a canonical ProjectOS intake source', () => {
 });
 
 test('Real Route Integration: pipeline is wired and invoked', () => {
-  assert.match(ownerApiSource, /require\(["']\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.js["']\)/, 'Must import pipeline');
+  assert.match(ownerApiSource, /import \{ executeOwnerCommand \} from ["']\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts["']/, 'Must import pipeline natively');
   assert.match(ownerApiSource, /executeOwnerCommand\s*\(/, 'Must invoke executeOwnerCommand');
   assert.match(ownerApiSource, /idempotencyKey:\s*providedKey/, 'Must pass idempotencyKey to execution');
 });
