@@ -395,7 +395,7 @@ test('Blocker 2: critical/destructive commands require governed approval but NO 
 
 test('Blocker 2: owner-command-pipeline source contains zero AAL2 / TOTP / MFA tokens', () => {
   const source = fs.readFileSync(
-    path.join(__dirname, '../src/projectos/owner-command-pipeline.js'),
+    path.join(__dirname, '../src/projectos/owner-command-pipeline.ts'),
     'utf8'
   );
   assert.doesNotMatch(source, /aal2|totp|mfa/i);
