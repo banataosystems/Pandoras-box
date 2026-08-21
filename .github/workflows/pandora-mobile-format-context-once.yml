@@ -1,0 +1,64 @@
+name: Pandora mobile package-context repair
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pandora-mobile-format-context-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair-once:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/pandora-mobile-owner-outcome-p0-20260820' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact repair branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: fix/pandora-mobile-owner-outcome-p0-20260820
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+      - name: Resolve locked package context
+        working-directory: apps/pandora-mobile
+        run: flutter pub get --enforce-lockfile
+      - name: Align command control and exact regression expectation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          command = Path('apps/pandora-mobile/lib/features/command/command_screen.dart')
+          text = command.read_text()
+          old = "_submitting ? 'Submitting safely…' : 'Prepare the request'"
+          new = "_submitting ? 'Submitting safely…' : 'Submit to Pandora'"
+          if text.count(old) != 1:
+              raise SystemExit(f'command label replacement count={text.count(old)}')
+          command.write_text(text.replace(old, new, 1))
+
+          test = Path('apps/pandora-mobile/test/app/pandora_shell_test.dart')
+          text = test.read_text()
+          old = "find.text('Prepare the request')"
+          if text.count(old) != 2:
+              raise SystemExit(f'legacy command test replacement count={text.count(old)}')
+          test.write_text(text.replace(old, "find.text('Submit to Pandora')", 2))
+          PY
+          cd apps/pandora-mobile
+          dart format lib/features/command/command_screen.dart test/app/pandora_shell_test.dart
+          flutter test test/app/pandora_shell_test.dart --plain-name 'ambiguous command retry reuses the same request identity' --reporter expanded
+      - name: Commit focused repair and remove helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/pandora-mobile-format-context-once.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/pandora-mobile/lib/features/command/command_screen.dart apps/pandora-mobile/test/app/pandora_shell_test.dart .github/workflows/pandora-mobile-format-context-once.yml
+          git commit -m 'fix(mobile): align command control with reviewed owner journey'
+          git push origin HEAD:fix/pandora-mobile-owner-outcome-p0-20260820

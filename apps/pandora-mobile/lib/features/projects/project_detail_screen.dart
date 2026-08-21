@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/pandora_dependencies.dart';
+import '../../core/data/owner_projection.dart';
 import '../../core/data/pandora_repository.dart';
 import '../../core/design/pandora_tokens.dart';
 import '../../core/models/pandora_models.dart';
@@ -44,15 +45,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
         body: PandoraPage(
-          title: widget.project.name,
+          title: canonicalOwnerProjectLabel(widget.project),
           subtitle: widget.project.purpose,
-          actions: [
-            IconButton(
-              tooltip: 'Refresh ${widget.project.name}',
-              onPressed: () => _controller?.refresh(),
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-          ],
           onRefresh: () => _controller!.refresh(),
           child: AnimatedBuilder(
             animation: _controller!,
@@ -115,9 +109,9 @@ class _LoadingProjectSnapshot extends StatelessWidget {
           _ProjectSnapshot(summary: project),
           const SizedBox(height: PandoraSpacing.md),
           const OwnerSignal(
-            label: 'Refreshing evidence',
+            label: 'Refreshing',
             value:
-                'The last verified summary stays visible while Pandora checks deeper project detail.',
+                'The last usable summary stays visible while Pandora checks deeper evidence.',
             icon: Icons.sync_rounded,
             tone: PandoraStatusTone.informative,
           ),
@@ -128,25 +122,41 @@ class _LoadingProjectSnapshot extends StatelessWidget {
 }
 
 class _ProjectSnapshot extends StatelessWidget {
-  const _ProjectSnapshot({required this.summary});
+  const _ProjectSnapshot({required this.summary, this.tasks = const []});
 
   final ProjectSummary summary;
+  final List<ProjectTask> tasks;
 
   @override
-  Widget build(BuildContext context) => OwnerBriefingHero(
-        eyebrow: 'Current project truth',
-        title: summary.phase,
-        message: summary.nextAction ??
-            'No verified next autonomous action is recorded yet.',
-        icon: summary.blocker == null
-            ? Icons.workspaces_outline
-            : Icons.block_rounded,
-        tone: summary.blocker == null
-            ? statusToneFor(summary.status)
-            : PandoraStatusTone.critical,
-        statusLabel: summary.status,
-        footer: FreshnessLabel(freshness: summary.freshness),
-      );
+  Widget build(BuildContext context) {
+    final state = resolveOwnerProjectState(summary, tasks: tasks);
+    return OwnerBriefingHero(
+      eyebrow: 'Current project truth',
+      title: state.label,
+      message: summary.nextAction ??
+          (summary.phase == 'Phase not verified'
+              ? 'No verified next autonomous action is recorded yet.'
+              : summary.phase),
+      icon: switch (state) {
+        OwnerProjectState.ownerActionRequired => Icons.priority_high_rounded,
+        OwnerProjectState.blocked => Icons.block_rounded,
+        OwnerProjectState.executing => Icons.play_circle_outline_rounded,
+        OwnerProjectState.monitoring => Icons.radar_rounded,
+        OwnerProjectState.idle => Icons.pause_circle_outline_rounded,
+        OwnerProjectState.archived => Icons.archive_outlined,
+      },
+      tone: switch (state) {
+        OwnerProjectState.ownerActionRequired => PandoraStatusTone.attention,
+        OwnerProjectState.blocked => PandoraStatusTone.critical,
+        OwnerProjectState.executing => PandoraStatusTone.informative,
+        OwnerProjectState.monitoring => PandoraStatusTone.informative,
+        OwnerProjectState.idle => PandoraStatusTone.neutral,
+        OwnerProjectState.archived => PandoraStatusTone.neutral,
+      },
+      statusLabel: compactProofSummary(summary),
+      footer: FreshnessLabel(freshness: summary.freshness),
+    );
+  }
 }
 
 class _DetailContent extends StatelessWidget {
@@ -161,7 +171,15 @@ class _DetailContent extends StatelessWidget {
         tasks.where((item) => item.state == ProjectTaskState.complete).toList();
     final blocked =
         tasks.where((item) => item.state == ProjectTaskState.blocked).toList();
-    final inProgress = tasks.where((item) => item.state.isActive).toList();
+    final inProgress = tasks
+        .where(
+          (item) =>
+              item.state == ProjectTaskState.inProgress ||
+              item.state == ProjectTaskState.ready ||
+              item.state == ProjectTaskState.waitingReview ||
+              item.state == ProjectTaskState.waitingApproval,
+        )
+        .toList();
     final notActive = tasks
         .where(
           (item) =>
@@ -175,7 +193,7 @@ class _DetailContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ProjectSnapshot(summary: detail.summary),
+        _ProjectSnapshot(summary: detail.summary, tasks: tasks),
         if (detail.summary.blocker != null) ...[
           const SizedBox(height: PandoraSpacing.sm),
           OwnerSignal(
@@ -196,10 +214,12 @@ class _DetailContent extends StatelessWidget {
               tone: PandoraStatusTone.verified,
             ),
             OwnerMetric(
-              label: 'In progress',
+              label: 'Working',
               value: '${inProgress.length}',
               icon: Icons.autorenew_rounded,
-              tone: PandoraStatusTone.informative,
+              tone: inProgress.isEmpty
+                  ? PandoraStatusTone.neutral
+                  : PandoraStatusTone.informative,
             ),
             OwnerMetric(
               label: 'Blocked',
@@ -212,15 +232,31 @@ class _DetailContent extends StatelessWidget {
           ],
         ),
         const SizedBox(height: PandoraSpacing.md),
-        PandoraSurface(
-          title: 'Proof ladder',
-          subtitle: detail.summary.progressLabel,
-          trailing: FreshnessLabel(freshness: detail.summary.freshness),
-          child: ProofLadder(stages: detail.summary.evidenceStages),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: ExpansionTile(
+            title: const Text('Verification'),
+            subtitle: Text(compactProofSummary(detail.summary)),
+            trailing: const Icon(Icons.expand_more_rounded),
+            childrenPadding: const EdgeInsets.fromLTRB(
+              PandoraSpacing.lg,
+              0,
+              PandoraSpacing.lg,
+              PandoraSpacing.md,
+            ),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FreshnessLabel(freshness: detail.summary.freshness),
+              ),
+              const SizedBox(height: PandoraSpacing.sm),
+              ProofLadder(stages: detail.summary.evidenceStages),
+            ],
+          ),
         ),
         if (inProgress.isNotEmpty) ...[
           const SizedBox(height: PandoraSpacing.md),
-          _TaskSection(title: 'In progress', tasks: inProgress),
+          _TaskSection(title: 'Working', tasks: inProgress),
         ],
         if (blocked.isNotEmpty) ...[
           const SizedBox(height: PandoraSpacing.md),
@@ -249,9 +285,9 @@ class _DetailContent extends StatelessWidget {
         if (tasks.isEmpty) ...[
           const SizedBox(height: PandoraSpacing.md),
           const EmptyContent(
-            title: 'No task breakdown returned',
+            title: 'No verified task breakdown',
             message:
-                'The project summary is visible, but Pandora has not returned task-level proof.',
+                'Pandora will not infer active work from an empty task record.',
           ),
         ],
         const SizedBox(height: PandoraSpacing.md),
@@ -303,14 +339,28 @@ class _TaskSection extends StatelessWidget {
           ),
           children: [
             for (var index = 0; index < tasks.length; index++) ...[
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(tasks[index].title),
-                subtitle: Text(tasks[index].status),
-                trailing: StatusBadge(
-                  label: tasks[index].risk.label,
-                  tone: statusToneFor(tasks[index].risk.label),
-                  compact: true,
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(vertical: PandoraSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      tasks[index].title,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: PandoraSpacing.xxs),
+                    Text(tasks[index].status),
+                    const SizedBox(height: PandoraSpacing.xs),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: StatusBadge(
+                        label: tasks[index].risk.label,
+                        tone: statusToneFor(tasks[index].risk.label),
+                        compact: true,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               if (index != tasks.length - 1) const Divider(),
@@ -326,21 +376,36 @@ class _EvidenceRow extends StatelessWidget {
   final EvidenceItem item;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(providerIconFor(item.provider)),
-        title: Text(item.type),
-        subtitle: Text(
-          [
-            item.provider,
-            item.verdict ?? item.status,
-            ownerRelativeTime(item.observedAt),
-          ].where((value) => value.isNotEmpty).join(' · '),
-        ),
-        trailing: StatusBadge(
-          label: item.verdict ?? item.status,
-          tone: statusToneFor(item.verdict ?? item.status),
-          compact: true,
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: PandoraSpacing.sm),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(providerIconFor(item.provider), size: 20),
+            const SizedBox(width: PandoraSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.type),
+                  const SizedBox(height: PandoraSpacing.xxs),
+                  Text(
+                    [
+                      item.provider,
+                      ownerRelativeTime(item.observedAt),
+                    ].where((value) => value.isNotEmpty).join(' · '),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: PandoraSpacing.xs),
+                  StatusBadge(
+                    label: item.verdict ?? item.status,
+                    tone: statusToneFor(item.verdict ?? item.status),
+                    compact: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       );
 }
