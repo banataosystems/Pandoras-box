@@ -36,8 +36,8 @@ jobs:
     env:
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       GOLDENS_UPDATED: ${{ github.event_name == 'workflow_dispatch' && inputs.update_goldens == true && 'true' || 'false' }}
-      OWNER_TEST_FILENAME: pandora-mobile-0.3.0-rc.2-owner-test.apk
-      EXPECTED_APP_VERSION: 0.3.0-rc.2+5
+      OWNER_TEST_FILENAME: pandora-mobile-0.3.0-rc.3-owner-test.apk
+      EXPECTED_APP_VERSION: 0.3.0-rc.3+6
     steps:
       - name: Register exact-head evidence run
         shell: bash
@@ -227,8 +227,8 @@ jobs:
           "$aapt" dump badging "$apk" > "$evidence/badging.txt"
           "$aapt" dump permissions "$apk" > "$evidence/permissions.txt"
           grep -Fq "package: name='com.banataosystems.pandora_mobile'" "$evidence/badging.txt"
-          grep -Fq "versionCode='5'" "$evidence/badging.txt"
-          grep -Fq "versionName='0.3.0-rc.2'" "$evidence/badging.txt"
+          grep -Fq "versionCode='6'" "$evidence/badging.txt"
+          grep -Fq "versionName='0.3.0-rc.3'" "$evidence/badging.txt"
           grep -Fq "application-label:'Pandora'" "$evidence/badging.txt"
           if grep -Eiq \
             'ACCESS_(FINE|COARSE|BACKGROUND)_LOCATION|READ_CONTACTS|WRITE_CONTACTS|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|READ_MEDIA_|CAMERA|RECORD_AUDIO|BLUETOOTH_(SCAN|CONNECT|ADVERTISE)|QUERY_ALL_PACKAGES|REQUEST_INSTALL_PACKAGES|SYSTEM_ALERT_WINDOW' \

@@ -77,10 +77,12 @@ test('active Supabase history preserves the captured 52-file recovery chain and 
     '20260817145550_add_vercel_control_adapter.sql',
     '20260817145659_add_vercel_git_binding_clear.sql',
     '20260817145929_add_vercel_async_git_link_queue.sql',
+    '20260820042000_pandora_supabase_oauth_connection.sql',
     '20260820090000_add_pandora_outcome_lifecycle_contracts.sql',
     '20260821024500_projectos_owner_read_completion.sql',
   ]);
   assert.deepEqual(postSnapshotFiles, [
+    '20260820042000_pandora_supabase_oauth_connection.sql',
     '20260820090000_add_pandora_outcome_lifecycle_contracts.sql',
     '20260821024500_projectos_owner_read_completion.sql',
   ]);
