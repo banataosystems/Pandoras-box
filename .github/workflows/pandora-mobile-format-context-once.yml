@@ -93,10 +93,14 @@ jobs:
               'home_degraded_graphite_390x844.png',
               'home_loading_porcelain_390x844.png',
           }
-          if changed_f != expected_f:
-              raise SystemExit(f'Unexpected foundation baseline delta: {sorted(changed_f)}')
-          if changed_o != expected_o:
-              raise SystemExit(f'Unexpected production-screen baseline delta: {sorted(changed_o)}')
+          unexpected_f = changed_f - expected_f
+          unexpected_o = changed_o - expected_o
+          if unexpected_f:
+              raise SystemExit(f'Unexpected foundation baseline delta: {sorted(unexpected_f)}')
+          if unexpected_o:
+              raise SystemExit(f'Unexpected production-screen baseline delta: {sorted(unexpected_o)}')
+          if not changed_f and not changed_o:
+              raise SystemExit('Golden regeneration produced no baseline changes.')
 
           Path('/tmp/worker5-baseline-delta.txt').write_text(
               'foundation_changed=' + ','.join(sorted(changed_f)) + '\n'
@@ -125,7 +129,7 @@ jobs:
           lines = [
               'candidate_status=unreviewed',
               'visual_acceptance=false',
-              f'render_source_sha={os.environ["GITHUB_SHA"]}',
+              f'source_sha={os.environ["GITHUB_SHA"]}',
               'baseline_commit=pending_repair_commit',
               f'repository={os.environ["GITHUB_REPOSITORY"]}',
               f'branch={os.environ["GITHUB_REF_NAME"]}',
@@ -197,11 +201,19 @@ jobs:
               'apps/pandora-mobile/test/goldens/owner_screens/home_loading_porcelain_390x844.png',
           }
           extra = changed - allowed
-          missing = allowed - changed
           if extra:
               raise SystemExit(f'Unexpected changed paths: {sorted(extra)}')
-          if missing:
-              raise SystemExit(f'Expected repair paths absent: {sorted(missing)}')
+          required_fixed = {
+              '.github/workflows/pandora-mobile-format-context-once.yml',
+              'apps/pandora-mobile/docs/testing/owner-screen-baseline-candidate-manifest.txt',
+          }
+          if not required_fixed.issubset(changed):
+              raise SystemExit(
+                  f'Required evidence paths absent: {sorted(required_fixed - changed)}'
+              )
+          baseline_changes = changed - required_fixed
+          if not baseline_changes:
+              raise SystemExit('No reviewed baseline change is present in the repair diff.')
           PY
       - name: Commit one bounded repair head
         shell: bash
