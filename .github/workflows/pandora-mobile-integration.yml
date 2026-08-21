@@ -46,6 +46,9 @@ jobs:
       - name: Build Android debug APK
         working-directory: .pandora-mobile-build
         run: flutter build apk --debug
+      - name: Prepare owner-installable APK
+        working-directory: .pandora-mobile-build
+        run: cp build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/pandora-bok-preview.apk
       - name: Upload web artifact
         uses: actions/upload-artifact@v7
         with:
@@ -56,3 +59,11 @@ jobs:
         with:
           name: pandora-mobile-android-debug
           path: .pandora-mobile-build/build/app/outputs/flutter-apk/app-debug.apk
+      - name: Upload one-tap Android APK
+        id: owner_apk
+        uses: actions/upload-artifact@v7
+        with:
+          path: .pandora-mobile-build/build/app/outputs/flutter-apk/pandora-bok-preview.apk
+          archive: false
+      - name: Report one-tap APK URL
+        run: echo "Owner APK URL: ${{ steps.owner_apk.outputs.artifact-url }}"
