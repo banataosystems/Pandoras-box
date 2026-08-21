@@ -80,16 +80,20 @@ function buildGitHubEnvironmentConfiguration() {
     };
 }
 async function buildGitHubConfiguration(context) {
+    // Production Vercel/OIDC is the governed primary path. A legacy GITHUB_TOKEN
+    // must never shadow the Supabase/Vault control catalog in production; keep
+    // the environment token only as the explicit non-OIDC fallback for local or
+    // recovery runtimes.
+    const oidcToken = context.vercelOidcToken || process.env.VERCEL_OIDC_TOKEN;
+    if (oidcToken) {
+        return new github_control_resolver_js_1.GitHubControlResolver().resolve(oidcToken, process.env.MCPMASTER_GITHUB_ACCOUNT_ID);
+    }
     if (process.env.GITHUB_TOKEN?.trim()) {
         return buildGitHubEnvironmentConfiguration();
     }
-    const oidcToken = context.vercelOidcToken || process.env.VERCEL_OIDC_TOKEN;
-    if (!oidcToken) {
-        throw new MissingConfigurationError('github', [
-            'Vercel OIDC request token or GITHUB_TOKEN',
-        ]);
-    }
-    return new github_control_resolver_js_1.GitHubControlResolver().resolve(oidcToken, process.env.MCPMASTER_GITHUB_ACCOUNT_ID);
+    throw new MissingConfigurationError('github', [
+        'Vercel OIDC request token or GITHUB_TOKEN',
+    ]);
 }
 function buildSupabaseEnvironmentConfiguration() {
     const raw = requiredEnvironmentValue('supabase', 'SUPABASE_ACCOUNTS_JSON');
