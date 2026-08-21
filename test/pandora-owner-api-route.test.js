@@ -20,7 +20,7 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
     )
     .replace(
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
-      'const { executeOwnerCommand } = require("../../dist/projectos/owner-command-pipeline.js");'
+      'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
@@ -118,7 +118,7 @@ test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval
     )
     .replace(
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
-      'const { executeOwnerCommand } = require("../../dist/projectos/owner-command-pipeline.js");'
+      'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
