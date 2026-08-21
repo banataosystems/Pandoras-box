@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/banataosystems/Pandoras-box/docs/releases/vercel/release-evidence.schema.json",
+  "title": "Pandora Worker 4 external release evidence packet",
+  "description": "A source-controlled schema for externally issued evidence. Conformance describes structure only and never proves provider, reviewer, rehearsal, or owner issuance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["packet_version", "generated_at", "candidate", "evidence", "derived"],
+  "properties": {
+    "packet_version": { "const": "2.0.0" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["repository", "pull_request", "branch", "sha", "tree_sha", "base_sha", "observed_at"],
+      "properties": {
+        "repository": { "const": "banataosystems/Pandoras-box" },
+        "pull_request": { "const": 58 },
+        "branch": { "const": "release/vercel-promotion-recovery-20260819" },
+        "sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "tree_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "base_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "observed_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "evidence_class", "origin", "trust_effect", "issuer", "subject_sha", "observed_at", "expires_at", "receipt", "payload"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "evidence_class": { "type": "string", "minLength": 1 },
+          "origin": {
+            "enum": ["SOURCE_CONTROLLED", "GITHUB_PROVIDER", "VERCEL_PROVIDER", "SUPABASE_PROVIDER", "INDEPENDENT_REVIEWER", "OWNER_AUTHORIZATION"]
+          },
+          "trust_effect": {
+            "enum": ["DESCRIBES_EXPECTATION_ONLY", "DESCRIBES_ROUTE_COMPARISON_ONLY", "SATISFIES_EXTERNAL_GATE"]
+          },
+          "issuer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["identity", "transport"],
+            "properties": {
+              "identity": { "type": "string", "minLength": 1 },
+              "transport": { "type": "string", "minLength": 1 }
+            }
+          },
+          "subject_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "observed_at": { "type": "string", "format": "date-time" },
+          "expires_at": { "type": "string", "format": "date-time" },
+          "receipt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["locator", "sha256"],
+            "properties": {
+              "locator": { "type": "string", "minLength": 8 },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          },
+          "payload": { "type": "object" }
+        }
+      }
+    },
+    "derived": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "release_decision": { "const": "NOT_READY" },
+        "rollback_rehearsal_pass": { "const": false },
+        "rollback_provider_identity_present": { "const": false },
+        "owner_authorization_present": { "const": false }
+      }
+    }
+  }
+}
