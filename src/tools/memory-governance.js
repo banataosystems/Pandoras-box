@@ -124,6 +124,7 @@ function evaluateCanonicalContext(response, options = {}) {
             ],
             fallbackAuthority: 'github_and_supabase',
             freshestRecordAt: null,
+            freshnessScope: 'query_approved_records',
             warnings,
             retrievalMode: response.retrieval_mode ?? null,
         };
@@ -159,7 +160,9 @@ function evaluateCanonicalContext(response, options = {}) {
         degraded,
         degradedReasons,
         fallbackAuthority: 'github_and_supabase',
+        // This timestamp is intentionally query-scoped. It is not a project- or namespace-wide freshness anchor.
         freshestRecordAt: freshest === null ? null : new Date(freshest).toISOString(),
+        freshnessScope: 'query_approved_records',
         warnings,
         retrievalMode: response.retrieval_mode ?? null,
     };
