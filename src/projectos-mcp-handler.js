@@ -168,10 +168,16 @@ async function jsonBody(request) {
     }
 }
 
+function structuredToolContent(value) {
+    if (value && typeof value === "object" && !Array.isArray(value)) return value;
+    if (Array.isArray(value)) return { items: value };
+    return { value: value ?? null };
+}
+
 function toolResult(value) {
     return {
         content: [{ type: "text", text: JSON.stringify(value) }],
-        structuredContent: value,
+        structuredContent: structuredToolContent(value),
     };
 }
 
@@ -532,7 +538,7 @@ function createProjectOsMcpHandler(overrides = {}) {
             if (!authorization) {
                 throw Object.assign(new Error("A valid bearer access token is required"), { status: 401 });
             }
-            const current = await actorFor({ ...request, headers: { ...request.headers, authorization } }, dependencies);
+            const current = await actorFor({ headers: { authorization } }, dependencies);
             if (request.method !== "POST") {
                 response.setHeader("Allow", MCP_ALLOWED_METHODS);
                 rpcError(response, null, -32600, "Method not allowed", 405);
