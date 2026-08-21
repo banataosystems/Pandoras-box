@@ -5,6 +5,7 @@ exports.getAllTools = getAllTools;
 exports.getRuntimeToolDefinition = getRuntimeToolDefinition;
 exports.executeTool = executeTool;
 const github_js_1 = require("../tools/github.js");
+const github_project_bootstrap_js_1 = require("../tools/github-project-bootstrap.js");
 const flutterflow_js_1 = require("../tools/flutterflow.js");
 const memory_js_1 = require("../tools/memory.js");
 const provider_api_js_1 = require("../tools/provider-api.js");
@@ -15,6 +16,7 @@ const result_redaction_js_1 = require("./result-redaction.js");
 const source_authority_js_1 = require("./source-authority.js");
 const githubDefinitions = {
     ...github_js_1.githubTools,
+    ...github_project_bootstrap_js_1.githubProjectBootstrapTools,
     // The server method and executor case already existed, but the tool was never
     // registered in the public catalog. The manifest inventory exposed the drift.
     'github.get-workflow-run': {
@@ -244,9 +246,11 @@ async function executeTool(toolName, args, configuration) {
         const typedConfiguration = githubConfiguration;
         assertGitHubAccess(definition, args, typedConfiguration);
         (0, tool_manifest_js_1.assertHighImpactPolicy)(toolName, args);
-        const result = Object.prototype.hasOwnProperty.call(provider_api_js_1.githubProviderApiTools, toolName)
-            ? await (0, provider_api_js_1.executeGitHubProviderApiTool)(toolName, args, typedConfiguration)
-            : await (0, github_js_1.executeGitHubTool)(toolName, args, typedConfiguration);
+        const result = Object.prototype.hasOwnProperty.call(github_project_bootstrap_js_1.githubProjectBootstrapTools, toolName)
+            ? await (0, github_project_bootstrap_js_1.executeGitHubProjectBootstrapTool)(toolName, args, typedConfiguration)
+            : Object.prototype.hasOwnProperty.call(provider_api_js_1.githubProviderApiTools, toolName)
+                ? await (0, provider_api_js_1.executeGitHubProviderApiTool)(toolName, args, typedConfiguration)
+                : await (0, github_js_1.executeGitHubTool)(toolName, args, typedConfiguration);
         return (0, result_redaction_js_1.redactSensitiveResult)(filterGitHubResult(toolName, result, typedConfiguration));
     }
     if (definition.handler === 'memory') {
