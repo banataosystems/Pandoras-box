@@ -12,10 +12,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out exact dispatched head
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+
       - name: Verify branch has not moved
         shell: bash
         run: |
@@ -23,12 +24,14 @@ jobs:
           remote_sha="$(git ls-remote origin "refs/heads/${GITHUB_REF_NAME}" | cut -f1)"
           test -n "$remote_sha"
           test "$remote_sha" = "$GITHUB_SHA"
+
       - name: Install pinned Flutter
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           flutter-version: '3.47.0'
           cache: true
-      - name: Verify lockfile and formatting before evidence repair
+
+      - name: Verify source integrity before repair
         working-directory: apps/pandora-mobile
         shell: bash
         run: |
@@ -37,56 +40,48 @@ jobs:
           flutter pub get --enforce-lockfile
           cmp /tmp/pubspec.lock.expected pubspec.lock
           dart format --output=none --set-exit-if-changed lib test
-      - name: Record baseline hashes before regeneration
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd apps/pandora-mobile
-          find test/goldens/baselines -maxdepth 1 -type f -name 'foundation_*.png' -print0 \
-            | sort -z | xargs -0 sha256sum > /tmp/foundation.before
-          find test/goldens/owner_screens -maxdepth 1 -type f -name '*.png' -print0 \
-            | sort -z | xargs -0 sha256sum > /tmp/owner.before
-      - name: Regenerate only from exact production and foundation tests
+          find test/goldens/baselines -maxdepth 1 -type f -name 'foundation_*.png' -print0 | sort -z | xargs -0 sha256sum > /tmp/foundation.before
+          find test/goldens/owner_screens -maxdepth 1 -type f -name '*.png' -print0 | sort -z | xargs -0 sha256sum > /tmp/owner.before
+
+      - name: Regenerate exact production and foundation baselines
         working-directory: apps/pandora-mobile
         shell: bash
         run: |
           set -euo pipefail
           flutter test --update-goldens test/goldens/foundation_catalog_golden_test.dart
           flutter test --update-goldens test/goldens/owner_screens_visual_evidence_test.dart
-      - name: Prove changed baseline set matches reviewed owner-outcome scope
+          find test/goldens/baselines -maxdepth 1 -type f -name 'foundation_*.png' -print0 | sort -z | xargs -0 sha256sum > /tmp/foundation.after
+          find test/goldens/owner_screens -maxdepth 1 -type f -name '*.png' -print0 | sort -z | xargs -0 sha256sum > /tmp/owner.after
+
+      - name: Prove regenerated baseline scope
         shell: bash
         run: |
           set -euo pipefail
-          cd apps/pandora-mobile
-          find test/goldens/baselines -maxdepth 1 -type f -name 'foundation_*.png' -print0 \
-            | sort -z | xargs -0 sha256sum > /tmp/foundation.after
-          find test/goldens/owner_screens -maxdepth 1 -type f -name '*.png' -print0 \
-            | sort -z | xargs -0 sha256sum > /tmp/owner.after
           python3 - <<'PY'
           from pathlib import Path
 
-          def read_hashes(path):
+          def load(path):
               out = {}
               for line in Path(path).read_text().splitlines():
                   digest, name = line.split('  ', 1)
                   out[Path(name).name] = digest
               return out
 
-          before_f = read_hashes('/tmp/foundation.before')
-          after_f = read_hashes('/tmp/foundation.after')
-          before_o = read_hashes('/tmp/owner.before')
-          after_o = read_hashes('/tmp/owner.after')
+          before_f, after_f = load('/tmp/foundation.before'), load('/tmp/foundation.after')
+          before_o, after_o = load('/tmp/owner.before'), load('/tmp/owner.after')
+          if set(before_f) != set(after_f) or set(before_o) != set(after_o):
+              raise SystemExit('Golden inventory changed; refusing reconciliation.')
 
-          changed_f = {n for n, h in after_f.items() if before_f.get(n) != h}
-          changed_o = {n for n, h in after_o.items() if before_o.get(n) != h}
+          changed_f = {n for n in after_f if before_f[n] != after_f[n]}
+          changed_o = {n for n in after_o if before_o[n] != after_o[n]}
 
-          expected_f = {
+          allowed_f = {
               'foundation_graphite_360x800.png',
               'foundation_porcelain_2x_text.png',
               'foundation_porcelain_320x800.png',
               'foundation_porcelain_360x800.png',
           }
-          expected_o = {
+          allowed_o = {
               'activity_populated_porcelain_390x844.png',
               'approvals_high_risk_1_6x_text_390x844.png',
               'approvals_high_risk_porcelain_390x844.png',
@@ -100,39 +95,30 @@ jobs:
               'projects_list_porcelain_390x844.png',
               'safety_protected_porcelain_390x844.png',
           }
-          unexpected_f = changed_f - expected_f
-          unexpected_o = changed_o - expected_o
-          if unexpected_f:
-              raise SystemExit(f'Unexpected foundation baseline delta: {sorted(unexpected_f)}')
-          if unexpected_o:
-              raise SystemExit(f'Unexpected production-screen baseline delta: {sorted(unexpected_o)}')
+          if changed_f - allowed_f:
+              raise SystemExit(f'Unreviewed foundation baseline delta: {sorted(changed_f - allowed_f)}')
+          if changed_o - allowed_o:
+              raise SystemExit(f'Unreviewed production-screen baseline delta: {sorted(changed_o - allowed_o)}')
           if not changed_f and not changed_o:
               raise SystemExit('Golden regeneration produced no baseline changes.')
-
           Path('/tmp/worker5-baseline-delta.txt').write_text(
-              'foundation_changed=' + ','.join(sorted(changed_f)) + '\n'
+              'foundation_changed=' + ','.join(sorted(changed_f)) + '\n' +
               'owner_changed=' + ','.join(sorted(changed_o)) + '\n'
           )
           PY
+
       - name: Refresh production-screen candidate manifest hashes
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          import hashlib
-          import os
-          import subprocess
-
+          import hashlib, os, subprocess
           root = Path('apps/pandora-mobile')
-          screen_dir = root / 'test/goldens/owner_screens'
-          manifest = root / 'docs/testing/owner-screen-baseline-candidate-manifest.txt'
-          dart_version = subprocess.check_output(
-              ['dart', '--version'], stderr=subprocess.STDOUT, text=True
-          ).strip()
-          screens = sorted(screen_dir.glob('*.png'))
+          screens = sorted((root/'test/goldens/owner_screens').glob('*.png'))
           if len(screens) != 15:
-              raise SystemExit(f'Expected 15 owner-screen baselines, found {len(screens)}')
+              raise SystemExit(f'Expected 15 production-screen baselines, found {len(screens)}')
+          dart = subprocess.check_output(['dart','--version'], stderr=subprocess.STDOUT, text=True).strip()
           lines = [
               'candidate_status=unreviewed',
               'visual_acceptance=false',
@@ -142,17 +128,18 @@ jobs:
               f'branch={os.environ["GITHUB_REF_NAME"]}',
               f'workflow_run={os.environ["GITHUB_RUN_ID"]}',
               'flutter=3.47.0',
-              f'dart={dart_version}',
+              f'dart={dart}',
               'capture_test=test/goldens/owner_screens_visual_evidence_test.dart',
               'baseline_count=15',
               'review_gate=qualified independent production-screen visual review bound to the final exact head',
               '',
           ]
-          for path in screens:
-              lines.append(f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}')
-          manifest.write_text('\n'.join(lines) + '\n')
+          for p in screens:
+              lines.append(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}')
+          (root/'docs/testing/owner-screen-baseline-candidate-manifest.txt').write_text('\n'.join(lines)+'\n')
           PY
-      - name: Verify current source after reviewed baseline regeneration
+
+      - name: Verify complete current Flutter source
         working-directory: apps/pandora-mobile
         shell: bash
         run: |
@@ -162,84 +149,74 @@ jobs:
           flutter test --reporter expanded
           python3 - <<'PY'
           from pathlib import Path
-          import hashlib
-          import re
-
+          import hashlib, re
           manifest = Path('docs/testing/owner-screen-baseline-candidate-manifest.txt')
           screens = Path('test/goldens/owner_screens')
           pattern = re.compile(r'^([0-9a-f]{64})  (.+\.png)$')
           recorded = {}
           for line in manifest.read_text().splitlines():
-              match = pattern.match(line)
-              if match:
-                  recorded[match.group(2)] = match.group(1)
-          actual = {
-              path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-              for path in sorted(screens.glob('*.png'))
-          }
+              m = pattern.match(line)
+              if m: recorded[m.group(2)] = m.group(1)
+          actual = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(screens.glob('*.png'))}
           if recorded != actual:
-              raise SystemExit('Owner-screen manifest hashes do not exactly regenerated PNGs.')
+              raise SystemExit('Production-screen manifest hash mismatch.')
           PY
-      - name: Remove one-time helper and prove bounded repair diff
+
+      - name: Remove helper and prove bounded repository diff
         shell: bash
         run: |
           set -euo pipefail
           rm .github/workflows/pandora-mobile-format-context-once.yml
           python3 - <<'PY'
           import subprocess
-
-          changed = {
-              line[3:]
-              for line in subprocess.check_output(
-                  ['git', 'status', '--porcelain=v1'], text=True
-              ).splitlines()
+          helper = '.github/workflows/pandora-mobile-format-context-once.yml'
+          manifest = 'apps/pandora-mobile/docs/testing/owner-screen-baseline-candidate-manifest.txt'
+          allowed_f = {
+              'foundation_graphite_360x800.png','foundation_porcelain_2x_text.png',
+              'foundation_porcelain_320x800.png','foundation_porcelain_360x800.png'
           }
-          allowed = {
-              '.github/workflows/pandora-mobile-format-context-once.yml',
-              'apps/pandora-mobile/docs/testing/owner-screen-baseline-candidate-manifest.txt',
-              'apps/pandora-mobile/test/goldens/baselines/foundation_graphite_360x800.png',
-              'apps/pandora-mobile/test/goldens/baselines/foundation_porcelain_2x_text.png',
-              'apps/pandora-mobile/test/goldens/baselines/foundation_porcelain_320x800.png',
-              'apps/pandora-mobile/test/goldens/baselines/foundation_porcelain_360x800.png',
-              'apps/pandora-mobile/test/goldens/owner_screens/activity_populated_porcelain_390x844.png',
-              'apps/pandora-mobile/test/goldens/owner_screens/approvals_high_risk_1_6x_text_390x844.png',
-              'apps/pandora-mobile/test/goldens/owner_screens/approvals_high_risk_porcelain_390x844.png',
-              'apps/pandora-mobile/test/goldens/owner_screens/command_initial_porcelain_390x844.png',
-              'apps/pandora-mobile/test/goldens/owner_screens/connections_healthy_porcelain_390x844.png',
-              'apps/pandora-mobile/test/goldens/owner_screens/home_attention_porcelain_320x800.png',
-              'apps/pandora-mobile/test/goldens/owner_screens/home_attention_porcelain_390x844.png',
-              'apps/pandora-mobile/test/goldens/owner_screens/home_degraded_graphite_390x844.png',
-              'apps/pandora-mobile/test/goldens/owner_screens/home_loading_porcelain_390x844.png',
-              'apps/pandora-mobile/test/goldens/owner_screens/project_detail_porcelain_390x844.png',
-              'apps/pandora-mobile/test/goldens/owner_screens/projects_list_porcelain_390x844.png',
-              'apps/pandora-mobile/test/goldens/owner_screens/safety_protected_porcelain_390x844.png',
+          allowed_o = {
+              'activity_populated_porcelain_390x844.png','approvals_high_risk_1_6x_text_390x844.png',
+              'approvals_high_risk_porcelain_390x844.png','command_initial_porcelain_390x844.png',
+              'connections_healthy_porcelain_390x844.png','home_attention_porcelain_320x800.png',
+              'home_attention_porcelain_390x844.png','home_degraded_graphite_390x844.png',
+              'home_loading_porcelain_390x844.png','project_detail_porcelain_390x844.png',
+              'projects_list_porcelain_390x844.png','safety_protected_porcelain_390x844.png'
           }
-          extra = changed - allowed
+          raw = subprocess.check_output(['git','status','--porcelain=v1'], text=True).splitlines()
+          changed = {line[3:] for line in raw}
+          if helper not in changed:
+              raise SystemExit('One-time helper deletion missing from bounded diff.')
+          if manifest not in changed:
+              raise SystemExit('Candidate manifest refresh missing from bounded diff.')
+          baseline_count = 0
+          extra = []
+          for path in sorted(changed - {helper, manifest}):
+              prefix_f = 'apps/pandora-mobile/test/goldens/baselines/'
+              prefix_o = 'apps/pandora-mobile/test/goldens/owner_screens/'
+              if path.startswith(prefix_f) and path[len(prefix_f):] in allowed_f:
+                  baseline_count += 1
+              elif path.startswith(prefix_o) and path[len(prefix_o):] in allowed_o:
+                  baseline_count += 1
+              else:
+                  extra.append(path)
           if extra:
-              raise SystemExit(f'Unexpected changed paths: {sorted(extra)}')
-          required_fixed = {
-              '.github/workflows/pandora-mobile-format-context-once.yml',
-              'apps/pandora-mobile/docs/testing/owner-screen-baseline-candidate-manifest.txt',
-          }
-          if not required_fixed.issubset(changed):
-              raise SystemExit(
-                  f'Required evidence paths absent: {sorted(required_fixed - changed)}'
-              )
-          baseline_changes = changed - required_fixed
-          if not baseline_changes:
-              raise SystemExit('No reviewed baseline change is present in the repair diff.')
+              raise SystemExit(f'Unexpected changed paths: {extra}')
+          if baseline_count == 0:
+              raise SystemExit('No reviewed baseline change present.')
           PY
+
       - name: Commit one bounded repair head
         shell: bash
         run: |
           set -euo pipefail
+          remote_sha="$(git ls-remote origin "refs/heads/${GITHUB_REF_NAME}" | cut -f1)"
+          test "$remote_sha" = "$GITHUB_SHA"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git commit -m 'test(mobile): reconcile owner-outcome visual baselines'
           repair_sha="$(git rev-parse HEAD)"
-          remote_sha="$(git ls-remote origin "refs/heads/${GITHUB_REF_NAME}" | cut -f1)"
-          test "$remote_sha" = "$GITHUB_SHA"
           git push origin "HEAD:${GITHUB_REF_NAME}"
           {
             echo "render_source_sha=${GITHUB_SHA}"
@@ -247,8 +224,9 @@ jobs:
             cat /tmp/worker5-baseline-delta.txt
           } > /tmp/worker5-reconciliation.txt
           cat /tmp/worker5-reconciliation.txt >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload one-time reconciliation evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: pandora-mobile-one-time-golden-reconciliation
           path: /tmp/worker5-reconciliation.txt
