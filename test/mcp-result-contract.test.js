@@ -34,6 +34,21 @@ test("object structuredContent remains unchanged", () => {
   assert.strictEqual(normalizeMcpResultPayload(payload), payload);
 });
 
+test("primitive and null structuredContent values are wrapped safely", () => {
+  const values = ["test-value", 42, true, false, null];
+
+  for (const value of values) {
+    const payload = {
+      jsonrpc: "2.0",
+      id: 10,
+      result: { structuredContent: value },
+    };
+
+    const normalized = normalizeMcpResultPayload(payload);
+    assert.deepEqual(normalized.result.structuredContent, { result: value });
+  }
+});
+
 test("wrapped handlers normalize response.json and restore it afterward", async () => {
   const sent = [];
   const originalJson = function json(payload) {
@@ -51,5 +66,18 @@ test("wrapped handlers normalize response.json and restore it afterward", async 
 
   await handler({}, response);
   assert.deepEqual(sent[0].result.structuredContent, { result: ["a", "b"] });
+  assert.strictEqual(response.json, originalJson);
+});
+
+test("wrapped handler restores response.json when the handler throws", async () => {
+  const originalJson = function json() {
+    return this;
+  };
+  const response = { json: originalJson };
+  const handler = wrapMcpResultContract(async () => {
+    throw new Error("handler failure");
+  });
+
+  await assert.rejects(() => handler({}, response), { message: "handler failure" });
   assert.strictEqual(response.json, originalJson);
 });
