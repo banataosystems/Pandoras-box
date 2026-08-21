@@ -798,6 +798,13 @@ class ConnectionSummary {
     required this.canRead,
     required this.canChange,
     required this.freshness,
+    this.provider = 'unknown',
+    this.authMode = 'unknown',
+    this.recoveryOnly = false,
+    this.canConnect = false,
+    this.canReconnect = false,
+    this.canTest = false,
+    this.canDisconnect = false,
   });
 
   final String id;
@@ -808,24 +815,37 @@ class ConnectionSummary {
   final bool canRead;
   final bool canChange;
   final FreshnessInfo freshness;
+  final String provider;
+  final String authMode;
+  final bool recoveryOnly;
+  final bool canConnect;
+  final bool canReconnect;
+  final bool canTest;
+  final bool canDisconnect;
 
   factory ConnectionSummary.fromJson(Object? value) {
     final json = asJsonMap(value);
+    final advanced = asJsonMap(json['advanced']);
     return ConnectionSummary(
       id: jsonText(json['id'], fallback: 'unknown-connection'),
       name: jsonText(json['name'], fallback: 'Connected service'),
-      purpose: jsonText(
-        json['plainPurpose'],
-        fallback: 'Service purpose not recorded.',
-      ),
+      purpose: jsonText(json['plainPurpose'],
+          fallback: 'Service purpose not recorded.'),
       state: jsonText(json['state'], fallback: 'not_checked'),
       status: jsonText(json['plainStatus'], fallback: 'Not checked'),
       canRead: jsonBool(json['canRead']),
       canChange: jsonBool(json['canChange']),
-      freshness: FreshnessInfo.fromJson(<String, Object?>{
-        ...json,
-        'lastVerifiedAt': json['lastCheckedAt'],
-      }),
+      freshness: FreshnessInfo.fromJson(
+          <String, Object?>{...json, 'lastVerifiedAt': json['lastCheckedAt']}),
+      provider: jsonText(json['provider'],
+          fallback: jsonText(advanced['provider'], fallback: 'unknown')),
+      authMode: jsonText(json['authMode'],
+          fallback: jsonText(advanced['authMode'], fallback: 'unknown')),
+      recoveryOnly: jsonBool(json['recoveryOnly']),
+      canConnect: jsonBool(json['canConnect']),
+      canReconnect: jsonBool(json['canReconnect']),
+      canTest: jsonBool(json['canTest']),
+      canDisconnect: jsonBool(json['canDisconnect']),
     );
   }
 }

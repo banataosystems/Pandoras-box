@@ -10,6 +10,7 @@ import 'read_only_memory_cache.dart';
 class RemotePandoraRepository
     implements
         PandoraRepository,
+        ProviderConnectionRepository,
         AuthorizationInvalidationSource,
         AuthenticatedIdentityBoundary {
   RemotePandoraRepository({
@@ -149,6 +150,38 @@ class RemotePandoraRepository
       }
       rethrow;
     }
+  }
+
+  @override
+  Future<ProviderConnectLaunch> beginSupabaseOAuth() async {
+    final response = await _postJson(
+      pathSegments: const <String>['connections', 'supabase', 'oauth', 'start'],
+      operation: 'connection.supabase.oauth.start',
+      routeTemplate: '/connections/supabase/oauth/start',
+      idempotencyKey: _idempotencyKeys.create('supabase-oauth'),
+      body: const <String, Object?>{'clientMode': 'simple'},
+    );
+    return _parse(response, '/connections/supabase/oauth/start', () {
+      final json = _requiredMap(response, '/connections/supabase/oauth/start');
+      final rawUrl = jsonText(json['authorizeUrl']);
+      final uri = Uri.tryParse(rawUrl);
+      if (uri == null ||
+          uri.scheme != 'https' ||
+          uri.host != 'api.supabase.com' ||
+          !uri.path.endsWith('/v1/oauth/authorize')) {
+        throw _contractError(
+          response,
+          'SUPABASE_OAUTH_START_INVALID',
+          'Pandora could not create a safe Supabase authorization link.',
+        );
+      }
+      final rawExpiresAt = jsonText(json['expiresAt']);
+      return ProviderConnectLaunch(
+        authorizeUri: uri,
+        expiresAt:
+            rawExpiresAt.isEmpty ? null : DateTime.tryParse(rawExpiresAt),
+      );
+    });
   }
 
   @override
