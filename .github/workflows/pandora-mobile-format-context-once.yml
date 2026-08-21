@@ -167,6 +167,10 @@ jobs:
         run: |
           set -euo pipefail
           rm .github/workflows/pandora-mobile-format-context-once.yml
+          # Remove only ephemeral Flutter outputs created by this CI run.
+          rm -rf apps/pandora-mobile/.dart_tool apps/pandora-mobile/build
+          # Restore Flutter's transient rewrite; analysis options are outside the reviewed visual change.
+          git restore --source=HEAD --worktree -- apps/pandora-mobile/analysis_options.yaml
           python3 - <<'PY'
           import subprocess
           helper = '.github/workflows/pandora-mobile-format-context-once.yml'
