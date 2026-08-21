@@ -249,7 +249,8 @@ jobs:
               'remaining_gates': [
                   'independent different-vendor review bound to this exact SHA',
                   'reviewed exact-head visual evidence',
-                  'physical Android installation and authenticated owner journey',
+                  'physical Android fresh installation and authenticated owner journey',
+                  'physical uninstall/reinstall rollback with local-state loss disclosed',
                   'authorized production promotion and post-promotion verification',
               ],
           }
@@ -259,7 +260,7 @@ jobs:
           if not gate_pass:
               raise SystemExit('Exact-head gate blocked: ' + '; '.join(failures))
           PY
-      - name: Verify packaged Android INTERNET evidence
+      - name: Verify packaged Android INTERNET and signing evidence
         shell: bash
         run: |
           set -euo pipefail
@@ -285,13 +286,36 @@ jobs:
           )
           test "${#manifests[@]}" -eq 1
           grep -Fqx "source_sha=${SOURCE_SHA}" "${manifests[0]}"
+          mapfile -t signing_files < <(
+            find build/android-package-gate -type f \
+              -name signing-certificate-sha256.txt | sort
+          )
+          test "${#signing_files[@]}" -eq 1
+          signer_cert_sha256="$(tr '[:upper:]' '[:lower:]' < "${signing_files[0]}" | tr -d ':[:space:]')"
+          [[ "$signer_cert_sha256" =~ ^[0-9a-f]{64}$ ]]
+          grep -Fqx 'signing_scheme_v2_verified=true' "${manifests[0]}"
+          grep -Fqx "signing_certificate_sha256=${signer_cert_sha256}" "${manifests[0]}"
+          grep -Fqx 'signing_key_stability=ephemeral-ci-debug' "${manifests[0]}"
+          grep -Fqx 'fresh_install_only=true' "${manifests[0]}"
+          grep -Fqx 'in_place_update_eligible=false' "${manifests[0]}"
+          grep -Fqx 'rollback_install_mode=uninstall-reinstall' "${manifests[0]}"
+          grep -Fqx 'rollback_preserves_local_app_state=false' "${manifests[0]}"
+          export SIGNING_CERT_SHA256="$signer_cert_sha256"
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
 
           path = Path('build/exact-head-gate/gate.json')
           data = json.loads(path.read_text())
           data['android_internet_permission_verified'] = True
+          data['android_signing_scheme_v2_verified'] = True
+          data['android_signing_certificate_sha256'] = os.environ['SIGNING_CERT_SHA256']
+          data['android_signing_key_stability'] = 'ephemeral-ci-debug'
+          data['android_fresh_install_only'] = True
+          data['android_in_place_update_eligible'] = False
+          data['android_rollback_install_mode'] = 'uninstall-reinstall'
+          data['android_rollback_preserves_local_app_state'] = False
           path.write_text(json.dumps(data, indent=2, sort_keys=True) + '\n')
           PY
       - name: Upload immutable exact-head gate evidence
@@ -337,7 +361,7 @@ jobs:
           - Deployed: **no claim**
           - Production verified: **no claim**
 
-          A passing gate proves only exact-head CI and the presence of non-empty, unexpired test artifacts from the exact mobile workflow run. Independent different-vendor review, reviewed visual evidence, physical Android verification, authorized promotion, and post-promotion verification remain separate requirements.
+          A passing gate proves exact-head CI, non-empty unexpired test artifacts, Android INTERNET permission, and an exact v2 signing-certificate fingerprint. This owner-test artifact is fresh-install-only: in-place update is ineligible, rollback requires uninstall/reinstall, and local app state is not preserved. Independent different-vendor review, reviewed visual evidence, physical Android verification, authorized promotion, and post-promotion verification remain separate requirements.
           EOF
           )
           existing="$(gh api --paginate "repos/$REPOSITORY/issues/$PR_NUMBER/comments" --jq ".[] | select(.body | contains(\"$marker\")) | .id" | tail -n 1)"
@@ -356,7 +380,7 @@ jobs:
           $marker
           ## Independent different-vendor review requested
 
-          Review Pandora Mobile RC1 only at exact head \`$SOURCE_SHA\` on PR #$PR_NUMBER.
+          Review Pandora Mobile RC2 Owner Test only at exact head \`$SOURCE_SHA\` on PR #$PR_NUMBER.
 
           Exact-head mobile integration and ProjectOS security regression are green, and the four required non-empty, unexpired test artifacts are bound to the exact mobile workflow run. Independently inspect the complete diff, transparent-mark provenance and verifier, admin control-plane behavior, fail-closed data semantics, authorization boundaries, screenshot evidence, artifact manifests, and rollback path. Record PASS, PASS WITH NON-BLOCKING FINDINGS, or FAIL against this immutable SHA. Any later commit invalidates the review.
 

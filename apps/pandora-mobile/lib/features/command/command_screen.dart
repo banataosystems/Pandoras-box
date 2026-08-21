@@ -27,7 +27,7 @@ class _CommandScreenState extends State<CommandScreen> {
     'Repair Pandora command connectivity and verify the owner journey.',
     'Review every verified blocker and prepare the safest next action.',
     'Prepare the safest next Android release without promoting production.',
-    'Check connected services and separate Down, Stale, and Unknown truth.',
+    'Check connected services and tell me what needs attention.',
   ];
 
   final _objective = TextEditingController();

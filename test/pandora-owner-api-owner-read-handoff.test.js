@@ -10,6 +10,13 @@ const ownerApi = fs.readFileSync(
   path.join(root, "supabase/functions/pandora-owner-api/index.ts"),
   "utf8",
 );
+const commandScreen = fs.readFileSync(
+  path.join(
+    root,
+    "apps/pandora-mobile/lib/features/command/command_screen.dart",
+  ),
+  "utf8",
+);
 const migration = fs.readFileSync(
   path.join(root, "supabase/migrations/20260821024500_projectos_owner_read_completion.sql"),
   "utf8",
@@ -27,6 +34,21 @@ test("Phase 0 owner read routes only the canonical connected-services intent", (
   assert.match(ownerApi, /connections\(context\)/);
   assert.match(ownerApi, /safety\(context\)/);
   assert.match(ownerApi, /projectos_complete_owner_read_intake/);
+});
+
+test("visible connected-services suggestion routes to the canonical backend intent", () => {
+  const backendIntent = ownerApi.match(
+    /const CONNECTED_SERVICES_OWNER_INTENT\s*=\s*"([^"]+)"/,
+  )?.[1];
+  const visibleSuggestion = commandScreen.match(
+    /'([^']*[Cc]heck connected services[^']*)'/,
+  )?.[1];
+  const normalize = (value) =>
+    value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  assert.ok(backendIntent, "backend intent must remain extractable");
+  assert.ok(visibleSuggestion, "visible suggestion must remain extractable");
+  assert.equal(normalize(visibleSuggestion), normalize(backendIntent));
 });
 
 test("free-form intake no longer claims planning before a planner exists", () => {
