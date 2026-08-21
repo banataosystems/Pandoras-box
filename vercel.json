@@ -3,7 +3,7 @@
   "buildCommand": "npm run build",
   "framework": "express",
   "env": {
-    "NODE_OPTIONS": "--trace-deprecation",
+    "NODE_OPTIONS": "--throw-deprecation",
     "PANDORA_MEMORY_BASE_URL": "https://pandorasbox-memory.vercel.app",
     "PANDORA_MEMORY_GRANTED_SCOPES": "memory:health,memory:read,memory:write",
     "PANDORA_MEMORY_ALLOW_MUTATIONS": "true",
