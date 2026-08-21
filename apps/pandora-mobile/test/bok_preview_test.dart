@@ -20,7 +20,8 @@ void main() {
     final field = find.byKey(const ValueKey('bok-preview-intent'));
     await tester.enterText(field, 'Which customers have not ordered in 30 days?');
     final button = find.text('Simulate with Pandora');
-    await tester.ensureVisible(button);
+    await tester.drag(find.byType(ListView), const Offset(0, -420));
+    await tester.pumpAndSettle();
     await tester.tap(button);
     await tester.pump();
 

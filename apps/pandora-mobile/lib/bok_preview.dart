@@ -157,7 +157,9 @@ class _OwnerHeader extends StatelessWidget {
             children: [
               Text('BOK', style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 5),
-              const Text('Preview user: BOK Pilot Owner • Owner'),
+              const Text('BOK Pilot Owner'),
+              const SizedBox(height: 2),
+              const Text('Preview persona • Owner'),
               const SizedBox(height: 14),
               const Wrap(
                 spacing: 8,
