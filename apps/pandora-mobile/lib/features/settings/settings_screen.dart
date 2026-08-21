@@ -60,7 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               statusLabel: 'Owner-only controls',
             ),
             const SizedBox(height: PandoraSpacing.md),
-            const OwnerSignal(
+            OwnerSignal(
               label: 'Installed build',
               value:
                   '${PandoraConfig.releaseLabel} · ${PandoraConfig.artifactClass} · Not a production release',
