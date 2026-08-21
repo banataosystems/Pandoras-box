@@ -36,6 +36,19 @@ abstract final class PandoraSize {
   static const double wideBreakpoint = 840;
 }
 
+abstract final class PandoraMotion {
+  static const Duration quick = Duration(milliseconds: 140);
+  static const Duration standard = Duration(milliseconds: 220);
+  static const Duration deliberate = Duration(milliseconds: 320);
+  static const Curve standardCurve = Curves.easeOutCubic;
+
+  static Duration resolve({
+    required bool disableAnimations,
+    Duration duration = standard,
+  }) =>
+      disableAnimations ? Duration.zero : duration;
+}
+
 @immutable
 class PandoraPalette extends ThemeExtension<PandoraPalette> {
   const PandoraPalette({
