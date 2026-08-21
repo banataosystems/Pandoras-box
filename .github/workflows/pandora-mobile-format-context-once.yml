@@ -87,11 +87,18 @@ jobs:
               'foundation_porcelain_360x800.png',
           }
           expected_o = {
+              'activity_populated_porcelain_390x844.png',
+              'approvals_high_risk_1_6x_text_390x844.png',
+              'approvals_high_risk_porcelain_390x844.png',
               'command_initial_porcelain_390x844.png',
+              'connections_healthy_porcelain_390x844.png',
               'home_attention_porcelain_320x800.png',
               'home_attention_porcelain_390x844.png',
               'home_degraded_graphite_390x844.png',
               'home_loading_porcelain_390x844.png',
+              'project_detail_porcelain_390x844.png',
+              'projects_list_porcelain_390x844.png',
+              'safety_protected_porcelain_390x844.png',
           }
           unexpected_f = changed_f - expected_f
           unexpected_o = changed_o - expected_o
@@ -171,7 +178,7 @@ jobs:
               for path in sorted(screens.glob('*.png'))
           }
           if recorded != actual:
-              raise SystemExit('Owner-screen manifest hashes do not exactly match regenerated PNGs.')
+              raise SystemExit('Owner-screen manifest hashes do not exactly regenerated PNGs.')
           PY
       - name: Remove one-time helper and prove bounded repair diff
         shell: bash
@@ -194,11 +201,18 @@ jobs:
               'apps/pandora-mobile/test/goldens/baselines/foundation_porcelain_2x_text.png',
               'apps/pandora-mobile/test/goldens/baselines/foundation_porcelain_320x800.png',
               'apps/pandora-mobile/test/goldens/baselines/foundation_porcelain_360x800.png',
+              'apps/pandora-mobile/test/goldens/owner_screens/activity_populated_porcelain_390x844.png',
+              'apps/pandora-mobile/test/goldens/owner_screens/approvals_high_risk_1_6x_text_390x844.png',
+              'apps/pandora-mobile/test/goldens/owner_screens/approvals_high_risk_porcelain_390x844.png',
               'apps/pandora-mobile/test/goldens/owner_screens/command_initial_porcelain_390x844.png',
+              'apps/pandora-mobile/test/goldens/owner_screens/connections_healthy_porcelain_390x844.png',
               'apps/pandora-mobile/test/goldens/owner_screens/home_attention_porcelain_320x800.png',
               'apps/pandora-mobile/test/goldens/owner_screens/home_attention_porcelain_390x844.png',
               'apps/pandora-mobile/test/goldens/owner_screens/home_degraded_graphite_390x844.png',
               'apps/pandora-mobile/test/goldens/owner_screens/home_loading_porcelain_390x844.png',
+              'apps/pandora-mobile/test/goldens/owner_screens/project_detail_porcelain_390x844.png',
+              'apps/pandora-mobile/test/goldens/owner_screens/projects_list_porcelain_390x844.png',
+              'apps/pandora-mobile/test/goldens/owner_screens/safety_protected_porcelain_390x844.png',
           }
           extra = changed - allowed
           if extra:
