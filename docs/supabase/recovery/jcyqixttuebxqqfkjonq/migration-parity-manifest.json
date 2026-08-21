@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.1.0",
+  "schema_version": "2.2.0",
   "artifact_type": "supabase_secret_safe_migration_parity_manifest",
   "project_ref": "jcyqixttuebxqqfkjonq",
   "canonical_repository": "banataosystems/Pandoras-box",
@@ -29,6 +29,8 @@
     "provider_equivalence": false,
     "migration_count": 52,
     "chain_sha256": "77e2dbe177cac4eddd8b6de03bc98cd98c4c4d2bfd5a0dfd7bde6cff174a56fb",
+    "canonical_source_chain_sha256": "fd919e3a587bd5e910154eec815c05e0074c2ccbe079e427de1030bcf2001c93",
+    "legacy_replay_chain_sha256": "77e2dbe177cac4eddd8b6de03bc98cd98c4c4d2bfd5a0dfd7bde6cff174a56fb",
     "authorization_smoke": "pass",
     "database_rollback_smoke": "pass"
   },
@@ -789,10 +791,12 @@
     }
   ],
   "pending_change": {
-    "version": "20260812034825",
+    "version": "20260813014555",
     "provider_version": "20260813014555",
+    "legacy_local_version": "20260812034825",
+    "identity_repair": "filename_only_exact_payload_match",
     "name": "remove_projectos_approval_aal2",
-    "path": "supabase/migrations/20260812034825_remove_projectos_approval_aal2.sql",
+    "path": "supabase/migrations/20260813014555_remove_projectos_approval_aal2.sql",
     "bytes": 3472,
     "sha256": "8e9acf74b5ee5ea552697989768afc5aac938b92947e3495c2deecde30dadd31",
     "live_at_capture": true,

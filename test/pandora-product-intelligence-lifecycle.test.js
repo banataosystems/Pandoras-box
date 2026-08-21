@@ -132,3 +132,43 @@ test('missing lifecycle timestamps fail closed instead of using ingest time', ()
     /invalid_timestamp/,
   );
 });
+
+
+test('valid RFC3339 timestamp forms normalize to one canonical instant and dedupe identity', () => {
+  const equivalentTimestamps = [
+    '2026-08-20T00:00:00.000Z',
+    '2026-08-20T00:00:00Z',
+    '2026-08-20T00:00:00+00:00',
+    '2026-08-20T08:00:00+08:00',
+    '2026-08-20T00:00:00.000000Z',
+  ];
+
+  const normalized = equivalentTimestamps.map((timestamp) => {
+    const event = lifecycleEnvelope();
+    event.timestamp = timestamp;
+    return normalizeProductSignal(event, HASH_SALT);
+  });
+
+  for (const item of normalized) {
+    assert.equal(item.occurredAt, '2026-08-20T00:00:00.000Z');
+    assert.equal(item.dedupeKey, normalized[0].dedupeKey);
+  }
+});
+
+test('ambiguous or invalid timestamp forms fail closed', () => {
+  for (const timestamp of [
+    '2026-08-20 00:00:00',
+    '2026-02-30T00:00:00Z',
+    '2026-08-20T00:00:00-00:00',
+    '2026-08-20T00:00:00.123456Z',
+    'not-a-timestamp',
+  ]) {
+    const event = lifecycleEnvelope();
+    event.timestamp = timestamp;
+    assert.throws(
+      () => normalizeProductSignal(event, HASH_SALT),
+      /invalid_timestamp/,
+      timestamp,
+    );
+  }
+});

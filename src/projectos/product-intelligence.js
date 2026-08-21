@@ -57,12 +57,51 @@ const FORBIDDEN_KEY_EXCEPTIONS = new Set(['input_tokens', 'output_tokens']);
 const FORBIDDEN_KEY_PATTERN = /(^|_)(email|phone|full_?name|first_?name|last_?name|address|message|prompt|input|output|transcript|recording|audio|document|content|password|secret|token|authorization|cookie|card|account|beneficiary|client_?matter|case_?details|legal_?narrative)($|_)/i;
 const DIRECT_IDENTIFIER_PATTERN = /(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?\d[\d\s().-]{7,}\d)/i;
 const PANDORA_PSEUDONYM_PATTERN = /^(?:actor|org|project)_[A-Za-z0-9_-]{32}$/;
-function isCanonicalUtcTimestamp(value) {
-    const parsed = Date.parse(value);
-    return Number.isFinite(parsed) && new Date(parsed).toISOString() === value;
+const RFC3339_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|([+-])(\d{2}):(\d{2}))$/;
+function normalizeTimestamp(value) {
+    if (typeof value !== 'string')
+        return null;
+    const normalized = value.trim();
+    if (!normalized || normalized.length > 64)
+        return null;
+    const match = RFC3339_TIMESTAMP_PATTERN.exec(normalized);
+    if (!match)
+        return null;
+    const [, yearText, monthText, dayText, hourText, minuteText, secondText, fraction = '', zone, sign, offsetHourText, offsetMinuteText] = match;
+    const year = Number(yearText);
+    const month = Number(monthText);
+    const day = Number(dayText);
+    const hour = Number(hourText);
+    const minute = Number(minuteText);
+    const second = Number(secondText);
+    if (year < 1 || month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59 || second > 59)
+        return null;
+    if (fraction.length > 3 && /[1-9]/.test(fraction.slice(3)))
+        return null;
+    const millisecond = Number((fraction + '000').slice(0, 3));
+    const local = new Date(0);
+    local.setUTCFullYear(year, month - 1, day);
+    local.setUTCHours(hour, minute, second, millisecond);
+    if (local.getUTCFullYear() !== year
+        || local.getUTCMonth() !== month - 1
+        || local.getUTCDate() !== day
+        || local.getUTCHours() !== hour
+        || local.getUTCMinutes() !== minute
+        || local.getUTCSeconds() !== second
+        || local.getUTCMilliseconds() !== millisecond)
+        return null;
+    let offsetMinutes = 0;
+    if (zone !== 'Z') {
+        const offsetHour = Number(offsetHourText);
+        const offsetMinute = Number(offsetMinuteText);
+        if (offsetHour > 23 || offsetMinute > 59 || (sign === '-' && offsetHour === 0 && offsetMinute === 0))
+            return null;
+        offsetMinutes = (offsetHour * 60 + offsetMinute) * (sign === '+' ? 1 : -1);
+    }
+    return new Date(local.getTime() - offsetMinutes * 60_000).toISOString();
 }
 function isSafeStructuralMetadata(value) {
-    return PANDORA_PSEUDONYM_PATTERN.test(value) || isCanonicalUtcTimestamp(value);
+    return PANDORA_PSEUDONYM_PATTERN.test(value);
 }
 const ENVIRONMENTS = new Set(['production', 'preview', 'staging', 'development', 'unknown']);
 const PRIVACY_TIERS = new Set(['aggregate_only', 'anonymous_technical', 'pseudonymous_product']);
@@ -159,11 +198,8 @@ function normalizeProductSignal(rawBody, hashSalt) {
     const eventName = normalizeString(envelope.event ?? envelope.event_name ?? body.event_name, 160);
     if (!eventName)
         throw new Error('invalid_event_name');
-    const occurredAtText = normalizeString(envelope.timestamp ?? body.timestamp, 64);
-    if (!occurredAtText)
-        throw new Error('invalid_timestamp');
-    const occurredAtDate = new Date(occurredAtText);
-    if (Number.isNaN(occurredAtDate.getTime()))
+    const occurredAt = normalizeTimestamp(envelope.timestamp ?? body.timestamp);
+    if (!occurredAt)
         throw new Error('invalid_timestamp');
     const sanitizedProperties = sanitizeProductProperties(properties);
     sanitizedProperties.product_key = productKey;
@@ -182,14 +218,14 @@ function normalizeProductSignal(rawBody, hashSalt) {
     const dedupeMaterial = sourceUuid ?? stableSerialize({
         productKey,
         eventName,
-        occurredAt: occurredAtDate.toISOString(),
+        occurredAt,
         anonymousActorHash,
         sanitizedProperties,
     });
     return {
         productKey,
         eventName,
-        occurredAt: occurredAtDate.toISOString(),
+        occurredAt,
         environment,
         privacyTier,
         releaseSha,
