@@ -695,16 +695,18 @@ class MoreScreen extends StatelessWidget {
               onTap: () => _open(context, 'Safety & security', api.safety),
             ),
             const SizedBox(height: 18),
-            const _Section(
-              title: 'Runtime',
+            _Section(
+              title: 'About Pandora',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Canonical source: banataosystems/Pandoras-box'),
-                  SizedBox(height: 6),
-                  Text('Owner API: https://mcpmaster.vercel.app/api/operator'),
-                  SizedBox(height: 6),
-                  Text('Memory: https://pandorasbox-memory.vercel.app'),
+                  Text(PandoraConfig.visibleReleaseIdentity),
+                  const SizedBox(height: 6),
+                  const Text('Package ID: ${PandoraConfig.packageId}'),
+                  const SizedBox(height: 6),
+                  const Text('Source: banataosystems/Pandoras-box'),
+                  const SizedBox(height: 6),
+                  const Text('Backend: ${PandoraConfig.ownerApiBaseUrl}'),
                 ],
               ),
             ),

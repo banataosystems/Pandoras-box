@@ -22,7 +22,10 @@ class PandoraApi {
   String get _base =>
       PandoraConfig.ownerApiBaseUrl.replaceFirst(RegExp(r'/+$'), '');
 
-  Future<Map<String, String>> _headers({bool jsonBody = false}) async {
+  Future<Map<String, String>> _headers({
+    bool jsonBody = false,
+    String? idempotencyKey,
+  }) async {
     final session = Supabase.instance.client.auth.currentSession;
     final token = session?.accessToken;
     if (token == null || token.isEmpty) {
@@ -33,6 +36,8 @@ class PandoraApi {
       'Authorization': 'Bearer $token',
       if (PandoraConfig.organizationId.trim().isNotEmpty)
         'X-Organization-Id': PandoraConfig.organizationId.trim(),
+      if (idempotencyKey != null && idempotencyKey.trim().isNotEmpty)
+        'Idempotency-Key': idempotencyKey.trim(),
       if (jsonBody) 'Content-Type': 'application/json',
     };
   }
@@ -41,9 +46,13 @@ class PandoraApi {
     String method,
     String path, {
     Map<String, dynamic>? body,
+    String? idempotencyKey,
   }) async {
     final uri = Uri.parse('$_base$path');
-    final headers = await _headers(jsonBody: body != null);
+    final headers = await _headers(
+      jsonBody: body != null,
+      idempotencyKey: idempotencyKey,
+    );
     late final http.Response response;
     if (method == 'GET') {
       response = await _client.get(uri, headers: headers);
@@ -97,14 +106,27 @@ class PandoraApi {
   Future<dynamic> safety() => _request('GET', '/safety');
   Future<dynamic> actions() => _request('GET', '/actions');
 
-  Future<dynamic> ask({required String message, String? projectId}) =>
-      _request('POST', '/ask', body: <String, dynamic>{
-        'message': message,
-        'projectId': projectId ?? '',
-        'clientMode': 'simple',
-      });
+  Future<dynamic> ask({
+    required String message,
+    String? projectId,
+    String? idempotencyKey,
+  }) =>
+      _request(
+        'POST',
+        '/ask',
+        body: <String, dynamic>{
+          'message': message,
+          'projectId': projectId ?? '',
+          'clientMode': 'simple',
+        },
+        idempotencyKey: idempotencyKey,
+      );
 
-  Future<dynamic> runAction({required String actionId, String? projectId}) =>
+  Future<dynamic> runAction({
+    required String actionId,
+    String? projectId,
+    String? idempotencyKey,
+  }) =>
       _request(
         'POST',
         '/actions/${Uri.encodeComponent(actionId)}/run',
@@ -112,6 +134,7 @@ class PandoraApi {
           'projectId': projectId ?? '',
           'clientMode': 'simple',
         },
+        idempotencyKey: idempotencyKey,
       );
 
   Future<dynamic> decideApproval({
