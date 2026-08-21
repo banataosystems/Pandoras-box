@@ -9,7 +9,7 @@ permissions:
 jobs:
   reconcile:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Check out exact dispatched head
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -28,60 +28,7 @@ jobs:
         with:
           flutter-version: '3.47.0'
           cache: true
-      - name: Reconcile only proven behavioral assertions
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-
-          root = Path('apps/pandora-mobile/test')
-
-          def unique_file(marker: str) -> Path:
-              matches = []
-              for path in root.rglob('*.dart'):
-                  text = path.read_text()
-                  if marker in text:
-                      matches.append(path)
-              if len(matches) != 1:
-                  raise SystemExit(f'Expected one test file containing {marker!r}; found {matches}')
-              return matches[0]
-
-          def patch_near(path: Path, marker: str, old: str, new: str) -> None:
-              text = path.read_text()
-              marker_at = text.index(marker)
-              lo = max(0, marker_at - 1800)
-              hi = min(len(text), marker_at + 1800)
-              segment = text[lo:hi]
-              count = segment.count(old)
-              if count != 1:
-                  raise SystemExit(
-                      f'Expected exactly one {old!r} near {marker!r} in {path}; found {count}'
-                  )
-              segment = segment.replace(old, new, 1)
-              path.write_text(text[:lo] + segment + text[hi:])
-
-          home = unique_file('shows the requested owner command outcome first')
-          patch_near(
-              home,
-              'shows the requested owner command outcome first',
-              'findsNWidgets(2)',
-              'findsOneWidget',
-          )
-
-          projects = unique_file('keeps recovery-only records in Professional view')
-          patch_near(
-              projects,
-              'keeps recovery-only records in Professional view',
-              'findsOneWidget',
-              'findsWidgets',
-          )
-
-          Path('/tmp/worker5-behavior-paths.txt').write_text(
-              f'home_test={home}\nprojects_test={projects}\n'
-          )
-          PY
-      - name: Verify lockfile and format repaired assertions
+      - name: Verify lockfile and formatting before evidence repair
         working-directory: apps/pandora-mobile
         shell: bash
         run: |
@@ -89,8 +36,8 @@ jobs:
           cp pubspec.lock /tmp/pubspec.lock.expected
           flutter pub get --enforce-lockfile
           cmp /tmp/pubspec.lock.expected pubspec.lock
-          dart format lib test
-      - name: Record reviewed baseline hashes before regeneration
+          dart format --output=none --set-exit-if-changed lib test
+      - name: Record baseline hashes before regeneration
         shell: bash
         run: |
           set -euo pipefail
@@ -99,14 +46,14 @@ jobs:
             | sort -z | xargs -0 sha256sum > /tmp/foundation.before
           find test/goldens/owner_screens -maxdepth 1 -type f -name '*.png' -print0 \
             | sort -z | xargs -0 sha256sum > /tmp/owner.before
-      - name: Regenerate only from exact production/foundation tests
+      - name: Regenerate only from exact production and foundation tests
         working-directory: apps/pandora-mobile
         shell: bash
         run: |
           set -euo pipefail
           flutter test --update-goldens test/goldens/foundation_catalog_golden_test.dart
           flutter test --update-goldens test/goldens/owner_screens_visual_evidence_test.dart
-      - name: Prove the changed baseline set matches the exact failure packet
+      - name: Prove changed baseline set matches reviewed owner-outcome scope
         shell: bash
         run: |
           set -euo pipefail
@@ -118,55 +65,45 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          def read(path):
+          def read_hashes(path):
               out = {}
               for line in Path(path).read_text().splitlines():
                   digest, name = line.split('  ', 1)
                   out[Path(name).name] = digest
               return out
 
-          foundation_before = read('/tmp/foundation.before')
-          foundation_after = read('/tmp/foundation.after')
-          owner_before = read('/tmp/owner.before')
-          owner_after = read('/tmp/owner.after')
+          before_f = read_hashes('/tmp/foundation.before')
+          after_f = read_hashes('/tmp/foundation.after')
+          before_o = read_hashes('/tmp/owner.before')
+          after_o = read_hashes('/tmp/owner.after')
 
-          changed_foundation = {
-              name for name in foundation_after
-              if foundation_before.get(name) != foundation_after[name]
-          }
-          expected_foundation = {
+          changed_f = {n for n, h in after_f.items() if before_f.get(n) != h}
+          changed_o = {n for n, h in after_o.items() if before_o.get(n) != h}
+
+          expected_f = {
               'foundation_graphite_360x800.png',
               'foundation_porcelain_2x_text.png',
               'foundation_porcelain_320x800.png',
               'foundation_porcelain_360x800.png',
           }
-          if changed_foundation != expected_foundation:
-              raise SystemExit(
-                  f'Unexpected foundation baseline delta: {sorted(changed_foundation)}'
-              )
-
-          changed_owner = {
-              name for name in owner_after
-              if owner_before.get(name) != owner_after[name]
-          }
-          expected_owner = {
+          expected_o = {
               'command_initial_porcelain_390x844.png',
               'home_attention_porcelain_320x800.png',
               'home_attention_porcelain_390x844.png',
               'home_degraded_graphite_390x844.png',
               'home_loading_porcelain_390x844.png',
           }
-          if changed_owner != expected_owner:
-              raise SystemExit(
-                  f'Unexpected production-screen baseline delta: {sorted(changed_owner)}'
-              )
+          if changed_f != expected_f:
+              raise SystemExit(f'Unexpected foundation baseline delta: {sorted(changed_f)}')
+          if changed_o != expected_o:
+              raise SystemExit(f'Unexpected production-screen baseline delta: {sorted(changed_o)}')
 
           Path('/tmp/worker5-baseline-delta.txt').write_text(
-              'foundation_changed=' + ','.join(sorted(changed_foundation)) + '\n'
-              'owner_changed=' + ','.join(sorted(changed_owner)) + '\n'
+              'foundation_changed=' + ','.join(sorted(changed_f)) + '\n'
+              'owner_changed=' + ','.join(sorted(changed_o)) + '\n'
           )
           PY
-      - name: Refresh owner-screen candidate manifest hashes
+      - name: Refresh production-screen candidate manifest hashes
         shell: bash
         run: |
           set -euo pipefail
@@ -182,11 +119,14 @@ jobs:
           dart_version = subprocess.check_output(
               ['dart', '--version'], stderr=subprocess.STDOUT, text=True
           ).strip()
+          screens = sorted(screen_dir.glob('*.png'))
+          if len(screens) != 15:
+              raise SystemExit(f'Expected 15 owner-screen baselines, found {len(screens)}')
           lines = [
               'candidate_status=unreviewed',
               'visual_acceptance=false',
-              f'source_sha={os.environ["GITHUB_SHA"]}',
-              f'baseline_commit={os.environ["GITHUB_SHA"]}',
+              f'render_source_sha={os.environ["GITHUB_SHA"]}',
+              'baseline_commit=pending_repair_commit',
               f'repository={os.environ["GITHUB_REPOSITORY"]}',
               f'branch={os.environ["GITHUB_REF_NAME"]}',
               f'workflow_run={os.environ["GITHUB_RUN_ID"]}',
@@ -197,19 +137,16 @@ jobs:
               'review_gate=qualified independent production-screen visual review bound to the final exact head',
               '',
           ]
-          screens = sorted(screen_dir.glob('*.png'))
-          if len(screens) != 15:
-              raise SystemExit(f'Expected 15 owner-screen baselines, found {len(screens)}')
           for path in screens:
-              digest = hashlib.sha256(path.read_bytes()).hexdigest()
-              lines.append(f'{digest}  {path.name}')
+              lines.append(f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}')
           manifest.write_text('\n'.join(lines) + '\n')
           PY
-      - name: Verify regenerated baselines and complete Flutter suite
+      - name: Verify current source after reviewed baseline regeneration
         working-directory: apps/pandora-mobile
         shell: bash
         run: |
           set -euo pipefail
+          dart format --output=none --set-exit-if-changed lib test
           flutter analyze
           flutter test --reporter expanded
           python3 - <<'PY'
@@ -217,38 +154,36 @@ jobs:
           import hashlib
           import re
 
-          root = Path('.')
-          manifest = root / 'docs/testing/owner-screen-baseline-candidate-manifest.txt'
-          recorded = {}
+          manifest = Path('docs/testing/owner-screen-baseline-candidate-manifest.txt')
+          screens = Path('test/goldens/owner_screens')
           pattern = re.compile(r'^([0-9a-f]{64})  (.+\.png)$')
+          recorded = {}
           for line in manifest.read_text().splitlines():
               match = pattern.match(line)
               if match:
                   recorded[match.group(2)] = match.group(1)
-          screens = sorted((root / 'test/goldens/owner_screens').glob('*.png'))
-          if set(recorded) != {p.name for p in screens}:
-              raise SystemExit('Owner-screen manifest inventory does not match committed baselines.')
-          for path in screens:
-              actual = hashlib.sha256(path.read_bytes()).hexdigest()
-              if recorded[path.name] != actual:
-                  raise SystemExit(f'Manifest hash mismatch for {path.name}')
+          actual = {
+              path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in sorted(screens.glob('*.png'))
+          }
+          if recorded != actual:
+              raise SystemExit('Owner-screen manifest hashes do not exactly match regenerated PNGs.')
           PY
-      - name: Remove obsolete self-push helper and prove bounded diff
+      - name: Remove one-time helper and prove bounded repair diff
         shell: bash
         run: |
           set -euo pipefail
           rm .github/workflows/pandora-mobile-format-context-once.yml
-          mapfile -t changed < <(git status --porcelain=v1 | sed -E 's/^.. //' | sort)
-          printf '%s\n' "${changed[@]}"
           python3 - <<'PY'
-          from pathlib import Path
           import subprocess
 
-          paths = subprocess.check_output(
-              ['git', 'status', '--porcelain=v1'], text=True
-          ).splitlines()
-          changed = {line[3:] for line in paths}
-          allowed_fixed = {
+          changed = {
+              line[3:]
+              for line in subprocess.check_output(
+                  ['git', 'status', '--porcelain=v1'], text=True
+              ).splitlines()
+          }
+          allowed = {
               '.github/workflows/pandora-mobile-format-context-once.yml',
               'apps/pandora-mobile/docs/testing/owner-screen-baseline-candidate-manifest.txt',
               'apps/pandora-mobile/test/goldens/baselines/foundation_graphite_360x800.png',
@@ -261,24 +196,12 @@ jobs:
               'apps/pandora-mobile/test/goldens/owner_screens/home_degraded_graphite_390x844.png',
               'apps/pandora-mobile/test/goldens/owner_screens/home_loading_porcelain_390x844.png',
           }
-          behavior_paths = {}
-          for line in Path('/tmp/worker5-behavior-paths.txt').read_text().splitlines():
-              key, value = line.split('=', 1)
-              behavior_paths[key] = value
-          allowed = allowed_fixed | set(behavior_paths.values())
           extra = changed - allowed
-          missing = {
-              p for p in allowed_fixed
-              if p != '.github/workflows/pandora-mobile-format-context-once.yml'
-              and p not in changed
-          }
+          missing = allowed - changed
           if extra:
               raise SystemExit(f'Unexpected changed paths: {sorted(extra)}')
-          # Helper deletion and the nine proven baseline deltas must be present.
-          required = allowed_fixed
-          absent = required - changed
-          if absent:
-              raise SystemExit(f'Expected repair paths absent: {sorted(absent)}')
+          if missing:
+              raise SystemExit(f'Expected repair paths absent: {sorted(missing)}')
           PY
       - name: Commit one bounded repair head
         shell: bash
@@ -287,18 +210,17 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git commit -m 'test(mobile): reconcile owner-outcome visual evidence'
+          git commit -m 'test(mobile): reconcile owner-outcome visual baselines'
           repair_sha="$(git rev-parse HEAD)"
-          {
-            echo "render_source_sha=${GITHUB_SHA}"
-            echo "repair_sha=${repair_sha}"
-            cat /tmp/worker5-behavior-paths.txt
-            cat /tmp/worker5-baseline-delta.txt
-          } > /tmp/worker5-reconciliation.txt
           remote_sha="$(git ls-remote origin "refs/heads/${GITHUB_REF_NAME}" | cut -f1)"
           test "$remote_sha" = "$GITHUB_SHA"
           git push origin "HEAD:${GITHUB_REF_NAME}"
-          echo "repair_sha=${repair_sha}" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "render_source_sha=${GITHUB_SHA}"
+            echo "repair_sha=${repair_sha}"
+            cat /tmp/worker5-baseline-delta.txt
+          } > /tmp/worker5-reconciliation.txt
+          cat /tmp/worker5-reconciliation.txt >> "$GITHUB_STEP_SUMMARY"
       - name: Upload one-time reconciliation evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
