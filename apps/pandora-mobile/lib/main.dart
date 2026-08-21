@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'pandora_api.dart';
 import 'pandora_config.dart';
+import 'bok_preview.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -209,6 +210,18 @@ class _SignInScreenState extends State<SignInScreen> {
                   TextButton(
                     onPressed: _busy ? null : _resetPassword,
                     child: const Text('Reset password'),
+                  ),
+                  const SizedBox(height: 6),
+                  OutlinedButton.icon(
+                    onPressed: _busy
+                        ? null
+                        : () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const BokPreviewScreen(),
+                              ),
+                            ),
+                    icon: const Icon(Icons.visibility_outlined),
+                    label: const Text('Open BOK pilot preview'),
                   ),
                   const SizedBox(height: 12),
                   const Text(
