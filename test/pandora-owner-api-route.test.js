@@ -184,10 +184,189 @@ test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval
 
   const response = await handler(mockRequest);
   
-  assert.strictEqual(response.status, 202);
+  const bodyText = await response.clone().text(); if(response.status !== 202) console.log(bodyText); if(response.status !== 202) console.log(await response.clone().text()); assert.strictEqual(response.status, 202);
   const responseBody = JSON.parse(await response.text());
   
   assert.strictEqual(responseBody.needsApproval, true, 'Dangerous commands MUST pause for approval');
   assert.ok(responseBody.approvalId, 'Must issue an approval ID');
   assert.strictEqual(responseBody.status.whatIsStoppingUs, 'Pending approval.', 'Must stop execution');
+});
+
+
+test('Real Route Acceptance: POST /actions/:id/run with approved intent succeeds without AAL2', async () => {
+  const root = path.join(__dirname, '..');
+  const source = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/index.ts'), 'utf8');
+
+  const stripped = source
+    .replace(/import "jsr:.*?";/g, '')
+    .replace(/import \{ createClient \} from "jsr:.*?";/g, 'const createClient = global.mockCreateClient;')
+    .replace(
+      /import\s+\{[\s\S]*?\}\s+from\s+"\.\/contract\.ts";/g,
+      'const allowedCorsOrigin = () => "*"; const parseAllowedOrigins = () => []; const normalizeOwnerRoute = (r) => r; const connectionActionAllowed = () => true; const ownerRiskLabel = (r) => r; const normalizeIntakeFingerprintPart = (s) => s; const isReleaseEvidenceType = () => false;'
+    )
+    .replace(
+      /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
+      'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
+    )
+    .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
+    
+  const transpiled = ts.transpileModule(stripped, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+  
+  global.Deno = { env: { get: () => 'mock' } };
+  global.mockCreateClient = () => ({
+    auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
+    from: () => ({ 
+      select: () => ({ 
+        eq: () => ({ 
+          eq: () => ({ 
+            limit: () => Promise.resolve({ data: [{ organization_id: 'mock-org-1', role: 'owner' }] }) 
+          }) 
+        }) 
+      }) 
+    }),
+    rpc: async (func, args) => {
+      if (func === 'consume_runtime_rate_limit') {
+        return { data: { allowed: true } };
+      }
+      if (func === 'projectos_accept_intake') {
+        return { 
+          data: { 
+            is_new: false,
+            intake: { id: 'intake-mock-approved', status: 'approved', action_hash: 'mock-hash' } 
+          } 
+        };
+      }
+      if (func === 'projectos_dispatch_execution_claim') {
+        return { data: { id: 'claim-1', status: 'dispatched' } };
+      }
+      if (func === 'projectos_complete_execution') {
+        return { data: null };
+      }
+      return { data: null };
+    }
+  });
+  
+  eval(transpiled);
+  const handler = global.edgeHandler;
+  
+  const mockRequest = {
+    method: 'POST',
+    url: 'https://mock.edge/actions/dangerous-changes/run',
+    headers: {
+      get: (key) => {
+        if (key === 'authorization') return 'Bearer mock-jwt';
+        if (key === 'content-length') return '100';
+        return null;
+      }
+    },
+    body: {
+      getReader: () => {
+        let read = false;
+        return {
+          read: async () => {
+            if (read) return { done: true };
+            read = true;
+            return { done: false, value: new TextEncoder().encode(JSON.stringify({ message: 'Approved deletion' })) };
+          },
+          cancel: async () => {}
+        };
+      }
+    }
+  };
+
+  const response = await handler(mockRequest);
+  
+  assert.strictEqual(response.status, 202);
+  const responseBody = JSON.parse(await response.text());
+  
+  assert.strictEqual(responseBody.needsApproval, false, 'Should execute because it is already approved');
+  assert.strictEqual(typeof responseBody.status.whatChanged, 'string');
+});
+
+test('Real Route Acceptance: POST /actions/:id/run without approval fails closed', async () => {
+  const root = path.join(__dirname, '..');
+  const source = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/index.ts'), 'utf8');
+
+  const stripped = source
+    .replace(/import "jsr:.*?";/g, '')
+    .replace(/import \{ createClient \} from "jsr:.*?";/g, 'const createClient = global.mockCreateClient;')
+    .replace(
+      /import\s+\{[\s\S]*?\}\s+from\s+"\.\/contract\.ts";/g,
+      'const allowedCorsOrigin = () => "*"; const parseAllowedOrigins = () => []; const normalizeOwnerRoute = (r) => r; const connectionActionAllowed = () => true; const ownerRiskLabel = (r) => r; const normalizeIntakeFingerprintPart = (s) => s; const isReleaseEvidenceType = () => false;'
+    )
+    .replace(
+      /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
+      'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
+    )
+    .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
+    
+  const transpiled = ts.transpileModule(stripped, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+  
+  global.Deno = { env: { get: () => 'mock' } };
+  global.mockCreateClient = () => ({
+    auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
+    from: () => ({ 
+      select: () => ({ 
+        eq: () => ({ 
+          eq: () => ({ 
+            limit: () => Promise.resolve({ data: [{ organization_id: 'mock-org-1', role: 'owner' }] }) 
+          }) 
+        }) 
+      }) 
+    }),
+    rpc: async (func, args) => {
+      if (func === 'consume_runtime_rate_limit') {
+        return { data: { allowed: true } };
+      }
+      if (func === 'projectos_accept_intake') {
+        return { 
+          data: { 
+            is_new: true,
+            intake: { id: 'intake-mock-danger', status: 'accepted' } 
+          } 
+        };
+      }
+      return { data: null };
+    }
+  });
+  
+  eval(transpiled);
+  const handler = global.edgeHandler;
+  
+  const mockRequest = {
+    method: 'POST',
+    url: 'https://mock.edge/actions/dangerous-changes/run',
+    headers: {
+      get: (key) => {
+        if (key === 'authorization') return 'Bearer mock-jwt';
+        if (key === 'content-length') return '100';
+        return null;
+      }
+    },
+    body: {
+      getReader: () => {
+        let read = false;
+        return {
+          read: async () => {
+            if (read) return { done: true };
+            read = true;
+            return { done: false, value: new TextEncoder().encode(JSON.stringify({ message: 'Delete the database' })) };
+          },
+          cancel: async () => {}
+        };
+      }
+    }
+  };
+
+  const response = await handler(mockRequest);
+  
+  assert.strictEqual(response.status, 202);
+  const responseBody = JSON.parse(await response.text());
+  
+  assert.strictEqual(responseBody.needsApproval, true, 'Dangerous commands MUST pause for approval even on direct run route');
+  assert.strictEqual(responseBody.status.whatIsStoppingUs, 'Pending approval.');
 });

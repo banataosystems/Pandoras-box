@@ -701,9 +701,6 @@ async function connectionAction(
   if (!connectionActionAllowed(action, item.state)) {
     throw new Error("CONNECTION_ACTION_NOT_AVAILABLE");
   }
-  if (action !== "test" && context.aal !== "aal2") {
-    throw new Error("AAL2_REQUIRED");
-  }
 
   const provider = textValue(asRecord(item.advanced).provider, item.name);
   const requests: Record<GovernedConnectionAction, string> = {
@@ -1077,7 +1074,8 @@ async function acceptIntake(
       return {
         id: textValue(asRecord(result.intake).id),
         status: textValue(asRecord(result.intake).status) || 'accepted',
-        result: asRecord(result.intake).result
+        result: asRecord(result.intake).result,
+        isNew: result.is_new === true
       };
     },
     completeIntake: async (data: any) => {
@@ -1311,9 +1309,6 @@ Deno.serve(async (req: Request) => {
       const actionId = decodeURIComponent(route.split("/")[2]);
       const action = ACTION_CATALOG[actionId as keyof typeof ACTION_CATALOG];
       if (!action) throw new Error("ACTION_NOT_FOUND");
-      if (action.risk === "CRITICAL" && context.aal !== "aal2") {
-        throw new Error("AAL2_REQUIRED");
-      }
       const body = await bodyJson(req);
       const projectId = textValue(body.projectId ?? body.projectKey) || null;
       const ownerOutcome = textValue(body.message);

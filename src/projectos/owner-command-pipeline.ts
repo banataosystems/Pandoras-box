@@ -131,7 +131,7 @@ async function executeOwnerCommand(options) {
     // Concurrent in-flight protection:
     // If the intake was already created (not new) but is not yet completed,
     // it means another execution is currently in flight. We must not dispatch again.
-    if (intakeRecord && intakeRecord.isNew === false) {
+    if (intakeRecord && intakeRecord.isNew === false && intakeRecord.status !== 'approved') {
       return {
         reply: 'This exact command is currently being processed. Please wait a moment and check again.',
         needsApproval: false,
@@ -164,7 +164,7 @@ async function executeOwnerCommand(options) {
   // 6. Governed Planning & Risk Classification
   const risk = classifyIntentRisk(sanitizedMessage);
 
-  if (risk.requiresApproval) {
+  if (risk.requiresApproval && (!intakeRecord || intakeRecord.status !== 'approved')) {
     const approvalId = `appr-${sha256Hex(`${intakeId}:approval`).substring(0, 12)}`;
     return {
       reply: `Pandora prepared a governed plan for your request (${risk.riskLevel} risk). Owner approval is required before execution.`,
