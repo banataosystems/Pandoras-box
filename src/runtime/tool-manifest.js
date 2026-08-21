@@ -19,10 +19,12 @@ function manifest(name, provider, risk, mutation, scope, requiredProviderScopes,
     };
 }
 const entries = [
+    manifest('github.create-repository', 'github', 'write', true, 'account', ['repositories:write'], { confirmationKind: 'github-create-repository' }),
     manifest('github.get-repository', 'github', 'read', false, 'repository', ['repositories:read']),
     manifest('github.list-repositories', 'github', 'read', false, 'account', ['repositories:read']),
     manifest('github.get-issue', 'github', 'read', false, 'repository', ['issues:read']),
     manifest('github.list-issues', 'github', 'read', false, 'repository', ['issues:read']),
+    manifest('github.list-issue-comments', 'github', 'read', false, 'repository', ['issues:read']),
     manifest('github.create-issue', 'github', 'write', true, 'repository', ['issues:write']),
     manifest('github.update-issue', 'github', 'write', true, 'repository', ['issues:write']),
     manifest('github.get-pull-request', 'github', 'read', false, 'repository', ['pull_requests:read']),
@@ -59,7 +61,7 @@ const entries = [
     manifest('flutterflow.inspect-readiness', 'flutterflow', 'read', false, 'project', ['projects:read', 'project_schema:read']),
     manifest('memory.health', 'memory', 'read', false, 'capability', ['memory:health']),
     manifest('memory.search', 'memory', 'read', false, 'capability', ['memory:read']),
-    manifest('memory.canonicalContext', 'memory', 'read', false, 'capability', ['memory:read']),
+    manifest('memory.canonicalContext', 'memory', 'read', false,'capability', ['memory:read']),
     manifest('memory.submitEvidenceCandidate', 'memory', 'write', true, 'project', ['memory:write']),
 ];
 exports.toolManifests = Object.freeze(Object.fromEntries(entries.map((entry) => [entry.name, Object.freeze(entry)])));
@@ -86,6 +88,11 @@ function expectedConfirmation(toolName, args) {
             : undefined;
     const suffix = renderedPath(args);
     switch (tool.confirmationKind) {
+        case 'github-create-repository': {
+            const owner = typeof args.owner === 'string' ? args.owner : undefined;
+            const name = typeof args.name === 'string' ? args.name : undefined;
+            return owner && name ? `CREATE REPOSITORY ${owner}/${name}` : undefined;
+        }
         case 'github-repository-api': {
             const owner = typeof args.owner === 'string' ? args.owner : undefined;
             const repo = typeof args.repo === 'string' ? args.repo : undefined;
