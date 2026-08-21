@@ -76,14 +76,8 @@ void main() {
     expect(lines, contains('candidate_status=unreviewed'));
     expect(lines, contains('visual_acceptance=false'));
     expect(lines, contains('baseline_count=15'));
-    expect(
-      lines.any((line) => line.startsWith('source_sha=')),
-      isTrue,
-    );
-    expect(
-      lines.any((line) => line.startsWith('review_gate=')),
-      isTrue,
-    );
+    expect(lines.any((line) => line.startsWith('source_sha=')), isTrue);
+    expect(lines.any((line) => line.startsWith('review_gate=')), isTrue);
 
     final hashLine = RegExp(r'^([0-9a-f]{64})  (.+\.png)$');
     final manifestedBaselines = lines

@@ -112,16 +112,26 @@ class SafetyOverview {
       );
     final items = ordered.map((json) {
       final provider = jsonText(json['provider'], fallback: 'Service');
+      final truth = _integrationTruth(json);
+      final explanation = switch (truth) {
+        ProviderTruthState.healthy =>
+          'Fresh verification says this service is healthy.',
+        ProviderTruthState.degraded =>
+          'Fresh verification shows partial impairment.',
+        ProviderTruthState.down =>
+          'Fresh verification shows this service is failing.',
+        ProviderTruthState.stale =>
+          'A previous state exists, but its verification has expired.',
+        ProviderTruthState.unknown =>
+          'No reliable current health state is available.',
+        ProviderTruthState.notConfigured =>
+          'This service is intentionally not configured here.',
+      };
       return SafetyItem.fromJson(<String, Object?>{
         'id': 'integration-${normalizeProviderKey(provider)}',
         'title': provider,
-        'plainStatus': humanizeToken(
-          json['status'],
-          fallback: 'Not checked',
-        ),
-        'explanation': json['freshness'] == 'fresh'
-            ? 'This connection has fresh health evidence.'
-            : 'Fresh health evidence is not available.',
+        'plainStatus': truth.label,
+        'explanation': explanation,
       });
     }).toList(growable: false);
     return <SafetySection>[
@@ -133,30 +143,48 @@ class SafetyOverview {
     ];
   }
 
-  static int _integrationAttentionRank(JsonMap integration) {
-    final words =
-        '${jsonText(integration['status'])} ${jsonText(integration['freshness'])}'
-            .toLowerCase();
-    if (words.contains('down') ||
-        words.contains('failed') ||
-        words.contains('critical') ||
-        words.contains('unhealthy') ||
-        words.contains('blocked')) {
-      return 4;
+  static ProviderTruthState _integrationTruth(JsonMap integration) {
+    final status = jsonText(integration['status']).toLowerCase();
+    final freshness = FreshnessState.parse(integration['freshness']);
+    if (status.contains('not configured') ||
+        status.contains('not_configured')) {
+      return ProviderTruthState.notConfigured;
     }
-    if (words.contains('degraded') ||
-        words.contains('warning') ||
-        words.contains('stale') ||
-        words.contains('attention')) {
-      return 3;
+    if (freshness == FreshnessState.stale) return ProviderTruthState.stale;
+    if (freshness == FreshnessState.notChecked) {
+      return ProviderTruthState.unknown;
     }
-    if (words.contains('healthy') ||
-        words.contains('connected') ||
-        words.contains('ready')) {
-      return 1;
+    if (status.contains('down') ||
+        status.contains('failed') ||
+        status.contains('critical') ||
+        status.contains('unhealthy') ||
+        status.contains('unreachable')) {
+      return ProviderTruthState.down;
     }
-    return 2;
+    if (status.contains('degraded') ||
+        status.contains('warning') ||
+        status.contains('partial') ||
+        status.contains('impaired')) {
+      return ProviderTruthState.degraded;
+    }
+    if (status.contains('healthy') ||
+        status.contains('connected') ||
+        status.contains('ready') ||
+        status.contains('active')) {
+      return ProviderTruthState.healthy;
+    }
+    return ProviderTruthState.unknown;
   }
+
+  static int _integrationAttentionRank(JsonMap integration) =>
+      switch (_integrationTruth(integration)) {
+        ProviderTruthState.down => 5,
+        ProviderTruthState.degraded => 4,
+        ProviderTruthState.stale => 3,
+        ProviderTruthState.unknown => 2,
+        ProviderTruthState.notConfigured => 1,
+        ProviderTruthState.healthy => 0,
+      };
 }
 
 abstract interface class PandoraRepository {

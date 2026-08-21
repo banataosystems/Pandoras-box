@@ -154,17 +154,16 @@ Future<void> _seedPandoraMarkImageCache(WidgetTester tester) async {
         .instantiateImageCodec(encoded)
         .timeout(const Duration(seconds: 5));
     try {
-      final frame =
-          await codec.getNextFrame().timeout(const Duration(seconds: 5));
+      final frame = await codec.getNextFrame().timeout(
+            const Duration(seconds: 5),
+          );
       return ImageInfo(image: frame.image, scale: 1.0);
     } finally {
       codec.dispose();
     }
   });
   if (decoded == null) {
-    throw TestFailure(
-      'Flutter did not return the decoded exact Pandora mark.',
-    );
+    throw TestFailure('Flutter did not return the decoded exact Pandora mark.');
   }
   if (decoded.image.width != 1024 || decoded.image.height != 1024) {
     final dimensions = '${decoded.image.width}x${decoded.image.height}';
@@ -183,9 +182,7 @@ Future<void> _seedPandoraMarkImageCache(WidgetTester tester) async {
   cache.evict(key, includeLive: true);
   cache.putIfAbsent(
     key,
-    () => OneFrameImageStreamCompleter(
-      Future<ImageInfo>.value(decoded),
-    ),
+    () => OneFrameImageStreamCompleter(Future<ImageInfo>.value(decoded)),
   );
   _pandoraMarkImageSeeded = true;
 }
@@ -204,9 +201,7 @@ Future<void> _waitForRenderedPandoraMark(
         find.descendant(of: markFinder, matching: find.byType(Image)).first;
     final renderImage = tester.renderObject<RenderImage>(imageFinder);
     if (renderImage.image != null) return;
-    await tester.runAsync(
-      () => Future<void>.delayed(decodeSlice),
-    );
+    await tester.runAsync(() => Future<void>.delayed(decodeSlice));
     await tester.pump();
   }
   throw TestFailure(

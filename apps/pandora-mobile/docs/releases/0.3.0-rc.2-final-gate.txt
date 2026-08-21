@@ -1,0 +1,5 @@
+Pandora Mobile 0.3.0-rc.2+5 definitive owner-test gate.
+Parent repair head: e8257859c46102fa44e25dfb18a7142865265213
+Release class: owner-test pre-release.
+Production promotion: false.
+Required: exact-head format, analyze, full tests, reviewed visuals, web build, Android APK, package/permission inspection, independent review, then physical owner-device verification before any production claim.

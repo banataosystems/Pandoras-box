@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/analytics/owner_analytics.dart';
 import '../core/design/pandora_tokens.dart';
 import '../features/activity/activity_screen.dart';
 import '../features/approvals/approvals_screen.dart';
@@ -19,6 +22,18 @@ class _PandoraShellState extends State<PandoraShell> {
   int _index = 0;
   final Map<int, Widget> _pages = <int, Widget>{};
 
+  @override
+  void initState() {
+    super.initState();
+    unawaited(OwnerAnalytics.shared.capture(OwnerAnalyticsEvent.appOpened));
+    unawaited(
+      OwnerAnalytics.shared.capture(
+        OwnerAnalyticsEvent.screenViewed,
+        resultClass: 'home',
+      ),
+    );
+  }
+
   Widget _page(int index) => _pages.putIfAbsent(
         index,
         () => switch (index) {
@@ -35,6 +50,20 @@ class _PandoraShellState extends State<PandoraShell> {
     if (value == _index) return;
     HapticFeedback.selectionClick();
     setState(() => _index = value);
+    final screen = switch (value) {
+      0 => 'home',
+      1 => 'projects',
+      2 => 'command',
+      3 => 'approvals',
+      4 => 'activity',
+      _ => 'home',
+    };
+    unawaited(
+      OwnerAnalytics.shared.capture(
+        OwnerAnalyticsEvent.screenViewed,
+        resultClass: screen,
+      ),
+    );
   }
 
   @override

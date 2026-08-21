@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/pandora_dependencies.dart';
+import '../../core/data/owner_projection.dart';
 import '../../core/data/pandora_repository.dart';
 import '../../core/design/pandora_tokens.dart';
 import '../../core/models/pandora_models.dart';
@@ -10,14 +11,13 @@ import '../../core/widgets/freshness_label.dart';
 import '../../core/widgets/owner_experience.dart';
 import '../../core/widgets/pandora_page.dart';
 import '../../core/widgets/pandora_surface.dart';
-import '../../core/widgets/proof_ladder.dart';
 import '../../core/widgets/status_badge.dart';
 import 'project_detail_screen.dart';
 
 enum ProjectFilter {
   all('All'),
   needsMe('Needs me'),
-  active('Active'),
+  working('Working'),
   blocked('Blocked'),
   stale('Stale'),
   productionVerified('Production verified');
@@ -37,6 +37,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   ScreenController<List<ProjectSummary>>? _controller;
   final _search = TextEditingController();
   ProjectFilter _filter = ProjectFilter.all;
+  bool _showInternal = false;
 
   @override
   void didChangeDependencies() {
@@ -58,20 +59,19 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   List<ProjectSummary> _visible(List<ProjectSummary> projects) {
     final query = _search.text.trim().toLowerCase();
     final visible = projects.where((project) {
+      if (!_showInternal && !isOwnerVisibleProject(project)) return false;
+      final ownerState = resolveOwnerProjectState(project);
       final matchesQuery = query.isEmpty ||
-          '${project.name} ${project.purpose} ${project.phase} ${project.status}'
+          '${project.name} ${project.purpose} ${project.phase} ${ownerState.label}'
               .toLowerCase()
               .contains(query);
       if (!matchesQuery) return false;
       return switch (_filter) {
         ProjectFilter.all => true,
-        ProjectFilter.needsMe => project.blocker != null,
-        ProjectFilter.active => project.status.toLowerCase().contains(
-              'active',
-            ),
-        ProjectFilter.blocked =>
-          project.status.toLowerCase().contains('blocked') ||
-              project.blocker != null,
+        ProjectFilter.needsMe =>
+          ownerState == OwnerProjectState.ownerActionRequired,
+        ProjectFilter.working => ownerState == OwnerProjectState.executing,
+        ProjectFilter.blocked => ownerState == OwnerProjectState.blocked,
         ProjectFilter.stale => project.freshness.state != FreshnessState.fresh,
         ProjectFilter.productionVerified =>
           project.evidenceState(EvidenceStage.productionVerified) ==
@@ -85,14 +85,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   @override
   Widget build(BuildContext context) => PandoraPage(
         title: 'Projects',
-        subtitle: 'Truth, blockers, proof, and the next safe action.',
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Projects',
-            onPressed: () => _controller?.refresh(),
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
+        subtitle: 'Business systems first; technical workstreams on demand.',
         onRefresh: () => _controller!.refresh(),
         child: AnimatedBuilder(
           animation: _controller!,
@@ -109,19 +102,25 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               );
             }
             final allProjects = controller.data ?? const <ProjectSummary>[];
+            final ownerProjects = allProjects
+                .where(isOwnerVisibleProject)
+                .toList(growable: false);
             final projects = _visible(allProjects);
-            final blocked = allProjects
+            final blocked = ownerProjects
                 .where(
                   (project) =>
-                      project.blocker != null ||
-                      project.status.toLowerCase().contains('blocked'),
+                      resolveOwnerProjectState(project) ==
+                      OwnerProjectState.blocked,
                 )
                 .length;
-            final stale = allProjects
-                .where((project) =>
-                    project.freshness.state != FreshnessState.fresh)
+            final working = ownerProjects
+                .where(
+                  (project) =>
+                      resolveOwnerProjectState(project) ==
+                      OwnerProjectState.executing,
+                )
                 .length;
-            final productionVerified = allProjects
+            final productionVerified = ownerProjects
                 .where(
                   (project) =>
                       project.evidenceState(EvidenceStage.productionVerified) ==
@@ -144,10 +143,18 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 OwnerMetricGrid(
                   metrics: [
                     OwnerMetric(
-                      label: 'Projects',
-                      value: '${allProjects.length}',
+                      label: 'Owner projects',
+                      value: '${ownerProjects.length}',
                       icon: Icons.workspaces_outline,
                       tone: PandoraStatusTone.informative,
+                    ),
+                    OwnerMetric(
+                      label: 'Working now',
+                      value: '$working',
+                      icon: Icons.play_circle_outline_rounded,
+                      tone: working > 0
+                          ? PandoraStatusTone.informative
+                          : PandoraStatusTone.neutral,
                     ),
                     OwnerMetric(
                       label: 'Blocked',
@@ -155,14 +162,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                       icon: Icons.block_rounded,
                       tone: blocked > 0
                           ? PandoraStatusTone.critical
-                          : PandoraStatusTone.neutral,
-                    ),
-                    OwnerMetric(
-                      label: 'Stale proof',
-                      value: '$stale',
-                      icon: Icons.schedule_rounded,
-                      tone: stale > 0
-                          ? PandoraStatusTone.attention
                           : PandoraStatusTone.neutral,
                     ),
                     OwnerMetric(
@@ -175,8 +174,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 ),
                 const SizedBox(height: PandoraSpacing.md),
                 PandoraSurface(
-                  title: 'Find a project',
-                  subtitle: 'Search by name, purpose, phase, or status.',
+                  title: 'Search portfolio',
+                  subtitle:
+                      'Internal recovery and ingestion records stay hidden in Simple view.',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -189,41 +189,43 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         ),
                       ),
                       const SizedBox(height: PandoraSpacing.sm),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            for (final filter in ProjectFilter.values) ...[
-                              FilterChip(
-                                label: Text(filter.label),
-                                selected: _filter == filter,
-                                onSelected: (_) =>
-                                    setState(() => _filter = filter),
-                              ),
-                              if (filter != ProjectFilter.values.last)
-                                const SizedBox(width: PandoraSpacing.xs),
-                            ],
-                          ],
-                        ),
+                      Wrap(
+                        spacing: PandoraSpacing.xs,
+                        runSpacing: PandoraSpacing.xs,
+                        children: [
+                          for (final filter in ProjectFilter.values)
+                            FilterChip(
+                              label: Text(filter.label),
+                              selected: _filter == filter,
+                              onSelected: (_) =>
+                                  setState(() => _filter = filter),
+                            ),
+                          FilterChip(
+                            label: const Text('Professional: internal'),
+                            selected: _showInternal,
+                            onSelected: (value) =>
+                                setState(() => _showInternal = value),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: PandoraSpacing.xl),
                 OwnerSectionHeading(
-                  title: 'Portfolio',
+                  title: _showInternal ? 'All project records' : 'Portfolio',
                   subtitle: projects.isEmpty
                       ? 'No projects match the current view.'
-                      : '${projects.length} project${projects.length == 1 ? '' : 's'} · attention first',
+                      : '${projects.length} project${projects.length == 1 ? '' : 's'} · owner action, blockers, and active work first',
                 ),
                 const SizedBox(height: PandoraSpacing.sm),
                 if (projects.isEmpty)
                   EmptyContent(
                     title: 'No matching projects',
-                    message:
-                        _search.text.isEmpty && _filter == ProjectFilter.all
-                            ? 'No verified projects were returned.'
-                            : 'Try another search or filter.',
+                    message: _search.text.isEmpty &&
+                            _filter == ProjectFilter.all
+                        ? 'No verified projects were returned for this view.'
+                        : 'Try another search or filter.',
                   )
                 else
                   for (var index = 0; index < projects.length; index++) ...[
@@ -244,80 +246,95 @@ class _ProjectCard extends StatelessWidget {
   final ProjectSummary project;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-        button: true,
-        label: 'Open ${project.name}',
-        child: InkWell(
-          borderRadius: PandoraRadius.cardBorder,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => ProjectDetailScreen(project: project),
-            ),
-          ),
-          child: PandoraSurface(
-            title: project.name,
-            subtitle: project.purpose,
-            trailing: StatusBadge(
-              label: project.status,
-              tone: statusToneFor(project.status),
-              compact: true,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        project.phase,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                    ),
-                    const SizedBox(width: PandoraSpacing.sm),
-                    FreshnessLabel(freshness: project.freshness),
-                  ],
-                ),
-                const SizedBox(height: PandoraSpacing.sm),
-                ProofLadder(stages: project.evidenceStages, compact: true),
-                if (project.blocker != null) ...[
-                  const SizedBox(height: PandoraSpacing.sm),
-                  OwnerSignal(
-                    label: 'Blocked by',
-                    value: project.blocker!,
-                    icon: Icons.block_rounded,
-                    tone: PandoraStatusTone.critical,
-                  ),
-                ],
-                if (project.nextAction != null) ...[
-                  const SizedBox(height: PandoraSpacing.xs),
-                  OwnerSignal(
-                    label: 'Next safe action',
-                    value: project.nextAction!,
-                    icon: Icons.arrow_forward_rounded,
-                    tone: PandoraStatusTone.informative,
-                  ),
-                ],
-              ],
-            ),
+  Widget build(BuildContext context) {
+    final ownerState = resolveOwnerProjectState(project);
+    return Semantics(
+      button: true,
+      label: 'Open ${canonicalOwnerProjectLabel(project)}',
+      child: InkWell(
+        borderRadius: PandoraRadius.cardBorder,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ProjectDetailScreen(project: project),
           ),
         ),
-      );
+        child: PandoraSurface(
+          title: canonicalOwnerProjectLabel(project),
+          subtitle: project.purpose,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: PandoraSpacing.xs,
+                runSpacing: PandoraSpacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  StatusBadge(
+                    label: ownerState.label,
+                    tone: statusToneFor(ownerState.label),
+                    compact: true,
+                  ),
+                  StatusBadge(
+                    label: compactProofSummary(project),
+                    tone: project.evidenceState(
+                              EvidenceStage.productionVerified,
+                            ) ==
+                            EvidenceClaimState.verified
+                        ? PandoraStatusTone.verified
+                        : PandoraStatusTone.neutral,
+                    compact: true,
+                  ),
+                  FreshnessLabel(freshness: project.freshness),
+                ],
+              ),
+              if (project.phase != 'Phase not verified') ...[
+                const SizedBox(height: PandoraSpacing.sm),
+                Text(
+                  project.phase,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+              if (project.blocker != null) ...[
+                const SizedBox(height: PandoraSpacing.sm),
+                OwnerSignal(
+                  label: 'Blocked by',
+                  value: project.blocker!,
+                  icon: Icons.block_rounded,
+                  tone: PandoraStatusTone.critical,
+                ),
+              ],
+              if (project.nextAction != null) ...[
+                const SizedBox(height: PandoraSpacing.xs),
+                OwnerSignal(
+                  label: 'Next',
+                  value: project.nextAction!,
+                  icon: Icons.arrow_forward_rounded,
+                  tone: PandoraStatusTone.informative,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 int _compareProjectAttention(ProjectSummary left, ProjectSummary right) {
-  int score(ProjectSummary project) {
-    if (project.blocker != null ||
-        project.status.toLowerCase().contains('blocked')) {
-      return 0;
-    }
-    if (project.freshness.state != FreshnessState.fresh) return 1;
-    if (project.status.toLowerCase().contains('active')) return 2;
-    return 3;
+  int score(ProjectSummary project) =>
+      switch (resolveOwnerProjectState(project)) {
+        OwnerProjectState.ownerActionRequired => 0,
+        OwnerProjectState.blocked => 1,
+        OwnerProjectState.executing => 2,
+        OwnerProjectState.monitoring => 3,
+        OwnerProjectState.idle => 4,
+        OwnerProjectState.archived => 5,
+      };
+  final difference = score(left).compareTo(score(right));
+  if (difference != 0) return difference;
+  if (left.freshness.state != right.freshness.state) {
+    return left.freshness.isFresh ? 1 : -1;
   }
-
-  final scoreDifference = score(left).compareTo(score(right));
-  if (scoreDifference != 0) return scoreDifference;
   return left.name.toLowerCase().compareTo(right.name.toLowerCase());
 }
 
