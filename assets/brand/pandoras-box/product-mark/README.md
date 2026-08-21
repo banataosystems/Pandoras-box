@@ -1,11 +1,38 @@
-# Pandora's Box Product Mark
+# Pandora's Box product mark
 
-This directory preserves the owner-approved Pandora's Box product mark and its asset identity.
+`2165-original.jpg` contains the exact owner-supplied artwork. Its attachment
+name was `2165.png`, but the bytes are JPEG/JFIF. The repository extension
+reflects the real encoding without re-encoding or modifying the artwork.
 
-`2165-original.jpg` contains the exact bytes supplied by the owner. The attachment was named `2165.png`, but file inspection proves the bytes are JPEG/JFIF. The repository extension is corrected without re-encoding or modifying the artwork.
+The `derived/` directory restores only the immutable, content-addressed PNG
+objects first preserved at commit
+`3e54c53f7189e3c8bf4f4129d271b3acfe1c5742`. That stale branch is not merged
+wholesale. Each restored blob is tied to the approved master by the transform,
+dimensions, Git blob, and SHA-256 recorded in `manifest.json`.
 
-Do not edit the provenance master. Create deterministic display derivatives in a separate `derived/` directory, record their checksums in `manifest.json`, and verify each rendered target before advancing its state.
+Run the content-addressed integrity verification from the repository root. It
+does not require an image toolchain:
 
-The black background is part of the approved treatment. Automated transparency removal would also remove or damage internal black contours and is prohibited without a later owner decision.
+```sh
+node scripts/verify-pandora-brand-assets.mjs
+```
 
-See `docs/decisions/2026-08-10-pandoras-box-product-mark.md` and issue #11 for the approved role, placements, proof gates, and rollback.
+To recreate every derivative, normalize the historical PNG metadata, and
+require exact byte equality, use
+`node scripts/verify-pandora-brand-assets.mjs --reproduce` with the exact
+ImageMagick version recorded in `manifest.json`. The optional `--write` mode
+performs the same reproduction checks and restores only the known outputs after
+all expected hashes pass.
+
+The black field is part of the approved treatment. Do not redraw, recolor,
+invert, trace, animate, remove the black field, or substitute a generic apple.
+In-product rendering must use `contain` with the accessible label
+`Pandora's Box`.
+
+The checked Flutter UI copy is declared in `apps/pandora-mobile/pubspec.yaml`,
+but Flutter rendering, native launcher wiring, favicon/manifest wiring, and
+device verification remain separate proof gates. No transparent Android
+notification mark is approved; silently creating one is prohibited.
+
+See `docs/decisions/2026-08-10-pandoras-box-product-mark.md` and issue #11 for
+the approved role, placements, proof gates, and rollback.
