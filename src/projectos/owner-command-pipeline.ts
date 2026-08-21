@@ -161,7 +161,7 @@ async function executeOwnerCommand(options) {
 
   const intakeId = intakeRecord?.id || `intake-${effectiveIdempotency.substring(0, 12)}`;
 
-  // 6. Governed Planning & Risk Classification (No AAL2/MFA gate)
+  // 6. Governed Planning & Risk Classification
   const risk = classifyIntentRisk(sanitizedMessage);
 
   if (risk.requiresApproval) {
