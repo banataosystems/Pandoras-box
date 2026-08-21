@@ -24,8 +24,15 @@ class PandoraPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final viewportWidth = MediaQuery.sizeOf(context).width;
+    final horizontalPadding = viewportWidth >= PandoraSize.wideBreakpoint
+        ? PandoraSpacing.xl
+        : viewportWidth >= 600
+            ? PandoraSpacing.lg
+            : PandoraSpacing.md;
     final content = CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
         SliverAppBar(
           toolbarHeight: 68,
@@ -50,10 +57,10 @@ class PandoraPage extends StatelessWidget {
           pinned: true,
         ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
             PandoraSpacing.md,
-            PandoraSpacing.md,
-            PandoraSpacing.md,
+            horizontalPadding,
             PandoraSpacing.xxl,
           ),
           sliver: SliverToBoxAdapter(
