@@ -999,6 +999,101 @@ async function safety(context: UserContext) {
   };
 }
 
+
+const CONNECTED_SERVICES_OWNER_INTENT =
+  "check connected services and tell me what needs attention";
+const CONNECTED_SERVICES_OWNER_OPERATION = "connected_services_health";
+
+function normalizeOwnerIntent(message: string) {
+  return message.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function ownerReadOperation(message: string) {
+  return normalizeOwnerIntent(message) === CONNECTED_SERVICES_OWNER_INTENT
+    ? CONNECTED_SERVICES_OWNER_OPERATION
+    : null;
+}
+
+async function completeConnectedServicesRead(
+  context: UserContext,
+  intake: JsonRecord,
+  acceptedProject: JsonRecord,
+  idempotency: string,
+) {
+  const [connectionItems, safetyItem] = await Promise.all([
+    connections(context),
+    safety(context),
+  ]);
+  const attentionNames = connectionItems
+    .filter((item) => item.state === "problem" || item.state === "needs_permission")
+    .map((item) => item.name);
+  if (safetyItem.state === "problem") attentionNames.push("Safety checks");
+  const notCheckedNames = connectionItems
+    .filter((item) => item.state === "not_checked")
+    .map((item) => item.name);
+
+  const summary = attentionNames.length
+    ? `I checked ${connectionItems.length} connected service${connectionItems.length === 1 ? "" : "s"}. Needs attention: ${attentionNames.join(", ")}.`
+    : notCheckedNames.length
+    ? `I checked ${connectionItems.length} connected service${connectionItems.length === 1 ? "" : "s"}. No confirmed problem is recorded. Not freshly verified: ${notCheckedNames.join(", ")}.`
+    : connectionItems.length
+    ? `I checked ${connectionItems.length} connected service${connectionItems.length === 1 ? "" : "s"}. No connected service currently needs attention.`
+    : "I checked the connected-service registry. No connected services are configured yet.";
+
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: completion, error: completionError } = await admin.rpc(
+    "projectos_complete_owner_read_intake",
+    {
+      p_organization_id: context.organizationId,
+      p_intake_id: textValue(intake.id),
+      p_operation: CONNECTED_SERVICES_OWNER_OPERATION,
+      p_result: {
+        summary,
+        providerCount: connectionItems.length,
+        needsAttention: attentionNames.length,
+        notChecked: notCheckedNames.length,
+        safetyState: safetyItem.state,
+      },
+    },
+  );
+  if (completionError) throw new Error("OWNER_READ_COMPLETION_FAILED");
+
+  return {
+    reply: summary,
+    needsApproval: false,
+    actionId: textValue(intake.id) || null,
+    approvalId: null,
+    status: {
+      whatChanged: "Connected services were checked.",
+      whereWeAre: attentionNames.length
+        ? `${attentionNames.length} item${attentionNames.length === 1 ? " needs" : "s need"} attention.`
+        : notCheckedNames.length
+        ? "No confirmed problem was found, but some services are not freshly verified."
+        : "The read-only check completed without a confirmed connection problem.",
+      whatIsDone: "The read-only result was recorded in Pandora Activity.",
+      whatIsHappeningNow: "No protected change is running.",
+      whatIsStoppingUs: null,
+      whatIWillDoNext: attentionNames.length
+        ? "Review the items that need attention."
+        : notCheckedNames.length
+        ? "Test or refresh the connections that are not freshly verified."
+        : "No action is required for this read-only check.",
+    },
+    advanced: {
+      intakeId: intake.id ?? null,
+      projectKey: acceptedProject.project_key ?? null,
+      idempotencyKey: idempotency,
+      ownerReadOperation: CONNECTED_SERVICES_OWNER_OPERATION,
+      providerCount: connectionItems.length,
+      needsAttention: attentionNames.length,
+      notChecked: notCheckedNames.length,
+      completion: asRecord(completion),
+    },
+  };
+}
+
 async function acceptIntake(
   context: UserContext,
   body: JsonRecord,
@@ -1053,27 +1148,33 @@ async function acceptIntake(
     p_project_name: null,
     p_repository: null,
     p_request_type: "work",
-    p_source: "flutterflow_owner_app",
+    p_source: "api",
     p_idempotency_key: idempotency,
   });
   if (error) throw new Error("INTAKE_FAILED");
   const result = asRecord(data);
   const intake = asRecord(result.intake);
   const acceptedProject = asRecord(result.project);
+  const readOperation = ownerReadOperation(message);
+  if (readOperation === CONNECTED_SERVICES_OWNER_OPERATION) {
+    return await completeConnectedServicesRead(
+      context, intake, acceptedProject, idempotency,
+    );
+  }
   return {
     reply:
-      "I saved that request and sent it into Pandora's governed planning flow.",
+      "I recorded that request, but no governed planner has started it yet.",
     needsApproval: false,
     actionId: textValue(intake.id) || null,
     approvalId: null,
     status: {
       whatChanged: "Your request was recorded.",
-      whereWeAre: "Pandora is preparing a safe plan.",
+      whereWeAre: "Waiting for a safe route.",
       whatIsDone: "The request is in the project record.",
       whatIsHappeningNow:
-        "Current state and required approvals will be checked next.",
+        "No execution plan has been created yet.",
       whatIsStoppingUs: null,
-      whatIWillDoNext: "Show you the plan before any protected change runs.",
+      whatIWillDoNext: "A governed planner route is required before anything can run.",
     },
     advanced: {
       intakeId: intake.id ?? null,
