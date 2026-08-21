@@ -37,7 +37,7 @@ function classifyIntentRisk(message) {
     lower.includes('destroy') ||
     lower.includes('dangerous')
   ) {
-    return { riskLevel: 'CRITICAL', requiresAal2: true, requiresApproval: true };
+    return { riskLevel: 'CRITICAL', requiresApproval: true };
   }
   if (
     lower.includes('deploy') ||
@@ -47,9 +47,9 @@ function classifyIntentRisk(message) {
     lower.includes('change') ||
     lower.includes('apply')
   ) {
-    return { riskLevel: 'WRITE', requiresAal2: false, requiresApproval: true };
+    return { riskLevel: 'WRITE', requiresApproval: true };
   }
-  return { riskLevel: 'READ', requiresAal2: false, requiresApproval: false };
+  return { riskLevel: 'READ', requiresApproval: false };
 }
 
 /**
@@ -131,39 +131,13 @@ async function executeOwnerCommand(options) {
 
   const intakeId = intakeRecord?.id || `intake-${effectiveIdempotency.substring(0, 12)}`;
 
-  // 6. Governed Planning & Risk Classification
+  // 6. Governed Planning & Risk Classification (No AAL2/MFA gate)
   const risk = classifyIntentRisk(sanitizedMessage);
-
-  if (risk.requiresAal2 && context.aal !== 'aal2') {
-    return {
-      reply: 'This action involves critical or destructive changes. Step-up identity verification (AAL2) is required before a plan can be authorized.',
-      needsApproval: true,
-      actionId: intakeId,
-      approvalId: null,
-      status: {
-        whatChanged: 'Your request was evaluated for risk.',
-        whereWeAre: 'Awaiting secondary authentication.',
-        whatIsDone: 'The request is securely recorded.',
-        whatIsHappeningNow: 'Waiting for identity verification (AAL2).',
-        whatIsStoppingUs: 'AAL2 authentication required.',
-        whatIWillDoNext: 'Complete the identity challenge to proceed.',
-      },
-      proof: {
-        stage: 'documented',
-        verified: false,
-      },
-      advanced: {
-        intakeId,
-        riskLevel: risk.riskLevel,
-        idempotencyKey: effectiveIdempotency,
-      },
-    };
-  }
 
   if (risk.requiresApproval) {
     const approvalId = `appr-${sha256Hex(`${intakeId}:approval`).substring(0, 12)}`;
     return {
-      reply: `Pandora prepared a governed plan for your request (${risk.riskLevel} risk). Approval is required before execution.`,
+      reply: `Pandora prepared a governed plan for your request (${risk.riskLevel} risk). Owner approval is required before execution.`,
       needsApproval: true,
       actionId: intakeId,
       approvalId,

@@ -1345,12 +1345,6 @@ Deno.serve(async (req: Request) => {
       const actionId = decodeURIComponent(route.split("/")[2]);
       const action = ACTION_CATALOG[actionId as keyof typeof ACTION_CATALOG];
       if (!action) throw new Error("ACTION_NOT_FOUND");
-      if (
-        (action.risk === "CRITICAL" || actionId === "pause-service" ||
-          actionId === "apply-approved-code-change") && context.aal !== "aal2"
-      ) {
-        throw new Error("AAL2_REQUIRED");
-      }
       const body = await bodyJson(req);
       const projectId = textValue(body.projectId ?? body.projectKey) || null;
       const ownerOutcome = textValue(body.message);

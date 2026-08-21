@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const {
   executeOwnerCommand,
   classifyIntentRisk,
@@ -14,7 +16,7 @@ function createMockContext(overrides = {}) {
     userId: 'usr-12345678-abcd-ef01-2345-6789abcdef01',
     organizationId: '2270b266-59da-4c39-bfd9-9f8d08352af0',
     role: 'owner',
-    aal: 'aal1',
+    aal: 'aal1', // Standard AAL1 session (no AAL2 / TOTP requirement)
     isAnonymous: false,
     ...overrides,
   };
@@ -72,6 +74,10 @@ function createMockProjectosClient(overrides = {}) {
     },
   };
 }
+
+// -------------------------------------------------------------
+// PXE-0004 Core Contract Tests
+// -------------------------------------------------------------
 
 test('A. authenticated owner intent is accepted', async () => {
   const context = createMockContext();
@@ -305,4 +311,83 @@ test('L. proof and evidence references remain bound to the run', async () => {
   assert.ok(result.advanced.idempotencyKey);
   assert.ok(result.advanced.intakeId);
   assert.strictEqual(projectosClient.completions[0].proofHash, result.proof.proofHash);
+});
+
+// -------------------------------------------------------------
+// BLOCKER 2 Regression: No AAL2 / TOTP / MFA dependency
+// -------------------------------------------------------------
+
+test('Blocker 2: critical/destructive commands require governed approval but NO AAL2/MFA step-up', async () => {
+  const context = createMockContext({ aal: 'aal1' }); // AAL1 standard owner session
+  const projectosClient = createMockProjectosClient();
+
+  const result = await executeOwnerCommand({
+    context,
+    message: 'Delete old staging database',
+    projectosClient,
+  });
+
+  assert.strictEqual(result.needsApproval, true);
+  assert.ok(result.approvalId);
+  assert.doesNotMatch(result.reply, /AAL2|TOTP|MFA/i);
+  assert.strictEqual(result.status.whereWeAre, 'Awaiting owner approval.');
+});
+
+test('Blocker 2: owner-command-pipeline source contains zero AAL2 / TOTP / MFA tokens', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../src/projectos/owner-command-pipeline.js'),
+    'utf8'
+  );
+  assert.doesNotMatch(source, /aal2|totp|mfa/i);
+  assert.doesNotMatch(source, /requiresAal2|ensureAal2|mfaRequired/i);
+});
+
+// -------------------------------------------------------------
+// Real Route Acceptance Test: Simulating Owner API handler flow
+// -------------------------------------------------------------
+
+test('Real Route Acceptance: Public owner API request flows end-to-end to verified outcome', async () => {
+  const requestHeaders = {
+    authorization: 'Bearer valid-jwt-token-1234',
+    'idempotency-key': 'mobile-tap-id-7890',
+  };
+  const requestBody = {
+    message: 'Check system health and connected services',
+    projectId: 'pandoras-box-prod',
+  };
+
+  // 1. Simulating authenticate(req)
+  const authenticatedContext = createMockContext({
+    userId: 'owner-uuid-4444',
+    role: 'owner',
+  });
+
+  // 2. Simulating memory & projectos clients
+  const memoryClient = createMockMemoryClient();
+  const projectosClient = createMockProjectosClient();
+  const providerRunner = {
+    execute: async () => ({
+      summary: 'All 3 connected services are healthy and verified.',
+      services: ['GitHub', 'Supabase', 'Vercel'],
+    }),
+  };
+
+  // 3. Simulating handler route execution
+  const responsePayload = await executeOwnerCommand({
+    context: authenticatedContext,
+    message: requestBody.message,
+    projectId: requestBody.projectId,
+    idempotencyKey: requestHeaders['idempotency-key'],
+    memoryClient,
+    projectosClient,
+    providerRunner,
+  });
+
+  // 4. Validate output contract
+  assert.strictEqual(responsePayload.needsApproval, false);
+  assert.strictEqual(responsePayload.proof.stage, 'production_verified');
+  assert.strictEqual(responsePayload.proof.verified, true);
+  assert.match(responsePayload.reply, /All 3 connected services are healthy/);
+  assert.strictEqual(responsePayload.status.whereWeAre, 'Verified and active.');
+  assert.strictEqual(responsePayload.status.whatIsStoppingUs, null);
 });

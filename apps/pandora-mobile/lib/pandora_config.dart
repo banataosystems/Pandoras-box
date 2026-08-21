@@ -1,10 +1,17 @@
 class PandoraConfig {
   PandoraConfig._();
 
-  static const appVersion = '0.3.0-rc.2';
-  static const buildNumber = '2';
+  static const appVersion = String.fromEnvironment(
+    'PANDORA_APP_VERSION',
+    defaultValue: '0.3.0-rc.2+5',
+  );
+  static const buildNumber = '5';
   static const packageId = 'com.banataosystems.pandora_mobile';
-  static const visibleReleaseIdentity = 'Pandora Mobile $appVersion (Build $buildNumber)';
+  static String get releaseLabel => '${appVersion.split('+').first} Owner Test';
+  static const artifactClass = 'Owner Test — Android debug signed';
+  static const productionRelease = false;
+
+  static const visibleReleaseIdentity = 'Pandora Mobile 0.3.0-rc.2 (Build 5)';
 
   static const supabaseUrl = String.fromEnvironment(
     'PANDORA_SUPABASE_URL',
