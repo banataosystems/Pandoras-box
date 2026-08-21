@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/pandora_dependencies.dart';
 import '../../core/data/owner_projection.dart';
+import '../../core/data/pandora_repository.dart';
 import '../../core/design/pandora_tokens.dart';
 import '../../core/models/pandora_models.dart';
 import '../../core/state/screen_controller.dart';
@@ -19,8 +21,21 @@ class ConnectionsScreen extends StatefulWidget {
   State<ConnectionsScreen> createState() => _ConnectionsScreenState();
 }
 
-class _ConnectionsScreenState extends State<ConnectionsScreen> {
+class _ConnectionsScreenState extends State<ConnectionsScreen>
+    with WidgetsBindingObserver {
   ScreenController<List<ConnectionSummary>>? _controller;
+  bool _connectingSupabase = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _controller?.refresh();
+  }
 
   @override
   void didChangeDependencies() {
@@ -34,8 +49,46 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller?.dispose();
     super.dispose();
+  }
+
+  Future<void> _connectSupabase() async {
+    final repository = PandoraDependencies.of(context).repository;
+    if (repository is! ProviderConnectionRepository) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Supabase OAuth is not available in this build.')),
+      );
+      return;
+    }
+    final providerRepository = repository as ProviderConnectionRepository;
+    setState(() => _connectingSupabase = true);
+    try {
+      final launch = await providerRepository.beginSupabaseOAuth();
+      final opened = await launchUrl(
+        launch.authorizeUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Pandora could not open Supabase authorization.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Pandora could not start Supabase authorization. No access was changed.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _connectingSupabase = false);
+    }
   }
 
   @override
@@ -68,10 +121,21 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
               final raw = controller.data ?? const <ConnectionSummary>[];
               final items = deduplicateConnections(raw);
               if (items.isEmpty) {
-                return const EmptyContent(
-                  title: 'No connections returned',
-                  message:
-                      'Pandora has not returned a verified connection list.',
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SupabaseOAuthCard(
+                      connected: false,
+                      busy: _connectingSupabase,
+                      onPressed: _connectSupabase,
+                    ),
+                    const SizedBox(height: PandoraSpacing.md),
+                    const EmptyContent(
+                      title: 'No connections returned',
+                      message:
+                          'Pandora has not returned a verified connection list.',
+                    ),
+                  ],
                 );
               }
               final changeReady =
@@ -97,6 +161,14 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
                     ),
                     const SizedBox(height: PandoraSpacing.md),
                   ],
+                  _SupabaseOAuthCard(
+                    connected: items.any((connection) =>
+                        connection.provider.toLowerCase() == 'supabase' &&
+                        connection.authMode.toLowerCase() == 'oauth'),
+                    busy: _connectingSupabase,
+                    onPressed: _connectSupabase,
+                  ),
+                  const SizedBox(height: PandoraSpacing.md),
                   OwnerBriefingHero(
                     eyebrow: 'Provider posture',
                     title: needsAttention == 0
@@ -154,6 +226,61 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
               );
             },
           ),
+        ),
+      );
+}
+
+class _SupabaseOAuthCard extends StatelessWidget {
+  const _SupabaseOAuthCard({
+    required this.connected,
+    required this.busy,
+    required this.onPressed,
+  });
+
+  final bool connected;
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => PandoraSurface(
+        title: connected ? 'Supabase connected with OAuth' : 'Connect Supabase',
+        subtitle: connected
+            ? 'Reauthorize when permissions expire or the account changes.'
+            : 'Grant Pandora access to the Supabase organizations and projects you choose.',
+        leading: const Icon(Icons.storage_rounded),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const OwnerSignal(
+              label: 'Credential protection',
+              value:
+                  'OAuth + PKCE · tokens remain server-side in Supabase Vault',
+              icon: Icons.lock_outline_rounded,
+              tone: PandoraStatusTone.verified,
+            ),
+            const SizedBox(height: PandoraSpacing.sm),
+            Text(
+              'Connecting does not authorize production changes. Pandora keeps protected mutations behind the existing governance gates.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: PandoraSpacing.md),
+            FilledButton.icon(
+              onPressed: busy ? null : onPressed,
+              icon: busy
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.open_in_new_rounded),
+              label: Text(
+                busy
+                    ? 'Opening Supabase…'
+                    : connected
+                        ? 'Reauthorize Supabase'
+                        : 'Connect Supabase',
+              ),
+            ),
+          ],
         ),
       );
 }

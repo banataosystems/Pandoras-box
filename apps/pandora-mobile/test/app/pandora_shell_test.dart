@@ -598,9 +598,9 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Prepare a safe plan');
     // Objective starters now sit above the submit control, which puts it below
     // the fold on a 800pt-tall surface.
-    await tester.ensureVisible(find.text('Prepare the request'));
+    await tester.ensureVisible(find.text('Submit to Pandora'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Prepare the request'));
+    await tester.tap(find.text('Submit to Pandora'));
     await tester.pumpAndSettle();
     expect(find.text('Retry same request safely'), findsOneWidget);
 
@@ -608,7 +608,7 @@ void main() {
       OutlinedButton,
       'Retry same request safely',
     );
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -400));
+    await tester.ensureVisible(retryButton);
     await tester.pumpAndSettle();
     await tester.tap(retryButton);
     await tester.pumpAndSettle();
@@ -616,7 +616,7 @@ void main() {
     expect(repository.idempotencyKeys, hasLength(2));
     expect(repository.idempotencyKeys.first, isNotNull);
     expect(repository.idempotencyKeys.last, repository.idempotencyKeys.first);
-    expect(find.text('Request recorded'), findsOneWidget);
+    expect(find.text('Request accepted'), findsOneWidget);
   });
 
   testWidgets('approval controls fail closed when expiry is not verified', (

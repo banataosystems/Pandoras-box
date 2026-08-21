@@ -31,7 +31,7 @@ void main() {
       expect(overview.sections, hasLength(1));
       expect(overview.sections.single.items, hasLength(2));
       expect(overview.sections.single.items.first.title, 'post hog');
-      expect(overview.sections.single.items.first.status, 'Down');
+      expect(overview.sections.single.items.first.status, 'Stale');
     },
   );
 }

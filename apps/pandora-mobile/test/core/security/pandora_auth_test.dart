@@ -12,9 +12,7 @@ void main() {
     });
 
     test('maps unconfirmed email to an app-owned message', () {
-      final failure = PandoraAuthFailure.signInProvider(
-        'Email not confirmed',
-      );
+      final failure = PandoraAuthFailure.signInProvider('Email not confirmed');
 
       expect(failure.message, 'Confirm your email before signing in.');
     });

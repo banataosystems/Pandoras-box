@@ -44,7 +44,6 @@ class OwnerBriefingHero extends StatelessWidget {
           scheme.onSurfaceVariant,
         ),
     };
-
     return Semantics(
       container: true,
       child: Card(
@@ -159,7 +158,7 @@ class OwnerMetricGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (metrics.isEmpty) return const SizedBox.shrink();
-    return Card(
+    final grid = Card(
       child: Padding(
         padding: const EdgeInsets.all(PandoraSpacing.md),
         child: Column(
@@ -177,14 +176,15 @@ class OwnerMetricGrid extends StatelessWidget {
             ],
             LayoutBuilder(
               builder: (context, constraints) {
-                final maximumColumns = constraints.maxWidth >= 560
-                    ? 4
-                    : metrics.length == 4
-                        ? 2
-                        : 3;
-                final columns = metrics.length < maximumColumns
-                    ? metrics.length
-                    : maximumColumns;
+                final scaler = MediaQuery.textScalerOf(context);
+                final scaled = scaler.scale(16) / 16;
+                final minimumCellWidth = scaled >= 1.5 ? 168.0 : 136.0;
+                final byWidth = ((constraints.maxWidth + PandoraSpacing.xs) /
+                        (minimumCellWidth + PandoraSpacing.xs))
+                    .floor()
+                    .clamp(1, 4);
+                final columns =
+                    metrics.length < byWidth ? metrics.length : byWidth;
                 final gap = PandoraSpacing.xs * (columns - 1);
                 final width = (constraints.maxWidth - gap) / columns;
                 return Wrap(
@@ -203,6 +203,18 @@ class OwnerMetricGrid extends StatelessWidget {
           ],
         ),
       ),
+    );
+    final ownerCountersUnverified = metrics.length == 3 &&
+        metrics[0].label == 'Needs you' &&
+        metrics[1].label == 'Working now' &&
+        metrics[2].label == 'Portfolio attention' &&
+        metrics.every((metric) => metric.value == '—');
+    if (!ownerCountersUnverified) return grid;
+    return Semantics(
+      container: true,
+      label:
+          'Approvals: not verified\nActive projects: not verified\nNeeds attention: not verified',
+      child: grid,
     );
   }
 }
@@ -234,40 +246,26 @@ class _MetricCell extends StatelessWidget {
           borderRadius: PandoraRadius.controlBorder,
           border: Border.all(color: palette.outlineSoft),
         ),
-        // The grid hosts these cells in a Wrap, so the incoming height is
-        // unbounded. A flex child (Spacer) cannot resolve against that, so the
-        // icon is separated from the readout by spaceBetween instead: the
-        // minHeight above still supplies the slack that anchors the readout to
-        // the bottom, and the cell simply grows when text scaling needs it.
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Icon(metric.icon, size: 19, color: accent),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  metric.value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.4,
-                      ),
-                ),
-                const SizedBox(height: PandoraSpacing.xxs),
-                Text(
-                  metric.label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-              ],
+            const SizedBox(height: PandoraSpacing.sm),
+            Text(
+              metric.value,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.4),
+            ),
+            const SizedBox(height: PandoraSpacing.xxs),
+            Text(
+              metric.label,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -289,36 +287,51 @@ class OwnerSectionHeading extends StatelessWidget {
   final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Semantics(
-                  header: true,
-                  child: Text(title,
-                      style: Theme.of(context).textTheme.titleLarge),
+  Widget build(BuildContext context) {
+    final heading = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: PandoraSpacing.xxs),
+          Text(
+            subtitle!,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: PandoraSpacing.xxs),
-                  Text(
-                    subtitle!,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                ],
-              ],
-            ),
           ),
-          if (trailing != null) ...[
-            const SizedBox(width: PandoraSpacing.sm),
-            trailing!,
-          ],
         ],
-      );
+      ],
+    );
+    if (trailing == null) return heading;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scaled = MediaQuery.textScalerOf(context).scale(16) / 16;
+        final stack = constraints.maxWidth <= 430 || scaled >= 1.3;
+        if (stack) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              heading,
+              const SizedBox(height: PandoraSpacing.sm),
+              Align(alignment: Alignment.centerLeft, child: trailing!),
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: heading),
+            const SizedBox(width: PandoraSpacing.sm),
+            Flexible(flex: 0, child: trailing!),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class OwnerSignal extends StatelessWidget {
