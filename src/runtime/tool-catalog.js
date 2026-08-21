@@ -100,6 +100,23 @@ function assertGitHubAccess(definition, args, configuration) {
     }
     assertRequiredScopes(definition, configuration.grantedScopes);
     const owner = typeof args.owner === 'string' ? args.owner : undefined;
+    if (definition.manifest.name === 'github.create-repository') {
+        const configuredLogin = typeof configuration.login === 'string' ? configuration.login.trim() : '';
+        if (!owner || !configuredLogin || owner.toLowerCase() !== configuredLogin.toLowerCase()) {
+            throw new Error('GitHub repository creation is limited to the configured account login');
+        }
+        if (typeof configuration.registerRepository !== 'function') {
+            throw new Error('GitHub repository creation requires the Pandora durable repository registrar');
+        }
+        if (args.startBuild === true && configuration.grantedScopes !== undefined
+            && !configuration.grantedScopes.includes('issues:write')) {
+            throw new Error('GitHub initial build dispatch requires issues:write before repository creation');
+        }
+        if (typeof args.name !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(args.name)) {
+            throw new Error('GitHub repository name is invalid');
+        }
+        return;
+    }
     const repo = typeof args.repo === 'string' ? args.repo : undefined;
     const allowlist = allowedRepositorySet(configuration);
     if (owner && repo) {
