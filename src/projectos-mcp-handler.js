@@ -532,7 +532,7 @@ function createProjectOsMcpHandler(overrides = {}) {
             if (!authorization) {
                 throw Object.assign(new Error("A valid bearer access token is required"), { status: 401 });
             }
-            const current = await actorFor({ ...request, headers: { ...request.headers, authorization } }, dependencies);
+            const current = await actorFor({ headers: { authorization } }, dependencies);
             if (request.method !== "POST") {
                 response.setHeader("Allow", MCP_ALLOWED_METHODS);
                 rpcError(response, null, -32600, "Method not allowed", 405);
