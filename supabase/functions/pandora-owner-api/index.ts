@@ -18,6 +18,10 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ALLOWED_ORIGINS = parseAllowedOrigins(
   Deno.env.get("PANDORA_ALLOWED_ORIGINS"),
 );
+const SUPABASE_OAUTH_CLIENT_ID = "d836261c-ffa5-409b-b614-927a40e30fad";
+const SUPABASE_OAUTH_REDIRECT_URI =
+  "https://jcyqixttuebxqqfkjonq.supabase.co/functions/v1/connect-supabase/oauth2/callback";
+const SUPABASE_OAUTH_AUTHORIZE_URI = "https://api.supabase.com/v1/oauth/authorize";
 
 const CORS_BASE_HEADERS = {
   "access-control-allow-headers":
@@ -403,7 +407,10 @@ async function loadProjectSummaries(context: UserContext) {
 
 function connectionSummary(value: unknown, healthRows: JsonRecord[] = []) {
   const connection = asRecord(value);
+  const configuration = asRecord(connection.configuration);
   const provider = textValue(connection.provider, "Service");
+  const authMode = textValue(configuration.auth_mode, "unknown").toLowerCase();
+  const recoveryOnly = provider.toLowerCase() === "supabase" && authMode !== "oauth";
   const status = textValue(connection.status, "not_checked").toLowerCase();
   const now = Date.now();
   const lastCheckedAt = textValue(connection.last_health_check_at);
@@ -453,6 +460,9 @@ function connectionSummary(value: unknown, healthRows: JsonRecord[] = []) {
   return {
     id: textValue(connection.id),
     name: textValue(connection.display_name, provider),
+    provider: provider.toLowerCase(),
+    authMode,
+    recoveryOnly,
     plainPurpose: purposes[provider.toLowerCase()] || "Connected service",
     state,
     plainStatus: ready
@@ -473,7 +483,7 @@ function connectionSummary(value: unknown, healthRows: JsonRecord[] = []) {
     canDisconnect: connectionActionAllowed("disconnect", state),
     needsOwnerApprovalForChanges: true,
     lastCheckedAt: connection.last_health_check_at ?? null,
-    advanced: { provider, scopes, observedStatus: status },
+    advanced: { provider, scopes, observedStatus: status, authMode, recoveryOnly },
   };
 }
 
@@ -661,7 +671,7 @@ async function connections(
   const [connectionsResult, healthResult] = await Promise.all([
     context.client.from("connector_installations")
       .select(
-        "id, provider, display_name, status, scopes, last_health_check_at, updated_at",
+        "id, provider, external_account_id, display_name, status, scopes, configuration, last_health_check_at, updated_at",
       )
       .eq("organization_id", context.organizationId).order("provider"),
     context.client.from("projectos_integration_health")
@@ -675,6 +685,34 @@ async function connections(
   return (connectionsResult.data || []).map((item: JsonRecord) =>
     connectionSummary(item, healthRows)
   );
+}
+
+async function beginSupabaseOAuth(context: UserContext) {
+  if (context.isAnonymous) throw new Error("PERMANENT_ACCOUNT_REQUIRED");
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await admin.rpc("begin_supabase_oauth_session", {
+    p_organization_id: context.organizationId,
+    p_user_id: context.userId,
+  });
+  if (error) throw new Error("SUPABASE_OAUTH_START_FAILED");
+  const launch = asRecord(data);
+  const state = textValue(launch.state);
+  const codeChallenge = textValue(launch.codeChallenge);
+  if (!state || !codeChallenge) throw new Error("SUPABASE_OAUTH_START_FAILED");
+  const authorize = new URL(SUPABASE_OAUTH_AUTHORIZE_URI);
+  authorize.searchParams.set("response_type", "code");
+  authorize.searchParams.set("client_id", SUPABASE_OAUTH_CLIENT_ID);
+  authorize.searchParams.set("redirect_uri", SUPABASE_OAUTH_REDIRECT_URI);
+  authorize.searchParams.set("state", state);
+  authorize.searchParams.set("code_challenge", codeChallenge);
+  authorize.searchParams.set("code_challenge_method", "S256");
+  return {
+    provider: "supabase",
+    authorizeUrl: authorize.toString(),
+    expiresAt: launch.expiresAt ?? null,
+  };
 }
 
 async function connectionAction(
@@ -999,101 +1037,6 @@ async function safety(context: UserContext) {
   };
 }
 
-
-const CONNECTED_SERVICES_OWNER_INTENT =
-  "check connected services and tell me what needs attention";
-const CONNECTED_SERVICES_OWNER_OPERATION = "connected_services_health";
-
-function normalizeOwnerIntent(message: string) {
-  return message.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function ownerReadOperation(message: string) {
-  return normalizeOwnerIntent(message) === CONNECTED_SERVICES_OWNER_INTENT
-    ? CONNECTED_SERVICES_OWNER_OPERATION
-    : null;
-}
-
-async function completeConnectedServicesRead(
-  context: UserContext,
-  intake: JsonRecord,
-  acceptedProject: JsonRecord,
-  idempotency: string,
-) {
-  const [connectionItems, safetyItem] = await Promise.all([
-    connections(context),
-    safety(context),
-  ]);
-  const attentionNames = connectionItems
-    .filter((item) => item.state === "problem" || item.state === "needs_permission")
-    .map((item) => item.name);
-  if (safetyItem.state === "problem") attentionNames.push("Safety checks");
-  const notCheckedNames = connectionItems
-    .filter((item) => item.state === "not_checked")
-    .map((item) => item.name);
-
-  const summary = attentionNames.length
-    ? `I checked ${connectionItems.length} connected service${connectionItems.length === 1 ? "" : "s"}. Needs attention: ${attentionNames.join(", ")}.`
-    : notCheckedNames.length
-    ? `I checked ${connectionItems.length} connected service${connectionItems.length === 1 ? "" : "s"}. No confirmed problem is recorded. Not freshly verified: ${notCheckedNames.join(", ")}.`
-    : connectionItems.length
-    ? `I checked ${connectionItems.length} connected service${connectionItems.length === 1 ? "" : "s"}. No connected service currently needs attention.`
-    : "I checked the connected-service registry. No connected services are configured yet.";
-
-  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: completion, error: completionError } = await admin.rpc(
-    "projectos_complete_owner_read_intake",
-    {
-      p_organization_id: context.organizationId,
-      p_intake_id: textValue(intake.id),
-      p_operation: CONNECTED_SERVICES_OWNER_OPERATION,
-      p_result: {
-        summary,
-        providerCount: connectionItems.length,
-        needsAttention: attentionNames.length,
-        notChecked: notCheckedNames.length,
-        safetyState: safetyItem.state,
-      },
-    },
-  );
-  if (completionError) throw new Error("OWNER_READ_COMPLETION_FAILED");
-
-  return {
-    reply: summary,
-    needsApproval: false,
-    actionId: textValue(intake.id) || null,
-    approvalId: null,
-    status: {
-      whatChanged: "Connected services were checked.",
-      whereWeAre: attentionNames.length
-        ? `${attentionNames.length} item${attentionNames.length === 1 ? " needs" : "s need"} attention.`
-        : notCheckedNames.length
-        ? "No confirmed problem was found, but some services are not freshly verified."
-        : "The read-only check completed without a confirmed connection problem.",
-      whatIsDone: "The read-only result was recorded in Pandora Activity.",
-      whatIsHappeningNow: "No protected change is running.",
-      whatIsStoppingUs: null,
-      whatIWillDoNext: attentionNames.length
-        ? "Review the items that need attention."
-        : notCheckedNames.length
-        ? "Test or refresh the connections that are not freshly verified."
-        : "No action is required for this read-only check.",
-    },
-    advanced: {
-      intakeId: intake.id ?? null,
-      projectKey: acceptedProject.project_key ?? null,
-      idempotencyKey: idempotency,
-      ownerReadOperation: CONNECTED_SERVICES_OWNER_OPERATION,
-      providerCount: connectionItems.length,
-      needsAttention: attentionNames.length,
-      notChecked: notCheckedNames.length,
-      completion: asRecord(completion),
-    },
-  };
-}
-
 async function acceptIntake(
   context: UserContext,
   body: JsonRecord,
@@ -1148,33 +1091,27 @@ async function acceptIntake(
     p_project_name: null,
     p_repository: null,
     p_request_type: "work",
-    p_source: "api",
+    p_source: "flutterflow_owner_app",
     p_idempotency_key: idempotency,
   });
   if (error) throw new Error("INTAKE_FAILED");
   const result = asRecord(data);
   const intake = asRecord(result.intake);
   const acceptedProject = asRecord(result.project);
-  const readOperation = ownerReadOperation(message);
-  if (readOperation === CONNECTED_SERVICES_OWNER_OPERATION) {
-    return await completeConnectedServicesRead(
-      context, intake, acceptedProject, idempotency,
-    );
-  }
   return {
     reply:
-      "I recorded that request, but no governed planner has started it yet.",
+      "I saved that request and sent it into Pandora's governed planning flow.",
     needsApproval: false,
     actionId: textValue(intake.id) || null,
     approvalId: null,
     status: {
       whatChanged: "Your request was recorded.",
-      whereWeAre: "Waiting for a safe route.",
+      whereWeAre: "Pandora is preparing a safe plan.",
       whatIsDone: "The request is in the project record.",
       whatIsHappeningNow:
-        "No execution plan has been created yet.",
+        "Current state and required approvals will be checked next.",
       whatIsStoppingUs: null,
-      whatIWillDoNext: "A governed planner route is required before anything can run.",
+      whatIWillDoNext: "Show you the plan before any protected change runs.",
     },
     advanced: {
       intakeId: intake.id ?? null,
@@ -1314,6 +1251,9 @@ Deno.serve(async (req: Request) => {
         ),
         202,
       );
+    }
+    if (req.method === "POST" && route === "/connections/supabase/oauth/start") {
+      return send(await beginSupabaseOAuth(context), 201);
     }
     if (req.method === "POST" && route === "/memory/search") {
       const body = await bodyJson(req);

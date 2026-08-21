@@ -56,39 +56,18 @@ function requestHeader(request, name) {
     return Array.isArray(value) ? value[0] : value;
 }
 
-function ownStringDataProperty(value, name) {
-    if (!value || (typeof value !== "object" && typeof value !== "function")) {
-        return undefined;
-    }
-    const descriptor = Object.getOwnPropertyDescriptor(value, name);
-    return descriptor
-        && Object.prototype.hasOwnProperty.call(descriptor, "value")
-        && typeof descriptor.value === "string"
-        ? descriptor.value
-        : undefined;
-}
-
-function requestUrlValue(request) {
-    return ownStringDataProperty(request, "originalUrl")
-        || ownStringDataProperty(request, "url")
-        || "/";
-}
-
-function parsedRequestUrl(request) {
-    try {
-        return new URL(requestUrlValue(request), DEFAULT_RESOURCE_ORIGIN);
-    } catch {
-        return new URL("/", DEFAULT_RESOURCE_ORIGIN);
-    }
-}
-
 function requestPath(request) {
-    return parsedRequestUrl(request).pathname;
+    const value = request.originalUrl || request.url || "/";
+    try {
+        return new URL(value, DEFAULT_RESOURCE_ORIGIN).pathname;
+    } catch {
+        return "/";
+    }
 }
 
 function metadataSelector(request) {
-    const values = parsedRequestUrl(request).searchParams.getAll("metadata");
-    return values.length === 1 ? values[0] : undefined;
+    const value = request.query?.metadata;
+    return Array.isArray(value) ? undefined : value;
 }
 
 function isMetadataRequest(request) {

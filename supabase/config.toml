@@ -6,3 +6,7 @@ verify_jwt = true
 # workload bearer first.
 [functions.mcpmaster-supabase-control]
 verify_jwt = false
+
+
+[functions.connect-supabase]
+verify_jwt = false

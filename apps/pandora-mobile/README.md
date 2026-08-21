@@ -1,11 +1,11 @@
 # Pandora Mobile
 
-Canonical Flutter operator client for MCPMaster / Pandora.
+Canonical Flutter owner and admin control center for MCPMaster / Pandora.
 
 ## Runtime authority
 
 - Source: `banataosystems/Pandoras-box`
-- Owner/operator API: `https://mcpmaster.vercel.app/api/operator`
+- Owner/operator API: the contract-proven Supabase `pandora-owner-api` Edge Function
 - Auth project: `https://jcyqixttuebxqqfkjonq.supabase.co`
 - Pandora Memory: `https://pandorasbox-memory.vercel.app`
 
@@ -19,10 +19,12 @@ Authentication uses the current Supabase user session JWT. Organization context 
 
 ## Security behavior
 
-The UI has no unauthenticated operational routes. It never weakens ProjectOS authorization. Approval decisions are submitted to the canonical backend and fail closed when the server requires stronger authentication or refuses the operation.
+The UI has no unauthenticated operational routes. It never weakens ProjectOS authorization. Approval decisions use the wire values `approve` and `reject`, only record a decision, and never execute the protected change. Mutations are not automatically retried after an ambiguous network outcome. The Vercel operator route is not used as a fallback because it exposes a different contract.
+
+The mobile integration workflow is read-only (`contents: read`) and cannot push source. Its literal private-key scan is owned by the app at `tool/check_private_key_literals.sh`; W5 does not modify the repository-wide recovery or ProjectOS security workflows. Formatter/evidence workflows for this lane must also remain read-only and must never commit or push source.
 
 ## Build
 
-The repository CI creates disposable Android/Web platform scaffolding around this source and runs `flutter pub get`, `flutter analyze`, `flutter test`, `flutter build web --release`, and `flutter build apk --debug`.
+The repository CI uses pinned Flutter 3.47.0, creates disposable Android/Web platform scaffolding around the complete app package, verifies deterministic brand assets, formats, analyzes, tests, compares reviewed goldens, captures actual owner-screen evidence, checks Android package permissions, and creates release-mode Web plus debug Android artifacts.
 
-A passing build is not production verification. Native authenticated journeys, API authorization behavior, deployment identity, and rollback proof remain separate release gates.
+A passing build is not production verification. Native authenticated journeys, API authorization behavior, deployment identity, independent exact-head review, and rollback proof remain separate release gates.
