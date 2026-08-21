@@ -168,10 +168,16 @@ async function jsonBody(request) {
     }
 }
 
+function structuredToolContent(value) {
+    if (value && typeof value === "object" && !Array.isArray(value)) return value;
+    if (Array.isArray(value)) return { items: value };
+    return { value: value ?? null };
+}
+
 function toolResult(value) {
     return {
         content: [{ type: "text", text: JSON.stringify(value) }],
-        structuredContent: value,
+        structuredContent: structuredToolContent(value),
     };
 }
 

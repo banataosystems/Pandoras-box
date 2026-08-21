@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: read
+  issues: read
+  pull-requests: read
 
 concurrency:
   group: projectos-security-${{ github.workflow }}-${{ github.ref }}
@@ -54,3 +56,185 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm audit --omit=dev --audit-level=high
+
+  external-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify exact-head Google Jules review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          TARGET_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          node <<'NODE'
+          "use strict";
+
+          const fs = require("node:fs");
+
+          const token = process.env.GH_TOKEN;
+          const eventHead = process.env.EVENT_HEAD_SHA;
+          const targetNumber = Number(process.env.TARGET_PR_NUMBER);
+          const repository = process.env.GITHUB_REPOSITORY;
+          const [owner, repo] = repository.split("/");
+          const apiRoot = "https://api.github.com";
+          const blockers = [];
+
+          function normalizeLogin(value) {
+            return typeof value === "string"
+              ? value.trim().toLowerCase().replace(/\[bot\]$/, "")
+              : "";
+          }
+
+          async function api(path) {
+            const response = await fetch(apiRoot + path, {
+              headers: {
+                accept: "application/vnd.github+json",
+                authorization: "Bearer " + token,
+                "x-github-api-version": "2022-11-28",
+              },
+            });
+            if (!response.ok) {
+              throw new Error("GitHub API " + response.status + " for " + path);
+            }
+            return response.json();
+          }
+
+          async function paginate(path) {
+            const values = [];
+            for (let page = 1; page <= 10; page += 1) {
+              const separator = path.includes("?") ? "&" : "?";
+              const batch = await api(path + separator + "per_page=100&page=" + page);
+              if (!Array.isArray(batch)) throw new Error("Expected list from " + path);
+              values.push(...batch);
+              if (batch.length < 100) return values;
+            }
+            throw new Error("Pagination exceeded safety bound for " + path);
+          }
+
+          function addBlocker(condition, message) {
+            if (!condition) blockers.push(message);
+          }
+
+          function appendSummary(lines) {
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          }
+
+          (async () => {
+            addBlocker(Boolean(token), "ephemeral GitHub workflow token is unavailable");
+            addBlocker(Number.isInteger(targetNumber) && targetNumber > 0, "target PR number is invalid");
+            addBlocker(/^[0-9a-f]{40}$/.test(eventHead || ""), "event head is not a full SHA");
+            if (blockers.length) throw new Error(blockers.join("; "));
+
+            const target = await api("/repos/" + owner + "/" + repo + "/pulls/" + targetNumber);
+            const targetFiles = await paginate("/repos/" + owner + "/" + repo + "/pulls/" + targetNumber + "/files");
+            const reportOnly = targetFiles.length === 1
+              && /^docs\/reviews\/[A-Za-z0-9_.-]+\.md$/.test(targetFiles[0].filename || "");
+            if (reportOnly) {
+              appendSummary([
+                "### ProjectOS external review",
+                "",
+                "Report-only PR exemption: exactly one docs/reviews artifact.",
+              ]);
+              return;
+            }
+
+            addBlocker(target.head && target.head.sha === eventHead, "target head moved or event is stale");
+            const markerMatches = [...String(target.body || "").matchAll(/<!--\s*projectos-external-review-issue\s*:\s*([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)#(\d+)\s*-->/gi)];
+            addBlocker(markerMatches.length === 1, "target body must contain exactly one external-review issue marker");
+            if (blockers.length) throw new Error(blockers.join("; "));
+
+            const reviewRepository = markerMatches[0][1];
+            const reviewIssueNumber = Number(markerMatches[0][2]);
+            addBlocker(reviewRepository.toLowerCase() === repository.toLowerCase(), "review issue repository must match target repository");
+            addBlocker(Number.isInteger(reviewIssueNumber) && reviewIssueNumber > 0, "review issue number is invalid");
+            if (blockers.length) throw new Error(blockers.join("; "));
+
+            const [reviewOwner, reviewRepo] = reviewRepository.split("/");
+            const issue = await api("/repos/" + reviewOwner + "/" + reviewRepo + "/issues/" + reviewIssueNumber);
+            addBlocker(!issue.pull_request, "external-review reference must be an issue");
+            const comments = await paginate("/repos/" + reviewOwner + "/" + reviewRepo + "/issues/" + reviewIssueNumber + "/comments");
+            const ready = comments
+              .filter((comment) => normalizeLogin(comment.user && comment.user.login) === "google-labs-jules")
+              .map((comment) => {
+                const links = [...String(comment.body || "").matchAll(/https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/pull\/(\d+)/g)];
+                return links.length === 1
+                  ? { comment, repository: links[0][1], number: Number(links[0][2]) }
+                  : undefined;
+              })
+              .filter(Boolean)
+              .sort((left, right) => String(right.comment.created_at || "").localeCompare(String(left.comment.created_at || "")));
+            addBlocker(ready.length > 0, "latest trusted Jules report link is missing");
+            if (blockers.length) throw new Error(blockers.join("; "));
+
+            const reference = ready[0];
+            addBlocker(reference.repository.toLowerCase() === reviewRepository.toLowerCase(), "report repository does not match review issue repository");
+            if (blockers.length) throw new Error(blockers.join("; "));
+
+            const [reportOwner, reportRepo] = reference.repository.split("/");
+            const report = await api("/repos/" + reportOwner + "/" + reportRepo + "/pulls/" + reference.number);
+            const reportFiles = await paginate("/repos/" + reportOwner + "/" + reportRepo + "/pulls/" + reference.number + "/files");
+            const reportCommit = await api("/repos/" + reportOwner + "/" + reportRepo + "/commits/" + report.head.sha);
+            const targetCommit = await api("/repos/" + owner + "/" + repo + "/commits/" + eventHead);
+
+            addBlocker(report.base && target.base && report.base.sha === target.base.sha, "report PR base is not the target PR exact base");
+            addBlocker(normalizeLogin(reportCommit.author && reportCommit.author.login) === "google-labs-jules", "report head author is not Google Jules");
+            addBlocker(normalizeLogin(reportCommit.committer && reportCommit.committer.login) === "google-labs-jules", "report head committer is not Google Jules");
+            addBlocker(reportFiles.length === 1, "report PR must change exactly one file");
+            const reportPath = reportFiles[0] && reportFiles[0].filename;
+            addBlocker(/^docs\/reviews\/[A-Za-z0-9_.-]+\.md$/.test(reportPath || ""), "report file path is invalid");
+            if (blockers.length) throw new Error(blockers.join("; "));
+
+            const encodedPath = reportPath.split("/").map(encodeURIComponent).join("/");
+            const file = await api("/repos/" + reportOwner + "/" + reportRepo + "/contents/" + encodedPath + "?ref=" + report.head.sha);
+            addBlocker(file.type === "file" && file.encoding === "base64", "report content is not a base64 file");
+            if (blockers.length) throw new Error(blockers.join("; "));
+
+            const content = Buffer.from(String(file.content || "").replace(/\s/g, ""), "base64").toString("utf8");
+            const targetTree = targetCommit.commit && targetCommit.commit.tree && targetCommit.commit.tree.sha;
+            addBlocker(content.includes(repository + "#" + targetNumber), "report does not name the exact target PR");
+            addBlocker(content.includes(eventHead), "report does not name the exact target head");
+            addBlocker(/^[0-9a-f]{40}$/.test(targetTree || "") && content.includes(targetTree), "report does not name the exact target tree");
+            addBlocker(/Google\s+Jules|Jules\s*\/\s*Gemini/i.test(content), "report does not state Google Jules identity");
+            const verdicts = [...content.matchAll(/^\s*projectos-verdict\s*:\s*(pass|fail|changes-requested|blocked)\s*$/gim)];
+            addBlocker(verdicts.length === 1, "report must contain exactly one projectos verdict");
+            const verdict = verdicts[0] && verdicts[0][1] && verdicts[0][1].toLowerCase();
+            addBlocker(verdict === "pass", "review verdict is " + (verdict || "missing"));
+            if (blockers.length) {
+              appendSummary([
+                "### ProjectOS external review",
+                "",
+                "Status: FAIL",
+                "",
+                ...blockers.map((message) => "- " + message),
+              ]);
+              throw new Error(blockers.join("; "));
+            }
+
+            appendSummary([
+              "### ProjectOS external review",
+              "",
+              "Status: PASS",
+              "",
+              "- Target: " + repository + "#" + targetNumber,
+              "- Head: " + eventHead,
+              "- Tree: " + targetTree,
+              "- Jules report PR: " + reference.repository + "#" + reference.number,
+              "- Report head: " + report.head.sha,
+              "- Verdict: pass",
+            ]);
+          })().catch((error) => {
+            if (blockers.length === 0) {
+              appendSummary([
+                "### ProjectOS external review",
+                "",
+                "Status: FAIL",
+                "",
+                "- " + error.message,
+              ]);
+            }
+            console.error(error.message);
+            process.exitCode = 1;
+          });
+          NODE
