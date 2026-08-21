@@ -28,6 +28,21 @@ class GitHubControlResolverError extends Error {
     }
 }
 exports.GitHubControlResolverError = GitHubControlResolverError;
+function validatedRegistrationInput(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input))
+        throw new GitHubControlResolverError('GitHub repository registration input is invalid');
+    const record = input;
+    if (!['created', 'builder_dispatched'].includes(record.stage)
+        || typeof record.owner !== 'string'
+        || typeof record.repo !== 'string'
+        || typeof record.repositoryId !== 'string'
+        || typeof record.repositoryUrl !== 'string'
+        || typeof record.projectKey !== 'string'
+        || typeof record.projectName !== 'string') {
+        throw new GitHubControlResolverError('GitHub repository registration input is invalid');
+    }
+    return record;
+}
 function validatedEndpoint(raw) {
     const endpoint = new URL(raw);
     if (endpoint.protocol !== 'https:'
@@ -47,6 +62,65 @@ class GitHubControlResolver {
         this.timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
         this.maxResponseBytes = options.maxResponseBytes || DEFAULT_MAX_RESPONSE_BYTES;
         this.fetchFn = options.fetchFn || globalThis.fetch;
+    }
+    async registerRepository(vercelOidcToken, accountId, registrationInput) {
+        const token = vercelOidcToken?.trim();
+        if (!token || token.length < 20) {
+            throw new GitHubControlResolverError('Vercel OIDC runtime token is required');
+        }
+        const input = validatedRegistrationInput(registrationInput);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+        try {
+            const response = await this.fetchFn(this.endpoint, {
+                method: 'POST',
+                headers: {
+                    authorization: `Bearer ${token}`,
+                    'content-type': 'application/json',
+                    accept: 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'github_repository_register',
+                    accountId,
+                    ...input,
+                }),
+                signal: controller.signal,
+                redirect: 'error',
+            });
+            const declaredLength = Number(response.headers?.get('content-length') || '0');
+            if (Number.isFinite(declaredLength) && declaredLength > this.maxResponseBytes) {
+                throw new GitHubControlResolverError('GitHub control response is too large');
+            }
+            const body = await response.text();
+            if (Buffer.byteLength(body, 'utf8') > this.maxResponseBytes) {
+                throw new GitHubControlResolverError('GitHub control response is too large');
+            }
+            if (!response.ok) {
+                throw new GitHubControlResolverError(`GitHub repository registration failed with status ${response.status}`, response.status);
+            }
+            let parsed;
+            try {
+                parsed = JSON.parse(body);
+            }
+            catch {
+                throw new GitHubControlResolverError('GitHub control returned invalid JSON');
+            }
+            if (!parsed || parsed.ok !== true || !parsed.registration || typeof parsed.registration !== 'object' || Array.isArray(parsed.registration)) {
+                throw new GitHubControlResolverError('GitHub control returned an invalid registration result');
+            }
+            return parsed.registration;
+        }
+        catch (error) {
+            if (error instanceof GitHubControlResolverError)
+                throw error;
+            if (error instanceof Error && error.name === 'AbortError') {
+                throw new GitHubControlResolverError('GitHub control request timed out');
+            }
+            throw new GitHubControlResolverError('GitHub repository registration request failed');
+        }
+        finally {
+            clearTimeout(timeout);
+        }
     }
     async resolve(vercelOidcToken, requestedAccountId) {
         const token = vercelOidcToken?.trim();
@@ -97,7 +171,10 @@ class GitHubControlResolver {
                     ? `GitHub account ${accountId} is not available`
                     : 'Multiple GitHub accounts are available; MCPMASTER_GITHUB_ACCOUNT_ID is required');
             }
-            return selected;
+            return {
+                ...selected,
+                registerRepository: async (input) => this.registerRepository(token, selected.id, input),
+            };
         }
         catch (error) {
             if (error instanceof GitHubControlResolverError)
