@@ -9,7 +9,7 @@ const {
   classifyIntentRisk,
   sanitizeOwnerText,
   sanitizeError,
-} = require('../src/projectos/owner-command-pipeline.js');
+} = require('../dist/projectos/owner-command-pipeline.js');
 
 function createMockContext(overrides = {}) {
   return {

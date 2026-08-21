@@ -13,5 +13,9 @@
     "sourceMap": true,
     "target": "ES2022"
   },
-  "include": ["src/**/*.js"]
+  "include": [
+    "src/**/*.js",
+    "src/**/*.ts",
+    "supabase/functions/pandora-owner-api/index.ts"
+  ]
 }

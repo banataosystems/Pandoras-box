@@ -1016,11 +1016,7 @@ function ownerReadOperation(message: string) {
 
 
 
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-// @ts-ignore
-const pipeline = require("../../src/projectos/owner-command-pipeline.js");
-const { executeOwnerCommand } = pipeline;
+import { executeOwnerCommand } from "../../src/projectos/owner-command-pipeline.ts";
 
 async function acceptIntake(
   context: UserContext,

@@ -273,7 +273,7 @@ async function executeOwnerCommand(options) {
   return finalOutcome;
 }
 
-module.exports = {
+export {
   executeOwnerCommand,
   classifyIntentRisk,
   sanitizeOwnerText,

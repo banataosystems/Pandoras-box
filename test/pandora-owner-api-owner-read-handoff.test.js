@@ -29,12 +29,10 @@ test("Phase 0 owner read routes only the canonical connected-services intent", (
   assert.match(ownerApi, /projectos_complete_owner_read_intake/);
 });
 
-test("free-form intake no longer claims planning before a planner exists", () => {
-  assert.doesNotMatch(ownerApi, /Pandora is preparing a safe plan\./);
-  assert.doesNotMatch(ownerApi, /Current state and required approvals will be checked next\./);
-  assert.match(ownerApi, /no governed planner has started it yet/);
-  assert.match(ownerApi, /No execution plan has been created yet/);
-  assert.match(ownerApi, /A governed planner route is required before anything can run/);
+test("free-form intake delegates entirely to the governed execution pipeline", () => {
+  assert.match(ownerApi, /executeOwnerCommand/);
+  assert.doesNotMatch(ownerApi, /no governed planner has started it yet/);
+  assert.doesNotMatch(ownerApi, /No execution plan has been created yet/);
 });
 
 test("owner read completion is service-role-only, scoped, idempotent and hash-linked", () => {
