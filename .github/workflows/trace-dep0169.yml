@@ -1,0 +1,111 @@
+name: Trace Node DEP0169
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/trace-dep0169.yml'
+      - 'scripts/trace-dep0169.mjs'
+      - 'vercel-entrypoint.js'
+      - 'src/projectos-mcp-handler.js'
+      - 'src/projectos-container-server.js'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trace-dep0169-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-nonproduction-trace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$EXPECTED_SHA"
+          {
+            echo '### DEP0169 exact-source binding'
+            echo
+            echo "- Expected: \`$EXPECTED_SHA\`"
+            echo "- Checked out: \`$actual_sha\`"
+            echo '- Surface: local Node 24 execution of `vercel-entrypoint.js`'
+            echo '- Provider mutation: `false`'
+            echo '- Deployment performed: `false`'
+            echo '- Credentials used: `false`'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      - name: Install exact locked dependencies
+        run: npm ci
+
+      - name: Build exact runtime source
+        run: npm run build
+
+      - name: Trace DEP0169 on harmless local requests
+        shell: bash
+        env:
+          EXACT_SOURCE_SHA: ${{ env.EXPECTED_SHA }}
+          NODE_OPTIONS: --trace-deprecation
+        run: |
+          set -euo pipefail
+          node scripts/trace-dep0169.mjs 2>&1 | tee dep0169-console.log
+          test -s artifacts/dep0169-trace.json
+
+      - name: Publish secret-free attribution summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -s artifacts/dep0169-trace.json ]; then
+            echo 'DEP0169 trace JSON was not produced.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          node <<'NODE'
+          const fs = require('node:fs');
+          const result = JSON.parse(
+            fs.readFileSync('artifacts/dep0169-trace.json', 'utf8'),
+          );
+          const lines = [
+            '',
+            '### DEP0169 attribution',
+            '',
+            `- Exact source: \`${result.exact_source_sha}\``,
+            `- Node: \`${result.node_version}\``,
+            `- Warnings observed: \`${result.warning_count}\``,
+            `- Unique stacks: \`${result.unique_warning_count}\``,
+            `- Dependency-attributed stacks: \`${result.attributed_warning_count}\``,
+          ];
+          for (const [index, warning] of result.warnings.entries()) {
+            const frame = warning.first_dependency;
+            lines.push(
+              `- Stack ${index + 1}: \`${frame?.package ?? 'unattributed'}@${frame?.version ?? 'unknown'}\` ` +
+              `\`${frame?.file ?? 'unknown'}:${frame?.line ?? '?'}:${frame?.column ?? '?'}\``,
+            );
+          }
+          lines.push(
+            '',
+            'The diagnostic used public metadata and intentionally unauthenticated MCP requests only. No bearer token, provider call, deployment, or mutation was used.',
+          );
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          NODE
+          cat artifacts/dep0169-trace.json
