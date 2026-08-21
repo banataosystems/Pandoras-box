@@ -15,11 +15,11 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
     .replace(/import "jsr:.*?";/g, '')
     .replace(/import \{ createClient \} from "jsr:.*?";/g, 'const createClient = global.mockCreateClient;')
     .replace(
-      /import \{.*?\} from "\.\/contract\.ts";/g,
+      /import\s+\{[\s\S]*?\}\s+from\s+"\.\/contract\.ts";/g,
       'const allowedCorsOrigin = () => "*"; const parseAllowedOrigins = () => []; const normalizeOwnerRoute = (r) => r; const connectionActionAllowed = () => true; const ownerRiskLabel = (r) => r; const normalizeIntakeFingerprintPart = (s) => s; const isReleaseEvidenceType = () => false;'
     )
     .replace(
-      /import \{ executeOwnerCommand \} from "\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
+      /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../../dist/projectos/owner-command-pipeline.js");'
     )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
@@ -113,11 +113,11 @@ test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval
     .replace(/import "jsr:.*?";/g, '')
     .replace(/import \{ createClient \} from "jsr:.*?";/g, 'const createClient = global.mockCreateClient;')
     .replace(
-      /import \{.*?\} from "\.\/contract\.ts";/g,
+      /import\s+\{[\s\S]*?\}\s+from\s+"\.\/contract\.ts";/g,
       'const allowedCorsOrigin = () => "*"; const parseAllowedOrigins = () => []; const normalizeOwnerRoute = (r) => r; const connectionActionAllowed = () => true; const ownerRiskLabel = (r) => r; const normalizeIntakeFingerprintPart = (s) => s; const isReleaseEvidenceType = () => false;'
     )
     .replace(
-      /import \{ executeOwnerCommand \} from "\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
+      /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../../dist/projectos/owner-command-pipeline.js");'
     )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
