@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.3.0",
   "product_key": "mcpmaster-pandoras-box",
   "role": "primary_product_mark",
   "decision_id": "PB-BRAND-2026-08-10-01",
@@ -9,6 +9,7 @@
     "attachment_name": "2165.png",
     "repository_path": "assets/brand/pandoras-box/product-mark/2165-original.jpg",
     "sha256": "d6f055b88b962b4dbae4ac67bc30f5e31b6c3a90997dfd5fddf9a0be23aa5970",
+    "git_blob_sha1": "b3b185aaebbb6307d0af6cfc033ffff4b3d580e9",
     "byte_size": 98032,
     "actual_format": "JPEG",
     "mime_type": "image/jpeg",
@@ -18,25 +19,234 @@
     "alpha": false,
     "background": "#000000"
   },
+  "provenance": {
+    "approval_issue": "https://github.com/banataosystems/Pandoras-box/issues/11",
+    "approval_pull_request": "https://github.com/banataosystems/Pandoras-box/pull/12",
+    "approval_pull_request_head": "bbcc51fa394ed4c598e41ec6167ca85c70c64c49",
+    "derivative_source_commit": "3e54c53f7189e3c8bf4f4129d271b3acfe1c5742",
+    "derivative_source_pull_request": "https://github.com/banataosystems/Pandoras-box/pull/8",
+    "reconciled_baseline": "3f1f3343ed94ae4df5f4cee3465c10a9f4fa3c2b",
+    "baseline_asset_state": "absent",
+    "reconciliation_note": "PR #12 documents the approved master. The stale PR #8 is not merged wholesale; only the immutable master-matching derivative blobs from isolated commit 3e54c53f7189e3c8bf4f4129d271b3acfe1c5742 are restored.",
+    "mobile_transparency_directive": "The owner explicitly required the in-product Pandora mark to have a genuinely transparent background for Pandora Mobile 0.3.0-rc.1. The approved master, launcher-safe, PWA, favicon, and historical opaque derivatives remain unchanged.",
+    "mobile_transparent_derivative_commit": "d557b7bd338ac3599ffeaaf3985fccf5ee94030c"
+  },
   "observed_artwork_bounds": {
     "x": 386,
     "y": 268,
     "width": 731,
     "height": 891,
-    "method": "3-percent-fuzz trim observation; derivatives require visual verification"
+    "method": "3-percent-fuzz trim observation"
+  },
+  "derivation": {
+    "verification_script": "scripts/verify-pandora-brand-assets.mjs",
+    "transparent_generator": "scripts/create-transparent-pandora-mark.py",
+    "tool": "ImageMagick 6.9.12-98 Q16 x86_64",
+    "filter": "Lanczos",
+    "color_change": false,
+    "transparency_change": "mobile in-product derivative only",
+    "fixed_png_time": "2026-08-10T10:39:16Z",
+    "fixed_png_time_reason": "The immutable smaller PNG blobs contain this historical tIME chunk. The verifier normalizes regenerated candidates to that recorded value so reproduction is byte-identical rather than merely pixel-identical.",
+    "smaller_png_background_chunk": "00ff (opaque grayscale white advisory bKGD metadata; actual black-field pixels are unchanged)",
+    "pipeline": [
+      {
+        "id": "ui_master",
+        "source": "2165-original.jpg",
+        "operation": "strip metadata; crop 1120x1120+192+154; reset page; Lanczos resize to 1024x1024; encode grayscale PNG"
+      },
+      {
+        "id": "transparent_ui",
+        "source": "ui-mark-1024.png",
+        "operation": "detect the actual outer-edge matte luminance; convert luminance distance to an 8-bit alpha channel; write deterministic RGBA PNG with only IHDR/IDAT/IEND chunks; retain approved artwork geometry; remove only the in-product black matte"
+      },
+      {
+        "id": "ui_sizes",
+        "source": "ui-mark-1024.png",
+        "operation": "Lanczos resize to the requested square size; preserve opaque pixels; normalize PNG tIME to 2026-08-10T10:39:16Z"
+      },
+      {
+        "id": "launcher_master",
+        "source": "2165-original.jpg",
+        "operation": "strip metadata; retain full square; Lanczos resize to 1024x1024; encode grayscale PNG"
+      },
+      {
+        "id": "pwa_sizes",
+        "source": "launcher-safe-1024.png",
+        "operation": "Lanczos resize to the requested square size; preserve opaque pixels; normalize PNG tIME to 2026-08-10T10:39:16Z"
+      }
+    ]
+  },
+  "derivatives": [
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/ui-mark-1024.png",
+      "purpose": "historical high-density opaque in-product UI source and transparent-derivative input",
+      "width": 1024,
+      "height": 1024,
+      "actual_format": "PNG",
+      "mime_type": "image/png",
+      "alpha": false,
+      "byte_size": 131190,
+      "sha256": "129ce23920d37db06e0cd0dd7b8847ace4796a13f243ac80cef4534cb5e1b940",
+      "git_blob_sha1": "6dd4a4f5950bbe90c832de92becf9dc863fe9f4b",
+      "source_commit": "3e54c53f7189e3c8bf4f4129d271b3acfe1c5742",
+      "transform": "ui_master"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/ui-mark-transparent-1024.png",
+      "purpose": "canonical matte-free, theme-tintable in-product Flutter UI mark",
+      "width": 1024,
+      "height": 1024,
+      "actual_format": "PNG",
+      "mime_type": "image/png",
+      "alpha": true,
+      "byte_size": 142951,
+      "sha256": "8a35b74baec47b960a42bb74587f9c531d6cbf8d45f16061836a9e63f00efcc5",
+      "git_blob_sha1": "b1b3f3977fc3ad52bcf6d6c135f1bcc6dc1b0b40",
+      "source_commit": "d557b7bd338ac3599ffeaaf3985fccf5ee94030c",
+      "transform": "transparent_ui",
+      "edge_luminance": 0,
+      "transparent_pixels": 722253,
+      "visible_pixels": 326323,
+      "opaque_pixels": 259234,
+      "edge_pixels": 64512,
+      "edge_transparent_pixels": 64512
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/ui-mark-512.png",
+      "purpose": "standard opaque in-product UI derivative retained for provenance",
+      "width": 512,
+      "height": 512,
+      "actual_format": "PNG",
+      "mime_type": "image/png",
+      "alpha": false,
+      "byte_size": 40836,
+      "sha256": "85c6b6c04013c81faf53d44f20934cd5db87c9edf8abca1cf5f84bddf26a13f6",
+      "git_blob_sha1": "b9cc38464621a40e146450f07d75d8d2c98e7e2c",
+      "source_commit": "3e54c53f7189e3c8bf4f4129d271b3acfe1c5742",
+      "transform": "ui_sizes:512"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/ui-mark-192.png",
+      "purpose": "sign-in and splash UI",
+      "width": 192,
+      "height": 192,
+      "actual_format": "PNG",
+      "mime_type": "image/png",
+      "alpha": false,
+      "byte_size": 8940,
+      "sha256": "11c99262080c7f6ed53d6494cea636b8a8bbe84cada33fa798b33bfc7d688914",
+      "git_blob_sha1": "536adbb36ec74ef8c06f8a6054c4bebb53d9407d",
+      "source_commit": "3e54c53f7189e3c8bf4f4129d271b3acfe1c5742",
+      "transform": "ui_sizes:192"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/ui-mark-48.png",
+      "purpose": "navigation and app-bar UI",
+      "width": 48,
+      "height": 48,
+      "actual_format": "PNG",
+      "mime_type": "image/png",
+      "alpha": false,
+      "byte_size": 1227,
+      "sha256": "dfd976922ad5d72e190ee414d97a24bd6b39fa1b0717567abb8ff1f94a851db9",
+      "git_blob_sha1": "a01aa82d2f2c59033998edb1091c80c09861b4aa",
+      "source_commit": "3e54c53f7189e3c8bf4f4129d271b3acfe1c5742",
+      "transform": "ui_sizes:48"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/favicon-32.png",
+      "purpose": "browser favicon candidate",
+      "width": 32,
+      "height": 32,
+      "actual_format": "PNG",
+      "mime_type": "image/png",
+      "alpha": false,
+      "byte_size": 714,
+      "sha256": "8d4586d02e5d96840a00262634c4e60b8b5336e0ea7aaa8c354ece2d83d17063",
+      "git_blob_sha1": "8a058e01bab2ae0d931be728a9708248e1569a6c",
+      "source_commit": "3e54c53f7189e3c8bf4f4129d271b3acfe1c5742",
+      "transform": "ui_sizes:32"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/launcher-safe-1024.png",
+      "purpose": "native launcher and adaptive-icon source candidate",
+      "width": 1024,
+      "height": 1024,
+      "actual_format": "PNG",
+      "mime_type": "image/png",
+      "alpha": false,
+      "byte_size": 78478,
+      "sha256": "f6b60b0b5dd491099193df903a296a7922b5f73d05e5e022e0f2ef7011f05a9c",
+      "git_blob_sha1": "48917e41a72352f147c6b19436fd361ec93cd26a",
+      "source_commit": "3e54c53f7189e3c8bf4f4129d271b3acfe1c5742",
+      "transform": "launcher_master"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/pwa-512.png",
+      "purpose": "PWA maskable-icon candidate",
+      "width": 512,
+      "height": 512,
+      "actual_format": "PNG",
+      "mime_type": "image/png",
+      "alpha": false,
+      "byte_size": 25817,
+      "sha256": "d2fad16999521d9d934bcc344d6aa7e824b31bca35a56a9c5382bf232a6a07eb",
+      "git_blob_sha1": "327f4dbaa831100686fa8646701a7d2e807d2039",
+      "source_commit": "3e54c53f7189e3c8bf4f4129d271b3acfe1c5742",
+      "transform": "pwa_sizes:512"
+    },
+    {
+      "path": "assets/brand/pandoras-box/product-mark/derived/pwa-192.png",
+      "purpose": "PWA install-icon candidate",
+      "width": 192,
+      "height": 192,
+      "actual_format": "PNG",
+      "mime_type": "image/png",
+      "alpha": false,
+      "byte_size": 5656,
+      "sha256": "2fe014564686eacfeb4cab5ded03e581e7c9b5840d5928f0ee4df53f229100c3",
+      "git_blob_sha1": "f16c5db68ae6506a8e8ea83e13152ef310994509",
+      "source_commit": "3e54c53f7189e3c8bf4f4129d271b3acfe1c5742",
+      "transform": "pwa_sizes:192"
+    }
+  ],
+  "flutter_integration": {
+    "asset_path": "apps/pandora-mobile/assets/brand/pandora-product-mark-ui-1024.png",
+    "source_derivative": "assets/brand/pandoras-box/product-mark/derived/ui-mark-transparent-1024.png",
+    "sha256": "8a35b74baec47b960a42bb74587f9c531d6cbf8d45f16061836a9e63f00efcc5",
+    "git_blob_sha1": "b1b3f3977fc3ad52bcf6d6c135f1bcc6dc1b0b40",
+    "pubspec_declared": true,
+    "dart_reference_state": "implemented",
+    "platform_launcher_state": "unchanged; separate opaque launcher-safe derivative retained",
+    "web_manifest_state": "unchanged; separate PWA derivatives retained"
   },
   "prohibited_changes": [
     "redraw",
     "trace",
-    "regenerate",
-    "recolor",
-    "invert",
+    "regenerate_with_a_different_model_or_artwork",
+    "recolor_the_approved_artwork_source",
+    "invert_the_approved_artwork_source",
     "distort",
-    "remove_black_field",
+    "remove_black_field_from_approved_master_launcher_or_pwa_assets",
+    "create_an_unverified_transparent_derivative",
     "substitute_generic_apple",
     "replace_with_ownership_mark"
   ],
-  "derivative_policy": "Deterministic crop, encoding normalization, and resizing only; preserve full artwork and safe area; record every derivative checksum.",
-  "implementation_state": "documented",
-  "verification_state": "source_hash_verified_only"
+  "implementation_state": "approved master and historical exact derivatives preserved; canonical content-addressed transparent Flutter UI derivative implemented for Pandora Mobile 0.3.0-rc.1",
+  "verification_state": {
+    "source_sha256_verified": true,
+    "source_git_blob_verified": true,
+    "derivative_sha256_verified": true,
+    "derivative_git_blobs_verified": true,
+    "derivative_byte_reproduction_verified": true,
+    "dimensions_format_and_opaque_pixels_verified": true,
+    "transparent_mobile_alpha_verified": true,
+    "transparent_mobile_edge_pixels_verified": true,
+    "local_visual_spot_check": "transparent derivative reviewed on porcelain, graphite, informative blue, and warm attention surfaces; no black, white, or matte rectangle observed",
+    "flutter_rendered_visual_verification": "pending exact-head production-screen evidence",
+    "android_adaptive_launcher_preview": "pending; launcher asset was intentionally not changed by this mobile UI derivative",
+    "android_notification_icon": "pending separate approved monochrome derivative; do not reuse the full product mark silently",
+    "web_favicon_and_manifest_runtime_verification": "pending",
+    "device_verification": "pending"
+  }
 }
