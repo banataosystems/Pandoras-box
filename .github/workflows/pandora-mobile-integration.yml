@@ -226,14 +226,145 @@ jobs:
           apksigner="$(find "${ANDROID_HOME:?}/build-tools" -type f -name apksigner | sort -V | tail -1)"
           test -x "$aapt"
           test -x "$apksigner"
-          "$apksigner" verify --verbose --print-certs "$apk" > "$evidence/apksigner.txt"
-          grep -Fqx 'Verified using v2 scheme (APK Signature Scheme v2): true' \
+          "$apksigner" verify --verbose --print-certs "$apk" |
+            tee "$evidence/apksigner.txt"
+          grep -Eq '^Verified using v2 scheme .*: true[[:space:]]*          printf '%s\n' "$signer_cert_sha256" > \
+            "$evidence/signing-certificate-sha256.txt"
+          "$aapt" dump badging "$apk" > "$evidence/badging.txt"
+          "$aapt" dump permissions "$apk" > "$evidence/permissions.txt"
+          grep -Fq "package: name='com.banataosystems.pandora_mobile'" "$evidence/badging.txt"
+          grep -Fq "versionCode='5'" "$evidence/badging.txt"
+          grep -Fq "versionName='0.3.0-rc.2'" "$evidence/badging.txt"
+          grep -Fq "application-label:'Pandora'" "$evidence/badging.txt"
+          if grep -Eiq \
+            'ACCESS_(FINE|COARSE|BACKGROUND)_LOCATION|READ_CONTACTS|WRITE_CONTACTS|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|READ_MEDIA_|CAMERA|RECORD_AUDIO|BLUETOOTH_(SCAN|CONNECT|ADVERTISE)|QUERY_ALL_PACKAGES|REQUEST_INSTALL_PACKAGES|SYSTEM_ALERT_WINDOW' \
+            "$evidence/permissions.txt"; then
+            echo "Unexpected sensitive Android permission detected." >&2
+            exit 1
+          fi
+      - name: Write Owner Test artifact manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=".pandora-mobile-build/build/app/outputs/flutter-apk/${OWNER_TEST_FILENAME}"
+          web=.pandora-mobile-build/build/web
+          visual=.pandora-mobile-build/pandora-mobile-owner-screen-evidence-manifest.txt
+          android_evidence=.pandora-mobile-build/android-package-evidence
+          {
+            echo "source_sha=${SOURCE_SHA}"
+            echo "flutter_version=$(flutter --version --machine | python3 -c 'import json,sys; print(json.load(sys.stdin)["frameworkVersion"])')"
+            echo "dart_version=$(dart --version 2>&1 | awk '{print $4}')"
+            echo "app_version=$(awk '/^version:/{print $2; exit}' .pandora-mobile-build/pubspec.yaml)"
+            echo "lock_sha256=$(sha256sum .pandora-mobile-build/pubspec.lock | cut -d ' ' -f1)"
+            echo "artifact_class=owner-test-pre-release"
+            echo "release_channel=github-prerelease"
+            echo "production_release=false"
+            echo "build_mode=release"
+            echo "signing_class=android-debug-key"
+            echo "signing_scheme_v2_verified=true"
+            echo "signing_certificate_sha256=$(cat "$android_evidence/signing-certificate-sha256.txt")"
+            echo "signing_key_stability=ephemeral-ci-debug"
+            echo "fresh_install_only=true"
+            echo "in_place_update_eligible=false"
+            echo "rollback_install_mode=uninstall-reinstall"
+            echo "rollback_preserves_local_app_state=false"
+            echo "store_release_eligible=false"
+            echo "physical_device_verified=false"
+            echo "authenticated_owner_journey_verified=false"
+            echo "independent_review_status=pending"
+            echo "posthog_binding=disabled_without_dedicated_pandora_mobile_project"
+            echo "apk_filename=${OWNER_TEST_FILENAME}"
+            echo "apk_sha256=$(sha256sum "$apk" | cut -d ' ' -f1)"
+            echo "apk_size_bytes=$(stat -c '%s' "$apk")"
+            echo "web_tree_sha256=$(find "$web" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d ' ' -f1)"
+            echo "web_files=$(find "$web" -type f | wc -l | tr -d ' ')"
+            echo "visual_evidence_manifest_sha256=$(sha256sum "$visual" | cut -d ' ' -f1)"
+            echo "visual_screen_count=$(awk -F= '$1 == "screen_count" {print $2}' "$visual")"
+            echo "visual_baseline_count=$(awk -F= '$1 == "baseline_count" {print $2}' "$visual")"
+            echo "goldens_updated=${GOLDENS_UPDATED}"
+            echo "android_badging_sha256=$(sha256sum "$android_evidence/badging.txt" | cut -d ' ' -f1)"
+            echo "android_permissions_sha256=$(sha256sum "$android_evidence/permissions.txt" | cut -d ' ' -f1)"
+            echo "android_apksigner_sha256=$(sha256sum "$android_evidence/apksigner.txt" | cut -d ' ' -f1)"
+          } > .pandora-mobile-build/pandora-mobile-artifact-manifest.txt
+      - name: Upload foundation golden review candidates
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.update_goldens == true }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pandora-mobile-golden-candidates
+          path: |
+            .pandora-mobile-build/test/goldens/**/*.png
+            .pandora-mobile-build/pubspec.lock
+          if-no-files-found: error
+          include-hidden-files: true
+      - name: Upload golden failure evidence
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pandora-mobile-golden-failures
+          path: |
+            .pandora-mobile-build/test/failures/**/*.png
+            .pandora-mobile-build/test/goldens/**/*.png
+            .pandora-mobile-build/android-package-evidence
+          if-no-files-found: ignore
+          include-hidden-files: true
+      - name: Upload web Owner Test artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pandora-mobile-web-owner-test
+          path: |
+            .pandora-mobile-build/build/web
+            .pandora-mobile-build/pandora-mobile-artifact-manifest.txt
+            .pandora-mobile-build/android-package-evidence
+          include-hidden-files: true
+      - name: Upload Android Owner Test artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pandora-mobile-android-owner-test
+          path: |
+            .pandora-mobile-build/build/app/outputs/flutter-apk/${{ env.OWNER_TEST_FILENAME }}
+            .pandora-mobile-build/pandora-mobile-artifact-manifest.txt
+            .pandora-mobile-build/android-package-evidence
+          if-no-files-found: error
+          include-hidden-files: true
+      - name: Publish exact-head verdict
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          case "$JOB_STATUS" in
+            success)
+              state='success'
+              description='Owner-test format, analysis, tests, visuals, web, and Android passed.'
+              ;;
+            failure)
+              state='failure'
+              description='Owner-test verification failed. Open the exact run for evidence.'
+              ;;
+            *)
+              state='error'
+              description='Owner-test verification did not complete.'
+              ;;
+          esac
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${SOURCE_SHA}" \
+            -f state="$state" \
+            -f context='Pandora Mobile exact-head' \
+            -f description="$description" \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+ \
             "$evidence/apksigner.txt"
-          grep -Eq '^Signer #1 certificate DN: .*CN=Android Debug' \
-            "$evidence/apksigner.txt"
-          signer_cert_sha256="$(
+          grep -Fq 'Signer #1 certificate DN:' "$evidence/apksigner.txt"
+          grep -Fq 'CN=Android Debug' "$evidence/apksigner.txt"
+          mapfile -t signer_cert_digests < <(
             sed -n 's/^Signer #1 certificate SHA-256 digest: //p' \
-              "$evidence/apksigner.txt" |
+              "$evidence/apksigner.txt"
+          )
+          test "${#signer_cert_digests[@]}" -eq 1
+          signer_cert_sha256="$(
+            printf '%s' "${signer_cert_digests[0]}" |
               tr '[:upper:]' '[:lower:]' |
               tr -d ':[:space:]'
           )"
