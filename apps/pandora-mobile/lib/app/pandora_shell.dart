@@ -46,8 +46,38 @@ class _PandoraShellState extends State<PandoraShell> {
         },
       );
 
+  Widget _animatedPage(BuildContext context, int index) {
+    final active = index == _index;
+    final disableAnimations =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final duration = PandoraMotion.resolve(
+      disableAnimations: disableAnimations,
+    );
+    final child = _pages.containsKey(index) || active
+        ? _page(index)
+        : const SizedBox.shrink();
+
+    return TickerMode(
+      enabled: active,
+      child: AnimatedOpacity(
+        opacity: active ? 1 : 0,
+        duration: duration,
+        curve: PandoraMotion.standardCurve,
+        child: AnimatedSlide(
+          offset: disableAnimations || active
+              ? Offset.zero
+              : const Offset(0, 0.012),
+          duration: duration,
+          curve: PandoraMotion.standardCurve,
+          child: child,
+        ),
+      ),
+    );
+  }
+
   void _select(int value) {
     if (value == _index) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     HapticFeedback.selectionClick();
     setState(() => _index = value);
     final screen = switch (value) {
@@ -95,9 +125,7 @@ class _PandoraShellState extends State<PandoraShell> {
       index: _index,
       children: [
         for (var index = 0; index < destinations.length; index++)
-          _pages.containsKey(index) || index == _index
-              ? _page(index)
-              : const SizedBox.shrink(),
+          _animatedPage(context, index),
       ],
     );
     return LayoutBuilder(
