@@ -127,6 +127,36 @@ async function executeOwnerCommand(options) {
         idempotentReplay: true,
       };
     }
+
+    // Concurrent in-flight protection:
+    // If the intake was already created (not new) but is not yet completed,
+    // it means another execution is currently in flight. We must not dispatch again.
+    if (intakeRecord && intakeRecord.isNew === false) {
+      return {
+        reply: 'This exact command is currently being processed. Please wait a moment and check again.',
+        needsApproval: false,
+        actionId: intakeRecord.id,
+        approvalId: null,
+        status: {
+          whatChanged: 'No new changes (command already in flight).',
+          whereWeAre: 'Processing prior request.',
+          whatIsDone: 'Command was previously accepted.',
+          whatIsHappeningNow: 'Waiting for the original execution to complete.',
+          whatIsStoppingUs: 'Concurrent duplicate request blocked.',
+          whatIWillDoNext: 'Check results once the original execution finishes.',
+        },
+        proof: {
+          stage: 'implemented',
+          verified: false,
+          ambiguous: true,
+        },
+        advanced: {
+          intakeId: intakeRecord.id,
+          idempotencyKey: effectiveIdempotency,
+          inFlightDuplicate: true,
+        },
+      };
+    }
   }
 
   const intakeId = intakeRecord?.id || `intake-${effectiveIdempotency.substring(0, 12)}`;

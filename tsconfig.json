@@ -15,7 +15,6 @@
   },
   "include": [
     "src/**/*.js",
-    "src/**/*.ts",
-    "supabase/functions/pandora-owner-api/index.ts"
+    "src/**/*.ts"
   ]
 }

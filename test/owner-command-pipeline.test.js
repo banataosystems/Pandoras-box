@@ -62,9 +62,17 @@ function createMockProjectosClient(overrides = {}) {
           },
         };
       }
+      if (overrides.existingInFlight) {
+        return {
+          id: 'intake-existing-2',
+          status: 'accepted',
+          isNew: false,
+        };
+      }
       return {
         id: `intake-${intakes.length}`,
         status: 'accepted',
+        isNew: true,
         ...data,
       };
     },
@@ -272,6 +280,58 @@ test('J. retry/replay with the same idempotency identity does not duplicate exec
 
   assert.strictEqual(result.idempotentReplay, true);
   assert.strictEqual(result.reply, 'Cached outcome from prior run');
+});
+
+test('M. concurrent identical command before completion returns in-flight status and does not dispatch', async () => {
+  const context = createMockContext();
+  const projectosClient = createMockProjectosClient({ existingInFlight: true });
+  let providerExecutionCount = 0;
+  const providerRunner = {
+    execute: async () => {
+      providerExecutionCount++;
+      return { summary: 'Executed' };
+    }
+  };
+
+  const result = await executeOwnerCommand({
+    context,
+    message: 'Concurrent command',
+    idempotencyKey: 'fixed-key-concurrent',
+    projectosClient,
+    providerRunner,
+  });
+
+  assert.strictEqual(providerExecutionCount, 0); // Must exactly be ZERO
+  assert.strictEqual(result.advanced.inFlightDuplicate, true);
+  assert.strictEqual(result.proof.ambiguous, true);
+  assert.strictEqual(result.needsApproval, false);
+});
+
+test('N. provider success followed by local finalization failure prevents second dispatch on retry', async () => {
+  const context = createMockContext();
+  let providerExecutionCount = 0;
+  const projectosClient = createMockProjectosClient({ existingInFlight: true }); // Retry sees existing uncompleted intake
+  
+  const providerRunner = {
+    execute: async () => {
+      providerExecutionCount++;
+      return { summary: 'Executed successfully' };
+    }
+  };
+
+  const retryResult = await executeOwnerCommand({
+    context,
+    message: 'Retry command after crash',
+    idempotencyKey: 'fixed-key-crash-retry',
+    projectosClient,
+    providerRunner,
+  });
+
+  // Because the previous run crashed before completeIntake, the DB still has it as accepted/in-flight (isNew: false).
+  // The pipeline must block the retry to prevent double dispatch of the provider.
+  assert.strictEqual(providerExecutionCount, 0); 
+  assert.strictEqual(retryResult.advanced.inFlightDuplicate, true);
+  assert.strictEqual(retryResult.proof.ambiguous, true);
 });
 
 test('K. sensitive information is absent from owner-facing errors and replies', async () => {
