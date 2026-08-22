@@ -1054,12 +1054,8 @@ async function acceptIntake(
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const memoryClient = {
-    loadCheckpoint: async (key: string) => {
-      // Memory Authority: We cannot reach the Vercel OIDC Pandora Memory source from this runtime.
-      throw new Error('MEMORY_AUTHORITY_UNAVAILABLE');
-    }
-  };
+  // Memory is attached directly to the exact plan via the providerRunner.
+  const memoryClient = null;
 
   const projectosClient = {
     acceptIntake: async (data: any) => {
@@ -1127,7 +1123,7 @@ async function acceptIntake(
         };
       }
 
-      // Exact payload binding and provider governed execution for critical operations
+      // 1. Fetch Intake and Plan
       const { data: intakeData, error: intakeError } = await adminClient
         .from("projectos_intake_requests")
         .select("analysis, idempotency_key")
@@ -1139,11 +1135,63 @@ async function acceptIntake(
       const analysis = intakeData.analysis as any;
       const planId = analysis?.activeExecutionPlanId;
       if (!planId) {
-         // Fail closed. Production environment cannot fabricate execution plans.
          throw new Error('PLANNING_REQUIRED');
       }
 
-      // Exact payload binding and provider governed execution for critical operations
+      const { data: planData, error: planError } = await adminClient
+        .from("execution_plans")
+        .select("request_id, tool, args")
+        .eq("id", planId)
+        .single();
+        
+      if (planError || !planData) throw new Error("PLAN_NOT_FOUND");
+
+      // 2. Retrieve governed Memory for this exact plan
+      let envelope: any;
+      try {
+        const memoryOrigin = Deno.env.get("PANDORA_MEMORY_BASE_URL") || "https://pandorasbox-memory.vercel.app";
+        const memoryRes = await fetch(`${memoryOrigin}/api/projectos/memory/plan-context`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ? `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` : "",
+          },
+          body: JSON.stringify({
+            namespace: 'real_life',
+            tool: planData.tool,
+            args: planData.args
+          })
+        });
+
+        if (!memoryRes.ok) {
+           throw new Error(`Memory retrieval failed: ${memoryRes.status}`);
+        }
+        
+        const memoryResult = await memoryRes.json();
+        envelope = memoryResult.envelope;
+        if (!envelope) throw new Error("Missing memory envelope in provider response");
+      } catch (err: any) {
+        throw new Error(`MEMORY_HYDRATION_FAILED: ${err.message}`);
+      }
+
+      // 3. Attach Memory context to EXACT plan
+      const encoder = new TextEncoder();
+      const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(JSON.stringify(envelope)));
+      const contextHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+
+      const { error: attachError } = await adminClient.rpc("attach_execution_plan_context", {
+        p_organization_id: context.organizationId,
+        p_plan_id: planId,
+        p_request_id: planData.request_id,
+        p_context_hash: contextHash,
+        p_context_envelope: envelope
+      });
+
+      if (attachError) {
+        throw new Error(`MEMORY_ATTACH_FAILED: ${attachError.message}`);
+      }
+
+      // 4. Exact payload binding and provider governed execution for critical operations
       const { data: claimData, error: claimError } = await adminClient.rpc("claim_execution_plan", {
         p_organization_id: context.organizationId,
         p_plan_id: planId
@@ -1167,7 +1215,8 @@ async function acceptIntake(
         itemsChecked: 1, 
         findings: [], 
         proofHash,
-        verified: false 
+        verified: false,
+        stage: "dispatch_pending"
       };
     }
   };

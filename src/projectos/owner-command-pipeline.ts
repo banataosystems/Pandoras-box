@@ -264,9 +264,9 @@ async function executeOwnerCommand(options) {
 
   // 8. Finalization & Proof Binding
   const proofHash = executionResult?.proofHash || null;
-  const isVerified = !!executionResult?.verified;
+  const isVerified = !!executionResult?.verified && !!proofHash;
   const porcelainReply = executionResult?.summary || 'The requested check completed successfully.';
-  const defaultStage = isVerified ? 'production_verified' : 'executed';
+  const defaultStage = isVerified ? 'production_verified' : executionResult?.stage || 'dispatch_pending';
 
   const finalOutcome = {
     reply: porcelainReply,
