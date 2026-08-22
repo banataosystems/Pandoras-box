@@ -263,7 +263,8 @@ async function executeOwnerCommand(options) {
   }
 
   // 8. Finalization & Proof Binding
-  const proofHash = executionResult?.proofHash || sha256Hex(`${intakeId}:production_verified:${Date.now()}`);
+  const proofHash = executionResult?.proofHash || null;
+  const isVerified = !!executionResult?.verified;
   const porcelainReply = executionResult?.summary || 'The requested check completed successfully.';
 
   const finalOutcome = {
@@ -272,16 +273,16 @@ async function executeOwnerCommand(options) {
     actionId: intakeId,
     approvalId: null,
     status: {
-      whatChanged: 'Requested operation completed successfully.',
-      whereWeAre: 'Verified and active.',
+      whatChanged: 'Requested operation completed.',
+      whereWeAre: isVerified ? 'Verified and active.' : 'Executed, pending verification.',
       whatIsDone: 'All checks executed within governed limits.',
-      whatIsHappeningNow: 'Systems operating normally.',
+      whatIsHappeningNow: isVerified ? 'Systems operating normally.' : 'Awaiting external verification.',
       whatIsStoppingUs: null,
       whatIWillDoNext: 'No action required.',
     },
     proof: {
-      stage: 'production_verified',
-      verified: true,
+      stage: isVerified ? 'production_verified' : 'executed',
+      verified: isVerified,
       proofHash,
     },
     advanced: {

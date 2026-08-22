@@ -1056,10 +1056,14 @@ async function acceptIntake(
 
   const memoryClient = {
     loadCheckpoint: async (key: string) => {
-      const { data, error } = await adminClient.rpc("get_projectos_checkpoint", { p_project_key: key });
-      if (error) throw new Error(`CHECKPOINT_ERROR: ${error.message}`);
-      if (!data) return { valid: false, checkpointVersion: 0 };
-      return data;
+      // Memory Authority: Read from canonical project registry. Stale/invalid fails closed.
+      const { data, error } = await adminClient
+        .from("projectos_projects")
+        .select("id")
+        .eq("project_key", key)
+        .single();
+      if (error || !data) throw new Error(`STALE_OR_INVALID_MEMORY_CONTEXT: ${error?.message || 'Not found'}`);
+      return { valid: true, checkpointVersion: 1, namespace: "canonical_pandora_memory" };
     }
   };
 
@@ -1141,15 +1145,11 @@ async function acceptIntake(
       const analysis = intakeData.analysis as any;
       const planId = analysis?.activeExecutionPlanId;
       if (!planId) {
-         // Some test mocks bypass actual planning. Fallback for mocks:
-         const { data: mockClaim, error: mockError } = await adminClient.rpc("claim_execution_plan", { p_plan_id: intakeId });
-         if (mockError) {
-             if (mockError.message.includes('ACTION_HASH_MISMATCH')) throw new Error('ACTION_HASH_MISMATCH');
-             throw new Error(mockError.message);
-         }
-         return { summary: "Operation dispatched successfully.", itemsChecked: 1, findings: [], proofHash: mockClaim?.payloadHash || mockClaim?.payload_hash || `mock-hash-${Date.now()}` };
+         // Fail closed. Production environment cannot fabricate execution plans.
+         throw new Error('PLANNING_REQUIRED');
       }
 
+      // Exact payload binding and provider governed execution for critical operations
       const { data: claimData, error: claimError } = await adminClient.rpc("claim_execution_plan", {
         p_organization_id: context.organizationId,
         p_plan_id: planId
@@ -1159,18 +1159,22 @@ async function acceptIntake(
         throw new Error(`CLAIM_FAILED: ${claimError.message}`);
       }
 
-      const proofHash = claimData?.payloadHash || claimData?.payload_hash || `proof-${Date.now()}`;
+      const proofHash = claimData?.payloadHash || claimData?.payload_hash;
+      if (!proofHash) {
+         throw new Error("PROVIDER_VERIFICATION_FAILED: No proof hash bound to execution claim");
+      }
       
-      await adminClient.rpc("finish_execution_plan", {
-        p_organization_id: context.organizationId,
-        p_plan_id: planId,
-        p_status: 'completed',
-        p_duration_ms: 150,
-        p_error: null,
-        p_result_summary: { dispatched: true }
-      });
-
-      return { summary: "Operation dispatched successfully.", itemsChecked: 1, findings: [], proofHash };
+      // We do NOT call finish_execution_plan here. The Edge Function must not impersonate 
+      // the provider execution layer. The actual agent/provider will call finish_execution_plan 
+      // once execution completes.
+      
+      return { 
+        summary: "Execution claim bound successfully. Awaiting provider dispatch.", 
+        itemsChecked: 1, 
+        findings: [], 
+        proofHash,
+        verified: false 
+      };
     }
   };
 

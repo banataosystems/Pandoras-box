@@ -37,8 +37,10 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
         eq: () => ({ 
           eq: () => ({ 
             limit: () => Promise.resolve({ data: [{ organization_id: 'mock-org-1', role: 'owner' }] }) 
-          }) 
-        }) 
+          }),
+          single: () => Promise.resolve({ data: { id: 'mock-project-id' } })
+        }),
+        update: () => ({ eq: () => Promise.resolve({ data: null }) })
       }) 
     }),
     rpc: async (func, args) => {
@@ -49,9 +51,12 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
         return { 
           data: { 
             is_new: true,
-            intake: { id: 'intake-mock-99', status: 'accepted' } 
+            intake: { id: 'intake-mock-99', status: 'accepted', analysis: { activeExecutionPlanId: 'mock-plan-id' } } 
           } 
         };
+      }
+      if (func === 'claim_execution_plan') {
+         return { data: { payloadHash: 'mock-hash-123' } };
       }
       if (func === 'projectos_complete_owner_read_intake') {
          return { data: null };
@@ -101,7 +106,7 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
   // 3. Verify owner-readable result from pipeline
   assert.strictEqual(responseBody.needsApproval, false, 'Should not require approval for read operations');
   assert.ok(responseBody.reply, 'Must contain a porcelain reply');
-  assert.strictEqual(responseBody.proof.stage, 'production_verified', 'Must reach verified stage');
+  assert.strictEqual(responseBody.proof.stage, 'executed', 'Must reach executed stage');
 });
 
 test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval', async () => {
@@ -577,8 +582,10 @@ test('Real Route Acceptance: Concurrent same-key requests trigger inFlightDuplic
         eq: () => ({ 
           eq: () => ({ 
             limit: () => Promise.resolve({ data: [{ organization_id: 'mock-org-1', role: 'owner' }] }) 
-          }) 
-        }) 
+          }),
+          single: () => Promise.resolve({ data: { id: 'mock-project-id' } })
+        }),
+        update: () => ({ eq: () => Promise.resolve({ data: null }) })
       }) 
     }),
     rpc: async (func, args) => {
