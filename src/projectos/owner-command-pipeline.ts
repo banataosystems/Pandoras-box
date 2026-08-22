@@ -163,9 +163,33 @@ async function executeOwnerCommand(options) {
 
   // 6. Governed Planning & Risk Classification
   const risk = classifyIntentRisk(sanitizedMessage);
+  
+  let planId = intakeRecord?.analysis?.latestExecutionPlanId || null;
+  let planStatus = 'unplanned';
+  
+  if (projectosClient && typeof projectosClient.createExecutionPlan === 'function') {
+    const planResult = await projectosClient.createExecutionPlan({
+      organizationId: context.organizationId,
+      requestId: intakeId,
+      intakeId: intakeId,
+      tool: 'projectos.execution_router',
+      risk: risk.riskLevel.toLowerCase(),
+      args: { message: sanitizedMessage, projectKey },
+      payloadHash: sha256Hex(sanitizedMessage),
+      expiresAt: new Date(Date.now() + 30 * 60000).toISOString()
+    });
+    if (planResult) {
+      planId = planResult.planId;
+      planStatus = planResult.status;
+    }
+  }
 
-  if (risk.requiresApproval && (!intakeRecord || intakeRecord.status !== 'approved')) {
-    const approvalId = `appr-${sha256Hex(`${intakeId}:approval`).substring(0, 12)}`;
+  if (risk.requiresApproval && planStatus !== 'approved' && planStatus !== 'executing') {
+    if (!planId) {
+      throw new Error('PLANNING_FAILED: Governed plan ID could not be generated for approval.');
+    }
+    const approvalId = planId;
+    
     return {
       reply: `Pandora prepared a governed plan for your request (${risk.riskLevel} risk). Owner approval is required before execution.`,
       needsApproval: true,
@@ -186,6 +210,7 @@ async function executeOwnerCommand(options) {
       advanced: {
         intakeId,
         approvalId,
+        planId,
         riskLevel: risk.riskLevel,
         idempotencyKey: effectiveIdempotency,
       },
@@ -193,14 +218,26 @@ async function executeOwnerCommand(options) {
   }
 
   let executionResult = null;
+  let claimedPlan = null;
+  
   try {
-    if (providerRunner && typeof providerRunner.execute === 'function') {
-      executionResult = await providerRunner.execute({
-        intakeId,
-        message: sanitizedMessage,
-        context,
-        memoryContext,
-      });
+    if (planId && planStatus === 'approved') {
+      if (projectosClient && typeof projectosClient.claimExecutionPlan === 'function') {
+        claimedPlan = await projectosClient.claimExecutionPlan(context.organizationId, planId);
+      }
+    }
+
+    if (claimedPlan && projectosClient && typeof projectosClient.enqueueExecutionDispatch === 'function') {
+      const dispatchResult = await projectosClient.enqueueExecutionDispatch(planId);
+      if (!dispatchResult) {
+        throw new Error('FAILED_TO_ENQUEUE_DISPATCH');
+      }
+      executionResult = {
+        summary: 'Command successfully dispatched for execution.',
+        itemsChecked: 0,
+        findings: [],
+        stage: 'dispatch_pending',
+      };
     } else {
       executionResult = {
         summary: 'Intent analyzed and planned successfully. No active execution provider is bound.',
@@ -210,6 +247,13 @@ async function executeOwnerCommand(options) {
       };
     }
   } catch (executionError) {
+    if (claimedPlan && projectosClient && typeof projectosClient.finishExecutionPlan === 'function') {
+      try {
+        await projectosClient.finishExecutionPlan(planId, 'failed', sanitizeError(executionError), {});
+      } catch (reconcileError) {
+        // Best effort stranded claim reconciliation
+      }
+    }
     // Check if error represents an ambiguous side-effect
     if (executionError.isAmbiguous) {
       return {
@@ -263,10 +307,18 @@ async function executeOwnerCommand(options) {
   }
 
   // 8. Finalization & Proof Binding
+  // The command was enqueued for execution. Verification will happen asynchronously.
+  let proofStage = 'dispatch_pending';
+  let isVerified = false;
+  
+  if (executionResult?.stage) {
+    // If we're bypassing dispatch and returning a mock or immediate result,
+    // we must not blindly accept production_verified.
+    proofStage = executionResult.stage === 'production_verified' ? 'executed' : executionResult.stage;
+  }
+  
   const proofHash = executionResult?.proofHash || null;
-  const isVerified = !!executionResult?.verified && !!proofHash;
   const porcelainReply = executionResult?.summary || 'The requested check completed successfully.';
-  const defaultStage = isVerified ? 'production_verified' : executionResult?.stage || 'dispatch_pending';
 
   const finalOutcome = {
     reply: porcelainReply,
@@ -282,9 +334,9 @@ async function executeOwnerCommand(options) {
       whatIWillDoNext: 'No action required.',
     },
     proof: {
-      stage: executionResult?.stage || defaultStage,
+      stage: proofStage,
       verified: isVerified,
-      proofHash,
+      proofHash: proofHash,
     },
     advanced: {
       intakeId,

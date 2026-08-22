@@ -76,10 +76,16 @@ function createMockProjectosClient(overrides = {}) {
         ...data,
       };
     },
-    completeIntake: async (data) => {
-      completions.push(data);
-      return { ok: true };
+    completeIntake: async (data) => { completions.push(data); return { ok: true }; },
+    createExecutionPlan: async (data) => { 
+      return { 
+        planId: 'mock-plan-id', 
+        status: (data && data.risk !== 'critical' && data.risk !== 'high') ? 'approved' : 'unplanned' 
+      }; 
     },
+    claimExecutionPlan: async (data) => { return { id: 'mock-plan-id', status: 'executing' }; },
+    enqueueExecutionDispatch: async (planId) => { return { id: 'mock-dispatch-id', planId, status: 'queued' }; },
+    finishExecutionPlan: async () => { return { ok: true }; }
   };
 }
 
@@ -223,18 +229,17 @@ test('G. final verified result returns an owner-readable outcome', async () => {
   assert.strictEqual(result.status.whatIsStoppingUs, null);
 });
 
-test('H. provider failure returns a bounded failure state', async () => {
+test('H. dispatch enqueue failure returns a bounded failure state', async () => {
   const context = createMockContext();
-  const providerRunner = {
-    execute: async () => {
-      throw new Error('Connection refused to backend service');
-    },
+  const projectosClient = createMockProjectosClient();
+  projectosClient.enqueueExecutionDispatch = async () => {
+    throw new Error('Database connection refused');
   };
 
   const result = await executeOwnerCommand({
     context,
     message: 'Check external service',
-    providerRunner,
+    projectosClient,
   });
 
   assert.strictEqual(result.proof.verified, false);
@@ -242,29 +247,26 @@ test('H. provider failure returns a bounded failure state', async () => {
   assert.match(result.reply, /could not be completed/);
 });
 
-test('I. ambiguous provider completion does not cause blind retry', async () => {
+test('I. stranded claim triggers reconciliation when enqueue fails', async () => {
   const context = createMockContext();
-  let executionAttempts = 0;
-  const ambiguousError = new Error('HTTP 504 Gateway Timeout during mutation');
-  ambiguousError.isAmbiguous = true;
-
-  const providerRunner = {
-    execute: async () => {
-      executionAttempts++;
-      throw ambiguousError;
-    },
+  let finishedPlan = false;
+  const projectosClient = createMockProjectosClient();
+  projectosClient.enqueueExecutionDispatch = async () => {
+    throw new Error('Enqueue error');
+  };
+  projectosClient.finishExecutionPlan = async () => {
+    finishedPlan = true;
   };
 
   const result = await executeOwnerCommand({
     context,
     message: 'Inspect system state',
-    providerRunner,
+    projectosClient,
   });
 
-  assert.strictEqual(executionAttempts, 1);
-  assert.strictEqual(result.proof.ambiguous, true);
+  assert.strictEqual(finishedPlan, true);
   assert.strictEqual(result.proof.verified, false);
-  assert.match(result.reply, /blind retries are blocked/);
+  assert.strictEqual(result.status.whereWeAre, 'Execution failed.');
 });
 
 test('J. retry/replay with the same idempotency identity does not duplicate execution', async () => {
@@ -298,38 +300,27 @@ test('M. concurrent identical command before completion returns in-flight status
     message: 'Concurrent command',
     idempotencyKey: 'fixed-key-concurrent',
     projectosClient,
-    providerRunner,
   });
 
-  assert.strictEqual(providerExecutionCount, 0); // Must exactly be ZERO
   assert.strictEqual(result.advanced.inFlightDuplicate, true);
   assert.strictEqual(result.proof.ambiguous, true);
   assert.strictEqual(result.needsApproval, false);
 });
 
-test('N. provider success followed by local finalization failure prevents second dispatch on retry', async () => {
+test('N. in-flight duplicate blocked from enqueue', async () => {
   const context = createMockContext();
-  let providerExecutionCount = 0;
-  const projectosClient = createMockProjectosClient({ existingInFlight: true }); // Retry sees existing uncompleted intake
+  let enqueueCalls = 0;
+  const projectosClient = createMockProjectosClient({ existingInFlight: true });
+  projectosClient.enqueueExecutionDispatch = async () => { enqueueCalls++; return {}; };
   
-  const providerRunner = {
-    execute: async () => {
-      providerExecutionCount++;
-      return { summary: 'Executed successfully' };
-    }
-  };
-
   const retryResult = await executeOwnerCommand({
     context,
     message: 'Retry command after crash',
     idempotencyKey: 'fixed-key-crash-retry',
     projectosClient,
-    providerRunner,
   });
 
-  // Because the previous run crashed before completeIntake, the DB still has it as accepted/in-flight (isNew: false).
-  // The pipeline must block the retry to prevent double dispatch of the provider.
-  assert.strictEqual(providerExecutionCount, 0); 
+  assert.strictEqual(enqueueCalls, 0); 
   assert.strictEqual(retryResult.advanced.inFlightDuplicate, true);
   assert.strictEqual(retryResult.proof.ambiguous, true);
 });
@@ -405,7 +396,7 @@ test('Blocker 2: owner-command-pipeline source contains zero AAL2 / TOTP / MFA t
 // Real Route Acceptance Test: Simulating Owner API handler flow
 // -------------------------------------------------------------
 
-test('Real Route Acceptance: Public owner API request flows end-to-end to verified outcome', async () => {
+test('Real Route Acceptance: Public owner API request flows end-to-end to dispatch enqueue', async () => {
   const requestHeaders = {
     authorization: 'Bearer valid-jwt-token-1234',
     'idempotency-key': 'mobile-tap-id-7890',
@@ -415,25 +406,14 @@ test('Real Route Acceptance: Public owner API request flows end-to-end to verifi
     projectId: 'pandoras-box-prod',
   };
 
-  // 1. Simulating authenticate(req)
   const authenticatedContext = createMockContext({
     userId: 'owner-uuid-4444',
     role: 'owner',
   });
 
-  // 2. Simulating memory & projectos clients
   const memoryClient = createMockMemoryClient();
   const projectosClient = createMockProjectosClient();
-  const providerRunner = {
-    execute: async () => ({
-      summary: 'All 3 connected services are healthy and verified.',
-      services: ['GitHub', 'Supabase', 'Vercel'],
-      verified: true,
-      proofHash: 'bound-runtime-evidence-hash',
-    }),
-  };
 
-  // 3. Simulating handler route execution
   const responsePayload = await executeOwnerCommand({
     context: authenticatedContext,
     message: requestBody.message,
@@ -441,14 +421,12 @@ test('Real Route Acceptance: Public owner API request flows end-to-end to verifi
     idempotencyKey: requestHeaders['idempotency-key'],
     memoryClient,
     projectosClient,
-    providerRunner,
   });
 
-  // 4. Validate output contract
   assert.strictEqual(responsePayload.needsApproval, false);
-  assert.strictEqual(responsePayload.proof.stage, 'production_verified');
-  assert.strictEqual(responsePayload.proof.verified, true);
-  assert.match(responsePayload.reply, /All 3 connected services are healthy/);
-  assert.strictEqual(responsePayload.status.whereWeAre, 'Verified and active.');
+  assert.strictEqual(responsePayload.proof.stage, 'dispatch_pending');
+  assert.strictEqual(responsePayload.proof.verified, false);
+  assert.match(responsePayload.reply, /Command successfully dispatched/);
+  assert.strictEqual(responsePayload.status.whereWeAre, 'Executed, pending verification.');
   assert.strictEqual(responsePayload.status.whatIsStoppingUs, null);
 });

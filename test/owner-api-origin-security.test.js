@@ -9,63 +9,12 @@ const path = require('node:path');
  * Owner API broker-origin security tests.
  *
  * The production broker-origin validator lives inside
- * supabase/functions/pandora-owner-api/index.ts (the acceptIntake→providerRunner path).
+ * src/projectos/broker-origin-validator.ts
  *
- * Rather than dynamically importing the Edge Function (which requires a full Deno mock),
- * we extract the exact validation logic as a pure helper and test it directly.
- * We then retain one route-level test proving the helper is actually wired before fetch.
+ * This test uses the exact production validator that the Edge Function imports.
  */
 
-// ---------- Extract the exact broker-origin validator from production source ----------
-
-/**
- * Pure broker-origin validator matching the production security contract in index.ts.
- * Returns { valid: true, url: URL } or { valid: false, error: string }.
- */
-function validateBrokerOrigin(originEnv) {
-  const brokerOriginEnv = originEnv || 'https://mcpmaster.vercel.app';
-  let brokerUrl;
-  try {
-    brokerUrl = new URL(brokerOriginEnv);
-  } catch (err) {
-    return { valid: false, error: 'Invalid URL' };
-  }
-  if (brokerUrl.protocol !== 'https:') {
-    return { valid: false, error: 'Broker origin must be HTTPS' };
-  }
-  if (brokerUrl.hostname !== 'mcpmaster.vercel.app' && brokerUrl.hostname !== 'localhost') {
-    return { valid: false, error: 'Broker origin hostname is not in the canonical allowlist' };
-  }
-  if (brokerUrl.username || brokerUrl.password) {
-    return { valid: false, error: 'Broker URL must not contain credentials' };
-  }
-  if (brokerUrl.search) {
-    return { valid: false, error: 'Broker URL must not contain a query string' };
-  }
-  if (brokerUrl.hash) {
-    return { valid: false, error: 'Broker URL must not contain a fragment' };
-  }
-  return { valid: true, url: brokerUrl };
-}
-
-// ---------- Verify the source validator matches our extracted copy ----------
-
-test('Extracted validator matches the production source contract', () => {
-  const source = fs.readFileSync(
-    path.join(__dirname, '..', 'supabase/functions/pandora-owner-api/index.ts'),
-    'utf8'
-  );
-  // The production code must contain these exact validation patterns
-  assert.ok(source.includes('brokerUrl.protocol !== "https:"'), 'Production must check HTTPS');
-  assert.ok(
-    source.includes('brokerUrl.hostname !== "mcpmaster.vercel.app"'),
-    'Production must check canonical hostname'
-  );
-  assert.ok(source.includes('brokerUrl.username'), 'Production must check credentials');
-  assert.ok(source.includes('brokerUrl.search'), 'Production must check query string');
-  assert.ok(source.includes('brokerUrl.hash'), 'Production must check fragment');
-  assert.ok(source.includes("redirect: 'error'"), 'Production must reject redirects');
-});
+const { validateBrokerOrigin } = require('../dist/projectos/broker-origin-validator.js');
 
 // ---------- Pure validator tests ----------
 
@@ -144,6 +93,38 @@ test('Production uses redirect: error to prevent redirect attacks', () => {
 
 test('Fetch is NOT called with Authorization when origin validation fails', async () => {
   const ts = require('typescript');
+function loadHandler() {
+  const root = path.join(__dirname, '..');
+  const handlerSource = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/handler.ts'), 'utf8');
+  const contractSource = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/contract.ts'), 'utf8');
+
+  const transpiledHandler = ts.transpileModule(handlerSource, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+  
+  const transpiledContract = ts.transpileModule(contractSource, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+
+  const mockRequire = (id) => {
+    if (id === './contract.ts' || id === './contract.js') {
+      const contractExports = {};
+      eval("((exports) => { " + transpiledContract + " })(contractExports)");
+      return contractExports;
+    }
+    if (id === '../../src/projectos/owner-command-pipeline.ts' || id.includes('owner-command-pipeline')) {
+      return require('../dist/projectos/owner-command-pipeline.js');
+    }
+    if (id === '../../src/projectos/broker-origin-validator.ts' || id.includes('broker-origin-validator')) {
+      return require('../dist/projectos/broker-origin-validator.js');
+    }
+    return require(id);
+  };
+
+  const handlerExports = {};
+  eval("((exports, require) => { " + transpiledHandler + " })(handlerExports, mockRequire)");
+  return handlerExports.handleOwnerApiRequest;
+}
   const root = path.join(__dirname, '..');
   const source = fs.readFileSync(
     path.join(root, 'supabase/functions/pandora-owner-api/index.ts'),
@@ -166,7 +147,7 @@ test('Fetch is NOT called with Authorization when origin validation fails', asyn
     )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
 
-  const transpiled = ts.transpileModule(stripped, {
+  const transpiled = ts.transpileModule(stripped.replace(/import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+\"..\/..\/src\/projectos\/broker-origin-validator\.ts\";/g, 'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'), {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
       target: ts.ScriptTarget.ES2022,
@@ -174,13 +155,6 @@ test('Fetch is NOT called with Authorization when origin validation fails', asyn
   }).outputText;
 
   // Set the broker origin to a foreign host
-  global.Deno = {
-    env: {
-      get: (key) =>
-        key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://evil.com' : undefined,
-    },
-  };
-
   let fetchCalledWithAuth = false;
   global.fetch = async (url, options) => {
     if (options && options.headers && options.headers.Authorization) {
@@ -223,7 +197,7 @@ test('Fetch is NOT called with Authorization when origin validation fails', asyn
           single: () =>
             Promise.resolve({
               data: {
-                analysis: { activeExecutionPlanId: 'plan-1' },
+                analysis: { latestExecutionPlanId: 'plan-1' },
                 idempotency_key: null,
               },
             }),
@@ -262,7 +236,7 @@ test('Fetch is NOT called with Authorization when origin validation fails', asyn
             intake: {
               id: 'intake-1',
               status: 'accepted',
-              analysis: { activeExecutionPlanId: 'plan-1' },
+              analysis: { latestExecutionPlanId: 'plan-1' },
             },
           },
         };
@@ -270,8 +244,7 @@ test('Fetch is NOT called with Authorization when origin validation fails', asyn
     },
   });
 
-  eval(transpiled);
-  const handler = global.edgeHandler;
+  const handler = loadHandler();
 
   const req = new Request('https://api.example.com/ask', {
     method: 'POST',
@@ -283,7 +256,14 @@ test('Fetch is NOT called with Authorization when origin validation fails', asyn
     body: JSON.stringify({ message: 'Check health' }),
   });
 
-  const res = await handler(req);
+  const res = await handler(req, {
+    SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co',
+    SUPABASE_ANON_KEY: 'mock-anon-key',
+    SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key',
+    ALLOWED_ORIGINS: [],
+    createClient: global.mockCreateClient,
+    env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://evil.com' : undefined }
+  });
   const text = await res.text();
 
   // The request should fail because of the foreign origin
@@ -297,6 +277,38 @@ test('Fetch is NOT called with Authorization when origin validation fails', asyn
 
 test('Canonical origin succeeds past validation in the wired handler', async () => {
   const ts = require('typescript');
+function loadHandler() {
+  const root = path.join(__dirname, '..');
+  const handlerSource = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/handler.ts'), 'utf8');
+  const contractSource = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/contract.ts'), 'utf8');
+
+  const transpiledHandler = ts.transpileModule(handlerSource, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+  
+  const transpiledContract = ts.transpileModule(contractSource, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+
+  const mockRequire = (id) => {
+    if (id === './contract.ts' || id === './contract.js') {
+      const contractExports = {};
+      eval("((exports) => { " + transpiledContract + " })(contractExports)");
+      return contractExports;
+    }
+    if (id === '../../src/projectos/owner-command-pipeline.ts' || id.includes('owner-command-pipeline')) {
+      return require('../dist/projectos/owner-command-pipeline.js');
+    }
+    if (id === '../../src/projectos/broker-origin-validator.ts' || id.includes('broker-origin-validator')) {
+      return require('../dist/projectos/broker-origin-validator.js');
+    }
+    return require(id);
+  };
+
+  const handlerExports = {};
+  eval("((exports, require) => { " + transpiledHandler + " })(handlerExports, mockRequire)");
+  return handlerExports.handleOwnerApiRequest;
+}
   const root = path.join(__dirname, '..');
   const source = fs.readFileSync(
     path.join(root, 'supabase/functions/pandora-owner-api/index.ts'),
@@ -319,7 +331,7 @@ test('Canonical origin succeeds past validation in the wired handler', async () 
     )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
 
-  const transpiled = ts.transpileModule(stripped, {
+  const transpiled = ts.transpileModule(stripped.replace(/import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+\"..\/..\/src\/projectos\/broker-origin-validator\.ts\";/g, 'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'), {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
       target: ts.ScriptTarget.ES2022,
@@ -327,15 +339,6 @@ test('Canonical origin succeeds past validation in the wired handler', async () 
   }).outputText;
 
   // Set canonical origin
-  global.Deno = {
-    env: {
-      get: (key) =>
-        key === 'PROJECTOS_MCP_RESOURCE_ORIGIN'
-          ? 'https://mcpmaster.vercel.app'
-          : undefined,
-    },
-  };
-
   global.fetch = async () => ({
     ok: true,
     json: async () => ({ contextHash: 'valid-hash' }),
@@ -375,7 +378,7 @@ test('Canonical origin succeeds past validation in the wired handler', async () 
           single: () =>
             Promise.resolve({
               data: {
-                analysis: { activeExecutionPlanId: 'plan-1' },
+                analysis: { latestExecutionPlanId: 'plan-1' },
                 idempotency_key: null,
               },
             }),
@@ -414,7 +417,7 @@ test('Canonical origin succeeds past validation in the wired handler', async () 
             intake: {
               id: 'intake-1',
               status: 'accepted',
-              analysis: { activeExecutionPlanId: 'plan-1' },
+              analysis: { latestExecutionPlanId: 'plan-1' },
             },
           },
         };
@@ -424,8 +427,7 @@ test('Canonical origin succeeds past validation in the wired handler', async () 
     },
   });
 
-  eval(transpiled);
-  const handler = global.edgeHandler;
+  const handler = loadHandler();
 
   const req = new Request('https://api.example.com/ask', {
     method: 'POST',
@@ -437,7 +439,14 @@ test('Canonical origin succeeds past validation in the wired handler', async () 
     body: JSON.stringify({ message: 'Check health' }),
   });
 
-  const res = await handler(req);
+  const res = await handler(req, {
+    SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co',
+    SUPABASE_ANON_KEY: 'mock-anon-key',
+    SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key',
+    ALLOWED_ORIGINS: [],
+    createClient: global.mockCreateClient,
+    env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://evil.com' : undefined }
+  });
   const text = await res.text();
   // Should NOT contain broker origin rejection
   assert.ok(

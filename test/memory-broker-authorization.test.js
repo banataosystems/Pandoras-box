@@ -14,7 +14,7 @@ const assert = require('node:assert/strict');
  * through mock-driven behavioral tests that prove each gate in isolation.
  */
 
-// ---------- Minimal broker simulation matching api/memory-broker.ts ----------
+// ---------- Minimal broker simulation using actual production logic ----------
 
 function createBrokerSimulation({
   authenticateFn,
@@ -24,6 +24,8 @@ function createBrokerSimulation({
   attachFn,
   serviceRoleKey,
 }) {
+  const { authorizeBrokerRequest } = require('../dist/projectos/broker-authorization.js');
+
   return async function memoryBroker(request, response) {
     if (request.method !== 'POST') {
       return response.status(405).json({ error: 'Method not allowed' });
@@ -51,105 +53,29 @@ function createBrokerSimulation({
       return response.status(401).json({ error: 'Missing authorization' });
     }
 
-    let identity;
     try {
-      identity = await authenticateFn(authorization);
-    } catch (err) {
-      return response.status(401).json({ error: 'Unauthorized' });
-    }
-
-    try {
-      if (!serviceRoleKey) {
-        throw new Error('Service role key is not configured');
-      }
-
-      // Fetch execution plan using service role
-      const planRes = await fetchFn(
-        `https://mock.supabase.co/rest/v1/execution_plans?id=eq.${planId}&select=organization_id,request_id,tool,args`,
-        {
-          method: 'GET',
-          headers: {
-            apikey: 'sb_publishable_mock_key_12345678',
-            Authorization: `Bearer ${serviceRoleKey}`,
-            Accept: 'application/json',
-          },
-        }
-      );
-
-      if (!planRes.ok) {
-        return response.status(500).json({ error: 'Failed to retrieve plan' });
-      }
-
-      const planRows = await planRes.json();
-      if (!planRows || planRows.length !== 1) {
-        return response.status(404).json({ error: 'Plan not found' });
-      }
-
-      const plan = planRows[0];
-      const { organization_id, request_id, tool, args } = plan;
-
-      // Verify membership using user's JWT (not service role)
-      const membershipRes = await fetchFn(
-        `https://mock.supabase.co/rest/v1/memberships?user_id=eq.${identity.userId}&organization_id=eq.${organization_id}&status=eq.active&select=role`,
-        {
-          method: 'GET',
-          headers: {
-            apikey: 'sb_publishable_mock_key_12345678',
-            Authorization: authorization, // User's bearer token!
-            Accept: 'application/json',
-          },
-        }
-      );
-
-      if (!membershipRes.ok) {
-        return response.status(500).json({ error: 'Failed to verify membership' });
-      }
-
-      const membershipRows = await membershipRes.json();
-      if (!membershipRows || membershipRows.length === 0) {
-        return response
-          .status(403)
-          .json({ error: 'Forbidden: No active membership in plan organization' });
-      }
-
-      const role = membershipRows[0].role;
-      if (role !== 'owner' && role !== 'admin') {
-        return response
-          .status(403)
-          .json({ error: 'Forbidden: Owner or admin role required' });
-      }
-
-      // Derive authoritative values from plan, ignore caller-supplied values
-      const authoritativeRequestId = request_id;
-      const authoritativeTool = tool;
-      const authoritativeArgs = args;
-
-      // Obtain Vercel workload OIDC
-      const oidcToken = await resolveOidcFn();
-      if (!oidcToken) {
-        return response.status(503).json({ error: 'Missing Vercel OIDC token' });
-      }
-
-      // Hydrate Memory
-      const hydrated = await hydrateFn(oidcToken, {
-        tool: authoritativeTool,
-        args: authoritativeArgs,
-      });
-      if (!hydrated || !hydrated.contextHash) {
-        return response.status(500).json({ error: 'Memory hydration failed' });
-      }
-
-      // Attach context
-      await attachFn(oidcToken, {
+      const result = await authorizeBrokerRequest({
         planId,
-        requestId: authoritativeRequestId,
-        contextHash: hydrated.contextHash,
-        contextEnvelope: hydrated.envelope,
+        authorization,
+        serviceRoleKey,
+        publicConfig: {
+          supabaseUrl: 'https://mock.supabase.co',
+          supabasePublishableKey: 'sb_publishable_mock_key_12345678'
+        },
+        authenticator: {
+          authenticate: async (auth) => authenticateFn(auth)
+        },
+        resolveOidcFn,
+        hydrateFn,
+        attachFn,
+        fetchFn
       });
-
-      return response.status(200).json({ ok: true, contextHash: hydrated.contextHash });
+      return response.status(200).json(result);
     } catch (err) {
-      return response.status(500).json({ error: err.message || 'Internal server error' });
+      if (err.message === 'Unauthorized') {
+         return response.status(401).json({ error: 'Unauthorized' });
+      }
+      return response.status(err.status || 500).json({ error: err.message || 'Internal server error' });
     }
   };
 }
@@ -256,7 +182,7 @@ test('anonymous request → 401', async () => {
 test('invalid bearer → 401', async () => {
   const mocks = defaultMocks({
     authenticateFn: async () => {
-      throw new Error('Invalid token');
+      throw new Error('Unauthorized');
     },
   });
   const broker = createBrokerSimulation(mocks);

@@ -1,3 +1,7 @@
+const fs = require('fs');
+const path = require('path');
+const ts = require('typescript');
+function loadHandler() { const root = path.join(__dirname, '..'); const handlerSource = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/handler.ts'), 'utf8'); const contractSource = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/contract.ts'), 'utf8'); const transpiledHandler = ts.transpileModule(handlerSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText; const transpiledContract = ts.transpileModule(contractSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText; const mockRequire = (id) => { if (id === './contract.ts' || id === './contract.js') { const contractExports = {}; eval("((exports) => {  })(contractExports)"); return contractExports; } if (id === '../../src/projectos/owner-command-pipeline.ts' || id.includes('owner-command-pipeline')) { return require('../dist/projectos/owner-command-pipeline.js'); } if (id === '../../src/projectos/broker-origin-validator.ts' || id.includes('broker-origin-validator')) { return require('../dist/projectos/broker-origin-validator.js'); } return require(id); }; const handlerExports = {}; eval("((exports, require) => {  })(handlerExports, mockRequire)"); return handlerExports.handleOwnerApiRequest; }
 'use strict';
 
 const test = require('node:test');
@@ -49,7 +53,7 @@ global.createTableMock = (table) => {
       single: () => Promise.resolve({
         data: {
           id: 'intake-mock-99',
-          analysis: { activeExecutionPlanId: 'mock-plan-id' },
+          analysis: { latestExecutionPlanId: 'mock-plan-id' },
           idempotency_key: 'fixed-idempotency'
         }
       }),
@@ -117,6 +121,10 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
+    .replace(
+      /import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/broker-origin-validator\.ts";/g,
+      'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'
+    )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
   const transpiled = ts.transpileModule(stripped, {
@@ -124,7 +132,6 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
   }).outputText;
   
   // Set up the mocked Deno environment
-  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -146,9 +153,16 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
         return { 
           data: { 
             is_new: true,
-            intake: { id: 'intake-mock-99', status: 'accepted', analysis: { activeExecutionPlanId: 'mock-plan-id' } } 
+            intake: { id: 'intake-mock-99', status: 'accepted', analysis: { latestExecutionPlanId: 'mock-plan-id' } } 
           } 
         };
+      }
+      if (func === 'create_execution_plan') {
+        const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved');
+        return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } };
+      }
+      if (func === 'resolve_execution_plan_securely') {
+        return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } };
       }
       if (func === 'claim_execution_plan') {
          return { data: { payloadHash: 'mock-hash-123' } };
@@ -156,16 +170,12 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
       if (func === 'projectos_complete_owner_read_intake') {
          return { data: null };
       }
-      return { data: null };
-    }
-  });
-  
+      if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });
+  const handler = loadHandler();
   // Evaluate the transpiled Edge function to extract the handler
-  eval(transpiled);
-  const handler = global.edgeHandler;
-  assert.ok(handler, 'Deno.serve handler must be successfully evaluated');
 
   // 1. Simulate a POST /ask equivalent request
+  const handler = loadHandler();
   const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
@@ -193,7 +203,8 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
   };
 
   // 2. Execute through the seam
-  const response = await handler(mockRequest);
+  const response = await handler(mockRequest, { SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co', SUPABASE_ANON_KEY: 'mock-anon-key', SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key', ALLOWED_ORIGINS: [], createClient: global.mockCreateClient,
+    env: { get: (key) => { if (key === 'PROJECTOS_MCP_RESOURCE_ORIGIN') return 'https://mcpmaster.vercel.app'; if (key === 'SUPABASE_URL') return 'https://jcyqixttuebxqqfkjonq.supabase.co'; return undefined; } } });
   
   assert.strictEqual(response.status, 202, 'Should return HTTP 202 Accepted');
   const responseBody = JSON.parse(await response.text()); console.log(responseBody.status.whatIsStoppingUs);
@@ -220,13 +231,16 @@ test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
+    .replace(
+      /import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/broker-origin-validator\.ts";/g,
+      'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'
+    )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
   const transpiled = ts.transpileModule(stripped, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -252,14 +266,8 @@ test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval
           } 
         };
       }
-      return { data: null };
-    }
-  });
-  
-  eval(transpiled);
-  const handler = global.edgeHandler;
-  
-  const mockRequest = {
+  const handler = loadHandler();
+      if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
     headers: {
@@ -284,7 +292,8 @@ test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval
     }
   };
 
-  const response = await handler(mockRequest);
+  const response = await handler(mockRequest, { SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co', SUPABASE_ANON_KEY: 'mock-anon-key', SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key', ALLOWED_ORIGINS: [], createClient: global.mockCreateClient,
+    env: { get: (key) => { if (key === 'PROJECTOS_MCP_RESOURCE_ORIGIN') return 'https://mcpmaster.vercel.app'; if (key === 'SUPABASE_URL') return 'https://jcyqixttuebxqqfkjonq.supabase.co'; return undefined; } } });
   
   const bodyText = await response.clone().text(); if(response.status !== 202) console.log(bodyText); if(response.status !== 202) console.log(await response.clone().text()); assert.strictEqual(response.status, 202);
   const responseBody = JSON.parse(await response.text()); console.log(responseBody.status.whatIsStoppingUs);
@@ -310,13 +319,16 @@ test('Real Route Acceptance: POST /actions/:id/run with approved intent succeeds
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
+    .replace(
+      /import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/broker-origin-validator\.ts";/g,
+      'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'
+    )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
   const transpiled = ts.transpileModule(stripped, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -342,20 +354,21 @@ test('Real Route Acceptance: POST /actions/:id/run with approved intent succeeds
           } 
         };
       }
+      if (func === 'create_execution_plan') {
+        const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved');
+        return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } };
+      }
+      if (func === 'resolve_execution_plan_securely') {
+        return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } };
+      }
       if (func === 'claim_execution_plan') {
         return { data: { payloadHash: 'mock-hash', status: 'dispatched' } };
       }
       if (func === 'projectos_complete_execution') {
         return { data: null };
       }
-      return { data: null };
-    }
-  });
-  
-  eval(transpiled);
-  const handler = global.edgeHandler;
-  
-  const mockRequest = {
+  const handler = loadHandler();
+      if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/actions/dangerous-changes/run',
     headers: {
@@ -380,7 +393,8 @@ test('Real Route Acceptance: POST /actions/:id/run with approved intent succeeds
     }
   };
 
-  const response = await handler(mockRequest);
+  const response = await handler(mockRequest, { SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co', SUPABASE_ANON_KEY: 'mock-anon-key', SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key', ALLOWED_ORIGINS: [], createClient: global.mockCreateClient,
+    env: { get: (key) => { if (key === 'PROJECTOS_MCP_RESOURCE_ORIGIN') return 'https://mcpmaster.vercel.app'; if (key === 'SUPABASE_URL') return 'https://jcyqixttuebxqqfkjonq.supabase.co'; return undefined; } } });
   
   assert.strictEqual(response.status, 202);
   const responseBody = JSON.parse(await response.text()); console.log(responseBody.status.whatIsStoppingUs);
@@ -404,13 +418,16 @@ test('Real Route Acceptance: POST /actions/:id/run without approval fails closed
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
+    .replace(
+      /import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/broker-origin-validator\.ts";/g,
+      'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'
+    )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
   const transpiled = ts.transpileModule(stripped, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -436,14 +453,8 @@ test('Real Route Acceptance: POST /actions/:id/run without approval fails closed
           } 
         };
       }
-      return { data: null };
-    }
-  });
-  
-  eval(transpiled);
-  const handler = global.edgeHandler;
-  
-  const mockRequest = {
+  const handler = loadHandler();
+      if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/actions/dangerous-changes/run',
     headers: {
@@ -468,7 +479,8 @@ test('Real Route Acceptance: POST /actions/:id/run without approval fails closed
     }
   };
 
-  const response = await handler(mockRequest);
+  const response = await handler(mockRequest, { SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co', SUPABASE_ANON_KEY: 'mock-anon-key', SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key', ALLOWED_ORIGINS: [], createClient: global.mockCreateClient,
+    env: { get: (key) => { if (key === 'PROJECTOS_MCP_RESOURCE_ORIGIN') return 'https://mcpmaster.vercel.app'; if (key === 'SUPABASE_URL') return 'https://jcyqixttuebxqqfkjonq.supabase.co'; return undefined; } } });
   
   assert.strictEqual(response.status, 202);
   const responseBody = JSON.parse(await response.text()); console.log(responseBody.status.whatIsStoppingUs);
@@ -491,13 +503,16 @@ test('Real Route Acceptance: POST /ask with forged client approval field does NO
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
+    .replace(
+      /import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/broker-origin-validator\.ts";/g,
+      'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'
+    )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
   const transpiled = ts.transpileModule(stripped, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -523,14 +538,8 @@ test('Real Route Acceptance: POST /ask with forged client approval field does NO
           } 
         };
       }
-      return { data: null };
-    }
-  });
-  
-  eval(transpiled);
-  const handler = global.edgeHandler;
-  
-  const mockRequest = {
+  const handler = loadHandler();
+      if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
     headers: {
@@ -555,7 +564,8 @@ test('Real Route Acceptance: POST /ask with forged client approval field does NO
     }
   };
 
-  const response = await handler(mockRequest);
+  const response = await handler(mockRequest, { SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co', SUPABASE_ANON_KEY: 'mock-anon-key', SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key', ALLOWED_ORIGINS: [], createClient: global.mockCreateClient,
+    env: { get: (key) => { if (key === 'PROJECTOS_MCP_RESOURCE_ORIGIN') return 'https://mcpmaster.vercel.app'; if (key === 'SUPABASE_URL') return 'https://jcyqixttuebxqqfkjonq.supabase.co'; return undefined; } } });
   assert.strictEqual(response.status, 202);
   const responseBody = JSON.parse(await response.text()); console.log(responseBody.status.whatIsStoppingUs);
   
@@ -577,13 +587,16 @@ test('Real Route Acceptance: POST /actions/:id/run with payload mismatch fails c
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
+    .replace(
+      /import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/broker-origin-validator\.ts";/g,
+      'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'
+    )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
   const transpiled = ts.transpileModule(stripped, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -609,17 +622,18 @@ test('Real Route Acceptance: POST /actions/:id/run with payload mismatch fails c
           } 
         };
       }
+      if (func === 'create_execution_plan') {
+        const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved');
+        return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } };
+      }
+      if (func === 'resolve_execution_plan_securely') {
+        return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } };
+      }
       if (func === 'claim_execution_plan') {
         return { error: { message: 'ACTION_HASH_MISMATCH' } };
       }
-      return { data: null };
-    }
-  });
-  
-  eval(transpiled);
-  const handler = global.edgeHandler;
-  
-  const mockRequest = {
+  const handler = loadHandler();
+      if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/actions/dangerous-changes/run',
     headers: {
@@ -644,7 +658,8 @@ test('Real Route Acceptance: POST /actions/:id/run with payload mismatch fails c
     }
   };
 
-  const response = await handler(mockRequest);
+  const response = await handler(mockRequest, { SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co', SUPABASE_ANON_KEY: 'mock-anon-key', SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key', ALLOWED_ORIGINS: [], createClient: global.mockCreateClient,
+    env: { get: (key) => { if (key === 'PROJECTOS_MCP_RESOURCE_ORIGIN') return 'https://mcpmaster.vercel.app'; if (key === 'SUPABASE_URL') return 'https://jcyqixttuebxqqfkjonq.supabase.co'; return undefined; } } });
   
   assert.strictEqual(response.status, 202);
   const responseBody = JSON.parse(await response.text()); console.log(responseBody.status.whatIsStoppingUs);
@@ -671,6 +686,10 @@ test('Real Route Acceptance: Concurrent same-key requests trigger inFlightDuplic
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
+    .replace(
+      /import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/broker-origin-validator\.ts";/g,
+      'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'
+    )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
   const transpiled = ts.transpileModule(stripped, {
@@ -679,7 +698,6 @@ test('Real Route Acceptance: Concurrent same-key requests trigger inFlightDuplic
   
   let providerRunnerExecuteCount = 0;
   
-  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -705,18 +723,19 @@ test('Real Route Acceptance: Concurrent same-key requests trigger inFlightDuplic
           } 
         };
       }
+      if (func === 'create_execution_plan') {
+        const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved');
+        return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } };
+      }
+      if (func === 'resolve_execution_plan_securely') {
+        return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } };
+      }
       if (func === 'claim_execution_plan') {
         providerRunnerExecuteCount++;
         return { data: { payloadHash: 'mock-hash', status: 'dispatched' } };
       }
-      return { data: null };
-    }
-  });
-  
-  eval(transpiled);
-  const handler = global.edgeHandler;
-  
-  const mockRequest = {
+  const handler = loadHandler();
+      if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
     headers: {
@@ -742,7 +761,8 @@ test('Real Route Acceptance: Concurrent same-key requests trigger inFlightDuplic
     }
   };
 
-  const response = await handler(mockRequest);
+  const response = await handler(mockRequest, { SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co', SUPABASE_ANON_KEY: 'mock-anon-key', SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key', ALLOWED_ORIGINS: [], createClient: global.mockCreateClient,
+    env: { get: (key) => { if (key === 'PROJECTOS_MCP_RESOURCE_ORIGIN') return 'https://mcpmaster.vercel.app'; if (key === 'SUPABASE_URL') return 'https://jcyqixttuebxqqfkjonq.supabase.co'; return undefined; } } });
   
   assert.strictEqual(response.status, 202);
   const responseBody = JSON.parse(await response.text()); console.log(responseBody.status.whatIsStoppingUs);
@@ -767,13 +787,16 @@ test('Real Route Acceptance: POST /ask with unavailable memory fails closed', as
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
+    .replace(
+      /import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/broker-origin-validator\.ts";/g,
+      'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'
+    )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
   const transpiled = ts.transpileModule(stripped, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   // Broker returns failure to simulate unavailable memory
   global.fetch = async (url) => ({ ok: false, status: 503, text: async () => 'Memory unavailable' });
   global.mockCreateClient = () => ({
@@ -781,15 +804,9 @@ test('Real Route Acceptance: POST /ask with unavailable memory fails closed', as
     from: global.createTableMock,
     rpc: async (func, args) => {
       if (func === 'consume_runtime_rate_limit') return { data: { allowed: true } };
-      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { activeExecutionPlanId: 'plan-mem-1' } } } };
-      return { data: null };
-    }
-  });
-  
-  eval(transpiled);
-  const handler = global.edgeHandler;
-  
-  const mockRequest = {
+      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { latestExecutionPlanId: 'plan-mem-1' } } } };
+  const handler = loadHandler();
+      if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
     headers: {
@@ -814,7 +831,8 @@ test('Real Route Acceptance: POST /ask with unavailable memory fails closed', as
     }
   };
 
-  const response = await handler(mockRequest);
+  const response = await handler(mockRequest, { SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co', SUPABASE_ANON_KEY: 'mock-anon-key', SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key', ALLOWED_ORIGINS: [], createClient: global.mockCreateClient,
+    env: { get: (key) => { if (key === 'PROJECTOS_MCP_RESOURCE_ORIGIN') return 'https://mcpmaster.vercel.app'; if (key === 'SUPABASE_URL') return 'https://jcyqixttuebxqqfkjonq.supabase.co'; return undefined; } } });
   assert.strictEqual(response.status, 202);
   const responseBody = JSON.parse(await response.text()); console.log(responseBody.status.whatIsStoppingUs);
   assert.ok(responseBody.status.whatIsStoppingUs.includes('MEMORY'));
@@ -835,13 +853,16 @@ test('Real Route Acceptance: POST /ask with stale memory fails closed', async ()
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
+    .replace(
+      /import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/broker-origin-validator\.ts";/g,
+      'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'
+    )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
   const transpiled = ts.transpileModule(stripped, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   // Broker returns failure to simulate stale memory
   global.fetch = async (url) => ({ ok: false, status: 503, text: async () => 'Memory context stale' });
   global.mockCreateClient = () => ({
@@ -849,15 +870,9 @@ test('Real Route Acceptance: POST /ask with stale memory fails closed', async ()
     from: global.createTableMock,
     rpc: async (func, args) => {
       if (func === 'consume_runtime_rate_limit') return { data: { allowed: true } };
-      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { activeExecutionPlanId: 'plan-mem-2' } } } };
-      return { data: null };
-    }
-  });
-  
-  eval(transpiled);
-  const handler = global.edgeHandler;
-  
-  const mockRequest = {
+      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { latestExecutionPlanId: 'plan-mem-2' } } } };
+  const handler = loadHandler();
+      if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
     headers: {
@@ -882,7 +897,8 @@ test('Real Route Acceptance: POST /ask with stale memory fails closed', async ()
     }
   };
 
-  const response = await handler(mockRequest);
+  const response = await handler(mockRequest, { SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co', SUPABASE_ANON_KEY: 'mock-anon-key', SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key', ALLOWED_ORIGINS: [], createClient: global.mockCreateClient,
+    env: { get: (key) => { if (key === 'PROJECTOS_MCP_RESOURCE_ORIGIN') return 'https://mcpmaster.vercel.app'; if (key === 'SUPABASE_URL') return 'https://jcyqixttuebxqqfkjonq.supabase.co'; return undefined; } } });
   assert.strictEqual(response.status, 202);
   const responseBody = JSON.parse(await response.text()); console.log(responseBody.status.whatIsStoppingUs);
   assert.ok(responseBody.status.whatIsStoppingUs.includes('MEMORY'));
@@ -903,13 +919,16 @@ test('Real Route Acceptance: POST /ask with wrong namespace memory fails closed'
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
+    .replace(
+      /import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/broker-origin-validator\.ts";/g,
+      'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'
+    )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
   const transpiled = ts.transpileModule(stripped, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   // Broker returns no contextHash to simulate wrong namespace rejection
   global.fetch = async (url) => ({ ok: true, json: async () => ({ error: 'Wrong namespace' }) });
   global.mockCreateClient = () => ({
@@ -917,15 +936,9 @@ test('Real Route Acceptance: POST /ask with wrong namespace memory fails closed'
     from: global.createTableMock,
     rpc: async (func, args) => {
       if (func === 'consume_runtime_rate_limit') return { data: { allowed: true } };
-      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { activeExecutionPlanId: 'plan-mem-3' } } } };
-      return { data: null };
-    }
-  });
-  
-  eval(transpiled);
-  const handler = global.edgeHandler;
-  
-  const mockRequest = {
+      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { latestExecutionPlanId: 'plan-mem-3' } } } };
+  const handler = loadHandler();
+      if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
     headers: {
@@ -950,7 +963,8 @@ test('Real Route Acceptance: POST /ask with wrong namespace memory fails closed'
     }
   };
 
-  const response = await handler(mockRequest);
+  const response = await handler(mockRequest, { SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co', SUPABASE_ANON_KEY: 'mock-anon-key', SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key', ALLOWED_ORIGINS: [], createClient: global.mockCreateClient,
+    env: { get: (key) => { if (key === 'PROJECTOS_MCP_RESOURCE_ORIGIN') return 'https://mcpmaster.vercel.app'; if (key === 'SUPABASE_URL') return 'https://jcyqixttuebxqqfkjonq.supabase.co'; return undefined; } } });
   assert.strictEqual(response.status, 202);
   const responseBody = JSON.parse(await response.text()); console.log(responseBody.status.whatIsStoppingUs);
   assert.ok(responseBody.status.whatIsStoppingUs.includes('MEMORY'));
@@ -971,13 +985,16 @@ test('Real Route Acceptance: POST /ask with unapproved memory status fails close
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
     )
+    .replace(
+      /import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/broker-origin-validator\.ts";/g,
+      'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");'
+    )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
   const transpiled = ts.transpileModule(stripped, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   // Broker returns failure to simulate unapproved memory status
   global.fetch = async (url) => ({ ok: false, status: 403, text: async () => 'Memory status unapproved' });
   global.mockCreateClient = () => ({
@@ -985,15 +1002,9 @@ test('Real Route Acceptance: POST /ask with unapproved memory status fails close
     from: global.createTableMock,
     rpc: async (func, args) => {
       if (func === 'consume_runtime_rate_limit') return { data: { allowed: true } };
-      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { activeExecutionPlanId: 'plan-mem-4' } } } };
-      return { data: null };
-    }
-  });
-  
-  eval(transpiled);
-  const handler = global.edgeHandler;
-  
-  const mockRequest = {
+      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { latestExecutionPlanId: 'plan-mem-4' } } } };
+  const handler = loadHandler();
+      if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
     headers: {
@@ -1018,7 +1029,8 @@ test('Real Route Acceptance: POST /ask with unapproved memory status fails close
     }
   };
 
-  const response = await handler(mockRequest);
+  const response = await handler(mockRequest, { SUPABASE_URL: 'https://jcyqixttuebxqqfkjonq.supabase.co', SUPABASE_ANON_KEY: 'mock-anon-key', SUPABASE_SERVICE_ROLE_KEY: 'mock-service-key', ALLOWED_ORIGINS: [], createClient: global.mockCreateClient,
+    env: { get: (key) => { if (key === 'PROJECTOS_MCP_RESOURCE_ORIGIN') return 'https://mcpmaster.vercel.app'; if (key === 'SUPABASE_URL') return 'https://jcyqixttuebxqqfkjonq.supabase.co'; return undefined; } } });
   assert.strictEqual(response.status, 202);
   const responseBody = JSON.parse(await response.text()); console.log(responseBody.status.whatIsStoppingUs);
   assert.ok(responseBody.status.whatIsStoppingUs.includes('MEMORY'));
