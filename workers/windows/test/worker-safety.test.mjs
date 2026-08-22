@@ -23,17 +23,22 @@ test('worker steps contain no deploy, merge, push, database mutation, or product
   }
 });
 
-test('redactor removes common secret forms', () => {
+test('redactor removes common secret forms without storing secret-shaped fixtures in source', () => {
+  const bearer = ['Bearer', 'abcdefghijklmnopqrstuvwxyz123456'].join(' ');
+  const githubPat = ['ghp', 'abcdefghijklmnopqrstuvwxyz123456'].join('_');
+  const supabaseSecret = ['sb', 'secret', 'abcdefghijklmnopqrstuvwxyz'].join('_');
+
   const sample = [
-    'Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456',
-    '[REDACTED]',
-    '[REDACTED]',
+    `Authorization: ${bearer}`,
+    githubPat,
+    supabaseSecret,
     'password=hunter2',
   ].join('\n');
+
   const output = redact(sample);
   assert.equal(output.includes('abcdefghijklmnopqrstuvwxyz123456'), false);
-  assert.equal(output.includes('ghp_abcdefghijklmnopqrstuvwxyz123456'), false);
-  assert.equal(output.includes('sb_secret_abcdefghijklmnopqrstuvwxyz'), false);
+  assert.equal(output.includes(githubPat), false);
+  assert.equal(output.includes(supabaseSecret), false);
   assert.equal(output.includes('hunter2'), false);
   assert.match(output, /REDACTED_SECRET/);
 });
