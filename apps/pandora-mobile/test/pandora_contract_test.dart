@@ -19,6 +19,15 @@ void main() {
     expect(PandoraConfig.supabasePublishableKey, startsWith('sb_publishable_'));
   });
 
+  test('release and version identity are deterministic and bind to RC2 (Build 5)', () {
+    expect(PandoraConfig.appVersion, '0.3.0-rc.2+5');
+    expect(PandoraConfig.buildNumber, '5');
+    expect(PandoraConfig.packageId, 'com.banataosystems.pandora_mobile');
+    expect(PandoraConfig.releaseLabel, '0.3.0-rc.2 Owner Test');
+    expect(PandoraConfig.visibleReleaseIdentity, contains('0.3.0-rc.2'));
+    expect(PandoraConfig.visibleReleaseIdentity, contains('Build 5'));
+  });
+
   test('verified owner routes are ordered and deduplicated', () {
     expect(PandoraConfig.ownerApiBaseUrls, hasLength(2));
     expect(PandoraConfig.ownerApiBaseUrls.first, contains('pandora-owner-api'));
@@ -30,6 +39,7 @@ void main() {
       PandoraConfig.supabaseUrl,
       ...PandoraConfig.ownerApiBaseUrls,
       PandoraConfig.organizationId,
+      PandoraConfig.packageId,
     ].join(' ');
     expect(combined.toLowerCase(), isNot(contains('mbanatao')));
   });

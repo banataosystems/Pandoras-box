@@ -27,3 +27,9 @@ test('Pandora owner API uses a canonical ProjectOS intake source', () => {
   assert.ok(sources.every((source) => ALLOWED_INTAKE_SOURCES.has(source)));
   assert.doesNotMatch(ownerApiSource, /flutterflow_owner_app/);
 });
+
+test('Real Route Integration: pipeline is wired and invoked', () => {
+  assert.match(ownerApiSource, /import \{ executeOwnerCommand \} from ["']\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts["']/, 'Must import pipeline natively');
+  assert.match(ownerApiSource, /executeOwnerCommand\s*\(/, 'Must invoke executeOwnerCommand');
+  assert.match(ownerApiSource, /idempotencyKey:\s*providedKey/, 'Must pass idempotencyKey to execution');
+});

@@ -1,6 +1,18 @@
 class PandoraConfig {
   PandoraConfig._();
 
+  static const appVersion = String.fromEnvironment(
+    'PANDORA_APP_VERSION',
+    defaultValue: '0.3.0-rc.2+5',
+  );
+  static const buildNumber = '5';
+  static const packageId = 'com.banataosystems.pandora_mobile';
+  static String get releaseLabel => '${appVersion.split('+').first} Owner Test';
+  static const artifactClass = 'Owner Test — Android debug signed';
+  static const productionRelease = false;
+
+  static const visibleReleaseIdentity = 'Pandora Mobile 0.3.0-rc.2 (Build 5)';
+
   static const supabaseUrl = String.fromEnvironment(
     'PANDORA_SUPABASE_URL',
     defaultValue: 'https://jcyqixttuebxqqfkjonq.supabase.co',
@@ -13,17 +25,14 @@ class PandoraConfig {
     defaultValue: 'sb_publishable_LGu6ncwUVEYI5THBjSV-3g_71AInQZt',
   );
 
-  // The installed APK proved the currently deployed Vercel compatibility route
-  // returns HTTP 404 for owner screens. The original Pandora client contract
-  // targets this Supabase Edge Function, using the signed-in user's JWT.
+  // The installed APK targets this Supabase Edge Function, using the signed-in user's JWT.
   static const ownerApiBaseUrl = String.fromEnvironment(
     'PANDORA_OWNER_API_BASE_URL',
     defaultValue:
         'https://jcyqixttuebxqqfkjonq.supabase.co/functions/v1/pandora-owner-api',
   );
 
-  // Retain the canonical Vercel route as failover for the future runtime that
-  // includes api/operator. Authorization still fails closed on 401/403.
+  // Retain the canonical Vercel route as failover for the future runtime.
   static const ownerApiFallbackBaseUrl = String.fromEnvironment(
     'PANDORA_OWNER_API_FALLBACK_BASE_URL',
     defaultValue: 'https://mcpmaster.vercel.app/api/operator',
