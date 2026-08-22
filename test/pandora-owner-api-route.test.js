@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 
-test('Real Route Acceptance: POST /ask equivalent request traverses full handler seam', async () => {
+test('Real Route Acceptance: POST /ask equivalent request traverses full handler seam to executed outcome', async () => {
   const root = path.join(__dirname, '..');
   const source = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/index.ts'), 'utf8');
 
@@ -21,6 +21,10 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
     .replace(
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
+    )
+    .replace(
+      /const memoryClient = \{[\s\S]*?loadCheckpoint:[\s\S]*?\};/,
+      'const memoryClient = { loadCheckpoint: async () => ({ valid: true, checkpointVersion: 1, namespace: "real_life" }) };'
     )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     
@@ -124,6 +128,10 @@ test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval
     .replace(
       /import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g,
       'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");'
+    )
+    .replace(
+      /const memoryClient = \{[\s\S]*?loadCheckpoint:[\s\S]*?\};/,
+      'const memoryClient = { loadCheckpoint: async () => ({ valid: true, checkpointVersion: 1, namespace: "real_life" }) };'
     )
     .replace(/Deno\.serve\(/g, 'global.edgeHandler = (');
     

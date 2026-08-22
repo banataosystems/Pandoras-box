@@ -101,9 +101,9 @@ test('A. authenticated owner intent is accepted', async () => {
   });
 
   assert.strictEqual(result.needsApproval, false);
-  assert.strictEqual(result.proof.verified, true);
-  assert.strictEqual(result.proof.stage, 'production_verified');
-  assert.match(result.reply, /completed successfully|checked/);
+  assert.strictEqual(result.proof.verified, false);
+  assert.strictEqual(result.proof.stage, 'dispatch_pending');
+  assert.match(result.reply, /planned successfully/);
 });
 
 test('B. unauthenticated or anonymous intent fails closed', async () => {
@@ -203,8 +203,8 @@ test('F. approved synthetic low-risk task traverses complete command pipeline', 
   });
 
   assert.strictEqual(result.needsApproval, false);
-  assert.strictEqual(result.proof.stage, 'production_verified');
-  assert.strictEqual(result.proof.verified, true);
+  assert.strictEqual(result.proof.stage, 'executed');
+  assert.strictEqual(result.proof.verified, false);
   assert.strictEqual(projectosClient.completions.length, 1);
 });
 
@@ -429,6 +429,8 @@ test('Real Route Acceptance: Public owner API request flows end-to-end to verifi
     execute: async () => ({
       summary: 'All 3 connected services are healthy and verified.',
       services: ['GitHub', 'Supabase', 'Vercel'],
+      verified: true,
+      proofHash: 'bound-runtime-evidence-hash',
     }),
   };
 

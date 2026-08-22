@@ -1056,14 +1056,8 @@ async function acceptIntake(
 
   const memoryClient = {
     loadCheckpoint: async (key: string) => {
-      // Memory Authority: Read from canonical project registry. Stale/invalid fails closed.
-      const { data, error } = await adminClient
-        .from("projectos_projects")
-        .select("id")
-        .eq("project_key", key)
-        .single();
-      if (error || !data) throw new Error(`STALE_OR_INVALID_MEMORY_CONTEXT: ${error?.message || 'Not found'}`);
-      return { valid: true, checkpointVersion: 1, namespace: "canonical_pandora_memory" };
+      // Memory Authority: We cannot reach the Vercel OIDC Pandora Memory source from this runtime.
+      throw new Error('MEMORY_AUTHORITY_UNAVAILABLE');
     }
   };
 

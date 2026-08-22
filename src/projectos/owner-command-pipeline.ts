@@ -192,7 +192,6 @@ async function executeOwnerCommand(options) {
     };
   }
 
-  // 7. Governed Execution (Safe Low-Risk READ / Status Commands)
   let executionResult = null;
   try {
     if (providerRunner && typeof providerRunner.execute === 'function') {
@@ -204,9 +203,10 @@ async function executeOwnerCommand(options) {
       });
     } else {
       executionResult = {
-        summary: 'All connected systems and project records were checked.',
-        itemsChecked: 1,
+        summary: 'Intent analyzed and planned successfully. No active execution provider is bound.',
+        itemsChecked: 0,
         findings: [],
+        stage: 'dispatch_pending',
       };
     }
   } catch (executionError) {
@@ -266,6 +266,7 @@ async function executeOwnerCommand(options) {
   const proofHash = executionResult?.proofHash || null;
   const isVerified = !!executionResult?.verified;
   const porcelainReply = executionResult?.summary || 'The requested check completed successfully.';
+  const defaultStage = isVerified ? 'production_verified' : 'executed';
 
   const finalOutcome = {
     reply: porcelainReply,
@@ -281,7 +282,7 @@ async function executeOwnerCommand(options) {
       whatIWillDoNext: 'No action required.',
     },
     proof: {
-      stage: isVerified ? 'production_verified' : 'executed',
+      stage: executionResult?.stage || defaultStage,
       verified: isVerified,
       proofHash,
     },
