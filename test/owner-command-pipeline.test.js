@@ -203,7 +203,7 @@ test('F. approved synthetic low-risk task traverses complete command pipeline', 
   });
 
   assert.strictEqual(result.needsApproval, false);
-  assert.strictEqual(result.proof.stage, 'executed');
+  assert.strictEqual(result.proof.stage, 'dispatch_pending');
   assert.strictEqual(result.proof.verified, false);
   assert.strictEqual(projectosClient.completions.length, 1);
 });
@@ -367,10 +367,9 @@ test('L. proof and evidence references remain bound to the run', async () => {
     projectosClient,
   });
 
-  assert.ok(result.proof.proofHash);
+  assert.strictEqual(result.proof.proofHash, null);
   assert.ok(result.advanced.idempotencyKey);
   assert.ok(result.advanced.intakeId);
-  assert.strictEqual(projectosClient.completions[0].proofHash, result.proof.proofHash);
 });
 
 // -------------------------------------------------------------

@@ -255,6 +255,7 @@ async function authenticate(req: Request): Promise<UserContext> {
     isAnonymous: claims.is_anonymous === true ||
       authData.user.is_anonymous === true,
     client,
+    token: authorization,
   };
 }
 
@@ -1146,50 +1147,36 @@ async function acceptIntake(
         
       if (planError || !planData) throw new Error("PLAN_NOT_FOUND");
 
-      // 2. Retrieve governed Memory for this exact plan
-      let envelope: any;
+      // 2. Hydrate and attach Memory using the control-plane broker
+      let contextHash: string | null = null;
       try {
-        const memoryOrigin = Deno.env.get("PANDORA_MEMORY_BASE_URL") || "https://pandorasbox-memory.vercel.app";
-        const memoryRes = await fetch(`${memoryOrigin}/api/projectos/memory/plan-context`, {
+        const brokerOrigin = Deno.env.get("PROJECTOS_MCP_RESOURCE_ORIGIN") || "https://mcpmaster.vercel.app";
+        const brokerRes = await fetch(`${brokerOrigin}/api/memory-broker`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ? `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` : "",
+            'Authorization': context.token, // USE USER TOKEN, NOT SERVICE ROLE
           },
           body: JSON.stringify({
-            namespace: 'real_life',
+            planId: planId,
+            requestId: planData.request_id,
             tool: planData.tool,
             args: planData.args
           })
         });
 
-        if (!memoryRes.ok) {
-           throw new Error(`Memory retrieval failed: ${memoryRes.status}`);
+        if (!brokerRes.ok) {
+           throw new Error(`Broker memory retrieval failed: ${brokerRes.status}`);
         }
         
-        const memoryResult = await memoryRes.json();
-        envelope = memoryResult.envelope;
-        if (!envelope) throw new Error("Missing memory envelope in provider response");
+        const brokerResult = await brokerRes.json();
+        contextHash = brokerResult.contextHash;
+        if (!contextHash) throw new Error("Missing memory contextHash in broker response");
       } catch (err: any) {
         throw new Error(`MEMORY_HYDRATION_FAILED: ${err.message}`);
       }
 
-      // 3. Attach Memory context to EXACT plan
-      const encoder = new TextEncoder();
-      const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(JSON.stringify(envelope)));
-      const contextHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
-
-      const { error: attachError } = await adminClient.rpc("attach_execution_plan_context", {
-        p_organization_id: context.organizationId,
-        p_plan_id: planId,
-        p_request_id: planData.request_id,
-        p_context_hash: contextHash,
-        p_context_envelope: envelope
-      });
-
-      if (attachError) {
-        throw new Error(`MEMORY_ATTACH_FAILED: ${attachError.message}`);
-      }
+      // Note: The broker automatically attaches the memory context to the database using its own Vercel workload identity!
 
       // 4. Exact payload binding and provider governed execution for critical operations
       const { data: claimData, error: claimError } = await adminClient.rpc("claim_execution_plan", {
