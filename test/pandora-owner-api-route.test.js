@@ -124,7 +124,7 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
   }).outputText;
   
   // Set up the mocked Deno environment
-  global.Deno = { env: { get: () => 'mock' } };
+  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -226,7 +226,7 @@ test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: () => 'mock' } };
+  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -316,7 +316,7 @@ test('Real Route Acceptance: POST /actions/:id/run with approved intent succeeds
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: () => 'mock' } };
+  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -410,7 +410,7 @@ test('Real Route Acceptance: POST /actions/:id/run without approval fails closed
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: () => 'mock' } };
+  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -497,7 +497,7 @@ test('Real Route Acceptance: POST /ask with forged client approval field does NO
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: () => 'mock' } };
+  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -583,7 +583,7 @@ test('Real Route Acceptance: POST /actions/:id/run with payload mismatch fails c
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: () => 'mock' } };
+  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -679,7 +679,7 @@ test('Real Route Acceptance: Concurrent same-key requests trigger inFlightDuplic
   
   let providerRunnerExecuteCount = 0;
   
-  global.Deno = { env: { get: () => 'mock' } };
+  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
   global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
@@ -773,23 +773,15 @@ test('Real Route Acceptance: POST /ask with unavailable memory fails closed', as
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
+  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
+  // Broker returns failure to simulate unavailable memory
+  global.fetch = async (url) => ({ ok: false, status: 503, text: async () => 'Memory unavailable' });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
     rpc: async (func, args) => {
       if (func === 'consume_runtime_rate_limit') return { data: { allowed: true } };
-      if (func === 'attach_execution_plan_context') {
-        const env = args.p_context_envelope;
-        const ageMs = Date.now() - new Date(env.retrievedAt).getTime();
-        if (!env) return { error: { message: 'projectos_memory_context_missing' } };
-        if (env.namespace !== 'real_life') return { error: { message: 'projectos_memory_context_invalid' } };
-        if (env.status === 'draft') return { error: { message: 'projectos_memory_context_unavailable' } };
-        if (ageMs > 60000 || ageMs < 0) return { error: { message: 'projectos_memory_context_stale' } };
-        return { data: null };
-      }
-      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted' } } };
+      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { activeExecutionPlanId: 'plan-mem-1' } } } };
       return { data: null };
     }
   });
@@ -849,23 +841,15 @@ test('Real Route Acceptance: POST /ask with stale memory fails closed', async ()
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
+  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
+  // Broker returns failure to simulate stale memory
+  global.fetch = async (url) => ({ ok: false, status: 503, text: async () => 'Memory context stale' });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
     rpc: async (func, args) => {
       if (func === 'consume_runtime_rate_limit') return { data: { allowed: true } };
-      if (func === 'attach_execution_plan_context') {
-        const env = args.p_context_envelope;
-        const ageMs = Date.now() - new Date(env.retrievedAt).getTime();
-        if (!env) return { error: { message: 'projectos_memory_context_missing' } };
-        if (env.namespace !== 'real_life') return { error: { message: 'projectos_memory_context_invalid' } };
-        if (env.status === 'draft') return { error: { message: 'projectos_memory_context_unavailable' } };
-        if (ageMs > 60000 || ageMs < 0) return { error: { message: 'projectos_memory_context_stale' } };
-        return { data: null };
-      }
-      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted' } } };
+      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { activeExecutionPlanId: 'plan-mem-2' } } } };
       return { data: null };
     }
   });
@@ -925,23 +909,15 @@ test('Real Route Acceptance: POST /ask with wrong namespace memory fails closed'
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
+  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
+  // Broker returns no contextHash to simulate wrong namespace rejection
+  global.fetch = async (url) => ({ ok: true, json: async () => ({ error: 'Wrong namespace' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
     rpc: async (func, args) => {
       if (func === 'consume_runtime_rate_limit') return { data: { allowed: true } };
-      if (func === 'attach_execution_plan_context') {
-        const env = args.p_context_envelope;
-        const ageMs = Date.now() - new Date(env.retrievedAt).getTime();
-        if (!env) return { error: { message: 'projectos_memory_context_missing' } };
-        if (env.namespace !== 'real_life') return { error: { message: 'projectos_memory_context_invalid' } };
-        if (env.status === 'draft') return { error: { message: 'projectos_memory_context_unavailable' } };
-        if (ageMs > 60000 || ageMs < 0) return { error: { message: 'projectos_memory_context_stale' } };
-        return { data: null };
-      }
-      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted' } } };
+      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { activeExecutionPlanId: 'plan-mem-3' } } } };
       return { data: null };
     }
   });
@@ -1001,23 +977,15 @@ test('Real Route Acceptance: POST /ask with unapproved memory status fails close
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
+  global.Deno = { env: { get: (key) => key === 'PROJECTOS_MCP_RESOURCE_ORIGIN' ? 'https://mcpmaster.vercel.app' : undefined } };
+  // Broker returns failure to simulate unapproved memory status
+  global.fetch = async (url) => ({ ok: false, status: 403, text: async () => 'Memory status unapproved' });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
     rpc: async (func, args) => {
       if (func === 'consume_runtime_rate_limit') return { data: { allowed: true } };
-      if (func === 'attach_execution_plan_context') {
-        const env = args.p_context_envelope;
-        const ageMs = Date.now() - new Date(env.retrievedAt).getTime();
-        if (!env) return { error: { message: 'projectos_memory_context_missing' } };
-        if (env.namespace !== 'real_life') return { error: { message: 'projectos_memory_context_invalid' } };
-        if (env.status === 'draft') return { error: { message: 'projectos_memory_context_unavailable' } };
-        if (ageMs > 60000 || ageMs < 0) return { error: { message: 'projectos_memory_context_stale' } };
-        return { data: null };
-      }
-      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted' } } };
+      if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { activeExecutionPlanId: 'plan-mem-4' } } } };
       return { data: null };
     }
   });
