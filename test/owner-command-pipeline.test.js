@@ -109,7 +109,7 @@ test('A. authenticated owner intent is accepted', async () => {
   assert.strictEqual(result.needsApproval, false);
   assert.strictEqual(result.proof.verified, false);
   assert.strictEqual(result.proof.stage, 'dispatch_pending');
-  assert.match(result.reply, /planned successfully/);
+  assert.match(result.reply, /successfully dispatched for execution/);
 });
 
 test('B. unauthenticated or anonymous intent fails closed', async () => {
@@ -332,16 +332,15 @@ test('K. sensitive information is absent from owner-facing errors and replies', 
   assert.match(sanitized, /\[REDACTED_SECRET\]/);
 
   const context = createMockContext();
-  const providerRunner = {
-    execute: async () => {
-      throw new Error(`Failed with key Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M`);
-    },
+  const projectosClient = createMockProjectosClient();
+  projectosClient.enqueueExecutionDispatch = async () => {
+    throw new Error(`Failed with key Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M`);
   };
 
   const result = await executeOwnerCommand({
     context,
     message: 'Inspect secret',
-    providerRunner,
+    projectosClient,
   });
 
   assert.strictEqual(result.reply.includes('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'), false);

@@ -5,7 +5,7 @@ const test = require("node:test");
 
 const root = join(__dirname, "..");
 const ownerApi = readFileSync(
-  join(root, "supabase/functions/pandora-owner-api/index.ts"),
+  join(root, "supabase/functions/pandora-owner-api/handler.ts"),
   "utf8",
 );
 const migration = readFileSync(
@@ -25,7 +25,7 @@ function between(source, start, end) {
 }
 
 test("owner API ordinary approval has no AAL2 step-up and reports it accurately", () => {
-  const decide = between(ownerApi, "async function decide(", "\nDeno.serve(");
+  const decide = between(ownerApi, "async function decide(", "\nexport async function handleOwnerApiRequest");
   assert.doesNotMatch(decide, /context\.aal|aal2|AAL2_REQUIRED/i);
   assert.match(decide, /context\.isAnonymous/);
   assert.match(decide, /rpc\("decide_approval"/);

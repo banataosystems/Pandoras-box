@@ -1,7 +1,7 @@
 -- 20260822100500_add_execution_dispatch_outbox.sql
 
 create table if not exists private.execution_dispatch_outbox (
-  id uuid primary key default extensions.uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   plan_id uuid not null references private.execution_plans(id) on delete restrict,
   status text not null check (status in ('queued', 'claimed', 'provider_submitted', 'verification_pending', 'completed', 'ambiguous', 'failed')),
   worker_identity text,

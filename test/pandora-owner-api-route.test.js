@@ -1,13 +1,30 @@
 const fs = require('fs');
 const path = require('path');
-const ts = require('typescript');
-function loadHandler() { const root = path.join(__dirname, '..'); const handlerSource = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/handler.ts'), 'utf8'); const contractSource = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/contract.ts'), 'utf8'); const transpiledHandler = ts.transpileModule(handlerSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText; const transpiledContract = ts.transpileModule(contractSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText; const mockRequire = (id) => { if (id === './contract.ts' || id === './contract.js') { const contractExports = {}; eval("((exports) => {  })(contractExports)"); return contractExports; } if (id === '../../src/projectos/owner-command-pipeline.ts' || id.includes('owner-command-pipeline')) { return require('../dist/projectos/owner-command-pipeline.js'); } if (id === '../../src/projectos/broker-origin-validator.ts' || id.includes('broker-origin-validator')) { return require('../dist/projectos/broker-origin-validator.js'); } return require(id); }; const handlerExports = {}; eval("((exports, require) => {  })(handlerExports, mockRequire)"); return handlerExports.handleOwnerApiRequest; }
+function loadHandler() {
+    const root = path.join(__dirname, '..');
+    const handlerSource = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/handler.ts'), 'utf8');
+    const stripped = handlerSource
+      .replace(/import "jsr:.*?";/g, '')
+      .replace(/import \{ createClient \} from "jsr:.*?";/g, 'const createClient = global.mockCreateClient;')
+      .replace(/import\s+\{[\s\S]*?\}\s+from\s+"\.\/contract\.ts";/g, 'const allowedCorsOrigin = () => "*"; const parseAllowedOrigins = () => []; const normalizeOwnerRoute = (r) => r; const connectionActionAllowed = () => true; const ownerRiskLabel = (r) => r; const normalizeIntakeFingerprintPart = (s) => s; const isReleaseEvidenceType = () => false;')
+      .replace(/import\s+\{\s*executeOwnerCommand\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/owner-command-pipeline\.ts";/g, 'const { executeOwnerCommand } = require("../dist/projectos/owner-command-pipeline.js");')
+      .replace(/import\s+\{\s*validateBrokerOrigin\s*\}\s+from\s+"\.\.\/\.\.\/src\/projectos\/broker-origin-validator\.ts";/g, 'const { validateBrokerOrigin } = require("../dist/projectos/broker-origin-validator.js");');
+
+    const transpiledHandler = ts.transpileModule(stripped, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const exportsObj = {};
+    const mockRequire = (id) => {
+       if (id === '../../src/projectos/owner-command-pipeline.ts' || id.includes('owner-command-pipeline')) { return require('../dist/projectos/owner-command-pipeline.js'); }
+       if (id === '../../src/projectos/broker-origin-validator.ts' || id.includes('broker-origin-validator')) { return require('../dist/projectos/broker-origin-validator.js'); }
+       return require(id);
+    };
+    const handlerFn = new Function('exports', 'require', transpiledHandler);
+    handlerFn(exportsObj, mockRequire);
+    return exportsObj.handleOwnerApiRequest;
+}
 'use strict';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const ts = require('typescript');
 
 global.createTableMock = (table) => {
@@ -107,7 +124,7 @@ global.createTableMock = (table) => {
 test('Real Route Acceptance: POST /ask equivalent request traverses full handler seam to executed outcome', async () => {
   global.mockMemoryEnvelope = undefined;
   const root = path.join(__dirname, '..');
-  const source = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/index.ts'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/handler.ts'), 'utf8');
 
   // Strip Deno-specific imports and mock the Edge environment
   const stripped = source
@@ -132,7 +149,7 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
   }).outputText;
   
   // Set up the mocked Deno environment
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
+  global.fetch = async (url) => { const env = global.mockMemoryEnvelope; if (env === null) return { ok: false, status: 403, text: async () => 'projectos_memory_context_missing' }; if (env !== undefined) { if (env.namespace !== 'real_life') return { ok: false, status: 403, text: async () => 'projectos_memory_context_invalid' }; if (env.status === 'draft') return { ok: false, status: 403, text: async () => 'projectos_memory_context_unavailable' }; const ageMs = Date.now() - new Date(env.retrievedAt).getTime(); if (ageMs > 60000 || ageMs < 0) return { ok: false, status: 403, text: async () => 'projectos_memory_context_stale' }; } return { ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) }; };
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -171,11 +188,11 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
          return { data: null };
       }
       if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });
-  const handler = loadHandler();
+  var handler = loadHandler();
   // Evaluate the transpiled Edge function to extract the handler
 
   // 1. Simulate a POST /ask equivalent request
-  const handler = loadHandler();
+  var handler = loadHandler();
   const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
@@ -217,7 +234,7 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
 
 test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval', async () => {
   const root = path.join(__dirname, '..');
-  const source = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/index.ts'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/handler.ts'), 'utf8');
 
   // Strip Deno-specific imports and mock the Edge environment
   const stripped = source
@@ -241,7 +258,7 @@ test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
+  global.fetch = async (url) => { const env = global.mockMemoryEnvelope; if (env === null) return { ok: false, status: 403, text: async () => 'projectos_memory_context_missing' }; if (env !== undefined) { if (env.namespace !== 'real_life') return { ok: false, status: 403, text: async () => 'projectos_memory_context_invalid' }; if (env.status === 'draft') return { ok: false, status: 403, text: async () => 'projectos_memory_context_unavailable' }; const ageMs = Date.now() - new Date(env.retrievedAt).getTime(); if (ageMs > 60000 || ageMs < 0) return { ok: false, status: 403, text: async () => 'projectos_memory_context_stale' }; } return { ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) }; };
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -266,7 +283,7 @@ test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval
           } 
         };
       }
-  const handler = loadHandler();
+  var handler = loadHandler();
       if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
@@ -306,7 +323,7 @@ test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval
 
 test('Real Route Acceptance: POST /actions/:id/run with approved intent succeeds without AAL2', async () => {
   const root = path.join(__dirname, '..');
-  const source = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/index.ts'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/handler.ts'), 'utf8');
 
   const stripped = source
     .replace(/import "jsr:.*?";/g, '')
@@ -329,7 +346,7 @@ test('Real Route Acceptance: POST /actions/:id/run with approved intent succeeds
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
+  global.fetch = async (url) => { const env = global.mockMemoryEnvelope; if (env === null) return { ok: false, status: 403, text: async () => 'projectos_memory_context_missing' }; if (env !== undefined) { if (env.namespace !== 'real_life') return { ok: false, status: 403, text: async () => 'projectos_memory_context_invalid' }; if (env.status === 'draft') return { ok: false, status: 403, text: async () => 'projectos_memory_context_unavailable' }; const ageMs = Date.now() - new Date(env.retrievedAt).getTime(); if (ageMs > 60000 || ageMs < 0) return { ok: false, status: 403, text: async () => 'projectos_memory_context_stale' }; } return { ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) }; };
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -367,7 +384,7 @@ test('Real Route Acceptance: POST /actions/:id/run with approved intent succeeds
       if (func === 'projectos_complete_execution') {
         return { data: null };
       }
-  const handler = loadHandler();
+  var handler = loadHandler();
       if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/actions/dangerous-changes/run',
@@ -405,7 +422,7 @@ test('Real Route Acceptance: POST /actions/:id/run with approved intent succeeds
 
 test('Real Route Acceptance: POST /actions/:id/run without approval fails closed', async () => {
   const root = path.join(__dirname, '..');
-  const source = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/index.ts'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'supabase/functions/pandora-owner-api/handler.ts'), 'utf8');
 
   const stripped = source
     .replace(/import "jsr:.*?";/g, '')
@@ -428,7 +445,7 @@ test('Real Route Acceptance: POST /actions/:id/run without approval fails closed
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
+  global.fetch = async (url) => { const env = global.mockMemoryEnvelope; if (env === null) return { ok: false, status: 403, text: async () => 'projectos_memory_context_missing' }; if (env !== undefined) { if (env.namespace !== 'real_life') return { ok: false, status: 403, text: async () => 'projectos_memory_context_invalid' }; if (env.status === 'draft') return { ok: false, status: 403, text: async () => 'projectos_memory_context_unavailable' }; const ageMs = Date.now() - new Date(env.retrievedAt).getTime(); if (ageMs > 60000 || ageMs < 0) return { ok: false, status: 403, text: async () => 'projectos_memory_context_stale' }; } return { ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) }; };
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -453,7 +470,7 @@ test('Real Route Acceptance: POST /actions/:id/run without approval fails closed
           } 
         };
       }
-  const handler = loadHandler();
+  var handler = loadHandler();
       if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/actions/dangerous-changes/run',
@@ -490,7 +507,7 @@ test('Real Route Acceptance: POST /actions/:id/run without approval fails closed
 });
 
 test('Real Route Acceptance: POST /ask with forged client approval field does NOT authorize execution', async () => {
-  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'index.ts'), 'utf8');
+  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'handler.ts'), 'utf8');
   const stripped = indexSource
     .replace(/import "jsr:.*?";/g, '')
     .replace(/import \{ createClient \} from "jsr:.*?";/g, 'const createClient = global.mockCreateClient;')
@@ -513,7 +530,7 @@ test('Real Route Acceptance: POST /ask with forged client approval field does NO
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
+  global.fetch = async (url) => { const env = global.mockMemoryEnvelope; if (env === null) return { ok: false, status: 403, text: async () => 'projectos_memory_context_missing' }; if (env !== undefined) { if (env.namespace !== 'real_life') return { ok: false, status: 403, text: async () => 'projectos_memory_context_invalid' }; if (env.status === 'draft') return { ok: false, status: 403, text: async () => 'projectos_memory_context_unavailable' }; const ageMs = Date.now() - new Date(env.retrievedAt).getTime(); if (ageMs > 60000 || ageMs < 0) return { ok: false, status: 403, text: async () => 'projectos_memory_context_stale' }; } return { ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) }; };
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -538,7 +555,7 @@ test('Real Route Acceptance: POST /ask with forged client approval field does NO
           } 
         };
       }
-  const handler = loadHandler();
+  var handler = loadHandler();
       if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
@@ -574,7 +591,7 @@ test('Real Route Acceptance: POST /ask with forged client approval field does NO
 });
 
 test('Real Route Acceptance: POST /actions/:id/run with payload mismatch fails closed', async () => {
-  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'index.ts'), 'utf8');
+  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'handler.ts'), 'utf8');
   const stripped = indexSource
     .replace(/import "jsr:.*?";/g, '')
     .replace(/import \{ createClient \} from "jsr:.*?";/g, 'const createClient = global.mockCreateClient;')
@@ -597,7 +614,7 @@ test('Real Route Acceptance: POST /actions/:id/run with payload mismatch fails c
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
+  global.fetch = async (url) => { const env = global.mockMemoryEnvelope; if (env === null) return { ok: false, status: 403, text: async () => 'projectos_memory_context_missing' }; if (env !== undefined) { if (env.namespace !== 'real_life') return { ok: false, status: 403, text: async () => 'projectos_memory_context_invalid' }; if (env.status === 'draft') return { ok: false, status: 403, text: async () => 'projectos_memory_context_unavailable' }; const ageMs = Date.now() - new Date(env.retrievedAt).getTime(); if (ageMs > 60000 || ageMs < 0) return { ok: false, status: 403, text: async () => 'projectos_memory_context_stale' }; } return { ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) }; };
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -632,7 +649,7 @@ test('Real Route Acceptance: POST /actions/:id/run with payload mismatch fails c
       if (func === 'claim_execution_plan') {
         return { error: { message: 'ACTION_HASH_MISMATCH' } };
       }
-  const handler = loadHandler();
+  var handler = loadHandler();
       if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/actions/dangerous-changes/run',
@@ -673,7 +690,7 @@ test('Real Route Acceptance: POST /actions/:id/run with payload mismatch fails c
 });
 
 test('Real Route Acceptance: Concurrent same-key requests trigger inFlightDuplicate', async () => {
-  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'index.ts'), 'utf8');
+  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'handler.ts'), 'utf8');
   const stripped = indexSource
     .replace(/import "jsr:.*?";/g, '')
     .replace(/import \{ createClient \} from "jsr:.*?";/g, 'const createClient = global.mockCreateClient;')
@@ -698,7 +715,7 @@ test('Real Route Acceptance: Concurrent same-key requests trigger inFlightDuplic
   
   let providerRunnerExecuteCount = 0;
   
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
+  global.fetch = async (url) => { const env = global.mockMemoryEnvelope; if (env === null) return { ok: false, status: 403, text: async () => 'projectos_memory_context_missing' }; if (env !== undefined) { if (env.namespace !== 'real_life') return { ok: false, status: 403, text: async () => 'projectos_memory_context_invalid' }; if (env.status === 'draft') return { ok: false, status: 403, text: async () => 'projectos_memory_context_unavailable' }; const ageMs = Date.now() - new Date(env.retrievedAt).getTime(); if (ageMs > 60000 || ageMs < 0) return { ok: false, status: 403, text: async () => 'projectos_memory_context_stale' }; } return { ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) }; };
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -734,7 +751,7 @@ test('Real Route Acceptance: Concurrent same-key requests trigger inFlightDuplic
         providerRunnerExecuteCount++;
         return { data: { payloadHash: 'mock-hash', status: 'dispatched' } };
       }
-  const handler = loadHandler();
+  var handler = loadHandler();
       if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
@@ -774,7 +791,7 @@ test('Real Route Acceptance: Concurrent same-key requests trigger inFlightDuplic
 
 test('Real Route Acceptance: POST /ask with unavailable memory fails closed', async () => {
   global.mockMemoryEnvelope = null;
-  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'index.ts'), 'utf8');
+  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'handler.ts'), 'utf8');
   const stripped = indexSource
     .replace(/import "jsr:.*?";/g, '')
     .replace(/import \{ createClient \} from "jsr:.*?";/g, 'const createClient = global.mockCreateClient;')
@@ -805,7 +822,7 @@ test('Real Route Acceptance: POST /ask with unavailable memory fails closed', as
     rpc: async (func, args) => {
       if (func === 'consume_runtime_rate_limit') return { data: { allowed: true } };
       if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { latestExecutionPlanId: 'plan-mem-1' } } } };
-  const handler = loadHandler();
+  var handler = loadHandler();
       if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
@@ -840,7 +857,7 @@ test('Real Route Acceptance: POST /ask with unavailable memory fails closed', as
 
 test('Real Route Acceptance: POST /ask with stale memory fails closed', async () => {
   global.mockMemoryEnvelope = { retrievedAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(), status: 'available', namespace: 'real_life' };
-  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'index.ts'), 'utf8');
+  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'handler.ts'), 'utf8');
   const stripped = indexSource
     .replace(/import "jsr:.*?";/g, '')
     .replace(/import \{ createClient \} from "jsr:.*?";/g, 'const createClient = global.mockCreateClient;')
@@ -871,7 +888,7 @@ test('Real Route Acceptance: POST /ask with stale memory fails closed', async ()
     rpc: async (func, args) => {
       if (func === 'consume_runtime_rate_limit') return { data: { allowed: true } };
       if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { latestExecutionPlanId: 'plan-mem-2' } } } };
-  const handler = loadHandler();
+  var handler = loadHandler();
       if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
@@ -906,7 +923,7 @@ test('Real Route Acceptance: POST /ask with stale memory fails closed', async ()
 
 test('Real Route Acceptance: POST /ask with wrong namespace memory fails closed', async () => {
   global.mockMemoryEnvelope = { retrievedAt: new Date().toISOString(), status: 'available', namespace: 'wrong_namespace' };
-  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'index.ts'), 'utf8');
+  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'handler.ts'), 'utf8');
   const stripped = indexSource
     .replace(/import "jsr:.*?";/g, '')
     .replace(/import \{ createClient \} from "jsr:.*?";/g, 'const createClient = global.mockCreateClient;')
@@ -937,7 +954,7 @@ test('Real Route Acceptance: POST /ask with wrong namespace memory fails closed'
     rpc: async (func, args) => {
       if (func === 'consume_runtime_rate_limit') return { data: { allowed: true } };
       if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { latestExecutionPlanId: 'plan-mem-3' } } } };
-  const handler = loadHandler();
+  var handler = loadHandler();
       if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',
@@ -972,7 +989,7 @@ test('Real Route Acceptance: POST /ask with wrong namespace memory fails closed'
 
 test('Real Route Acceptance: POST /ask with unapproved memory status fails closed', async () => {
   global.mockMemoryEnvelope = { retrievedAt: new Date().toISOString(), status: 'draft', namespace: 'real_life' };
-  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'index.ts'), 'utf8');
+  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'pandora-owner-api', 'handler.ts'), 'utf8');
   const stripped = indexSource
     .replace(/import "jsr:.*?";/g, '')
     .replace(/import \{ createClient \} from "jsr:.*?";/g, 'const createClient = global.mockCreateClient;')
@@ -1003,7 +1020,7 @@ test('Real Route Acceptance: POST /ask with unapproved memory status fails close
     rpc: async (func, args) => {
       if (func === 'consume_runtime_rate_limit') return { data: { allowed: true } };
       if (func === 'projectos_accept_intake') return { data: { is_new: true, intake: { id: 'intake-mock-99', status: 'accepted', analysis: { latestExecutionPlanId: 'plan-mem-4' } } } };
-  const handler = loadHandler();
+  var handler = loadHandler();
       if (func === 'create_execution_plan') { const isApproved = args && args.p_intake_id && args.p_intake_id.includes('approved'); return { data: { planId: 'mock-plan-id', status: isApproved ? 'approved' : 'unplanned' } }; } if (func === 'resolve_execution_plan_securely') { return { data: { organization_id: 'mock-org-1', request_id: 'req', tool: 'mock', args: {} } }; } return { data: null }; } });const mockRequest = {
     method: 'POST',
     url: 'https://mock.edge/ask',

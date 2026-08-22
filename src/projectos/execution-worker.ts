@@ -1,6 +1,6 @@
 'use strict';
 
-const crypto = require('node:crypto');
+const workerCrypto = require('node:crypto');
 const { sanitizeError } = require('./owner-command-pipeline');
 
 /**
@@ -79,7 +79,7 @@ async function processExecutionDispatch(options) {
       });
 
       // Record provider submission
-      const providerOpId = executionResult.providerOperationId || `local-${crypto.randomUUID()}`;
+      const providerOpId = executionResult.providerOperationId || `local-${workerCrypto.randomUUID()}`;
       await projectosClient.recordProviderSubmission(activeDispatchId, providerOpId);
 
     } catch (executionError) {

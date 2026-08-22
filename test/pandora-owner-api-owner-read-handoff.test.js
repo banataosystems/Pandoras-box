@@ -7,7 +7,7 @@ const { test } = require("node:test");
 
 const root = path.join(__dirname, "..");
 const ownerApi = fs.readFileSync(
-  path.join(root, "supabase/functions/pandora-owner-api/index.ts"),
+  path.join(root, "supabase/functions/pandora-owner-api/handler.ts"),
   "utf8",
 );
 const migration = fs.readFileSync(
