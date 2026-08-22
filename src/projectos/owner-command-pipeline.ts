@@ -263,7 +263,7 @@ async function executeOwnerCommand(options) {
   }
 
   // 8. Finalization & Proof Binding
-  const proofHash = sha256Hex(`${intakeId}:production_verified:${Date.now()}`);
+  const proofHash = executionResult?.proofHash || sha256Hex(`${intakeId}:production_verified:${Date.now()}`);
   const porcelainReply = executionResult?.summary || 'The requested check completed successfully.';
 
   const finalOutcome = {

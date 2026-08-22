@@ -238,8 +238,8 @@ test('Real Route Acceptance: POST /actions/:id/run with approved intent succeeds
           } 
         };
       }
-      if (func === 'projectos_dispatch_execution_claim') {
-        return { data: { id: 'claim-1', status: 'dispatched' } };
+      if (func === 'claim_execution_plan') {
+        return { data: { payloadHash: 'mock-hash', status: 'dispatched' } };
       }
       if (func === 'projectos_complete_execution') {
         return { data: null };
@@ -499,7 +499,7 @@ test('Real Route Acceptance: POST /actions/:id/run with payload mismatch fails c
           } 
         };
       }
-      if (func === 'projectos_dispatch_execution_claim') {
+      if (func === 'claim_execution_plan') {
         return { error: { message: 'ACTION_HASH_MISMATCH' } };
       }
       return { data: null };
@@ -541,7 +541,7 @@ test('Real Route Acceptance: POST /actions/:id/run with payload mismatch fails c
   
   // When an intake is already marked approved (is_new=false, status=approved),
   // the pipeline bypasses the approval gate and proceeds to execution.
-  // The action_hash binding is enforced at the database layer (projectos_dispatch_execution_claim),
+  // The action_hash binding is enforced at the database layer (claim_execution_plan),
   // which is a provider-level invariant tested in schema-foundation-baseline and Supabase migration tests.
   // At the edge function layer, an approved intake correctly proceeds without re-pausing.
   assert.strictEqual(responseBody.needsApproval, false, 'Approved intake must not re-pause for approval gate');
@@ -593,9 +593,9 @@ test('Real Route Acceptance: Concurrent same-key requests trigger inFlightDuplic
           } 
         };
       }
-      if (func === 'projectos_dispatch_execution_claim') {
+      if (func === 'claim_execution_plan') {
         providerRunnerExecuteCount++;
-        return { data: { id: 'claim-1', status: 'dispatched' } };
+        return { data: { payloadHash: 'mock-hash', status: 'dispatched' } };
       }
       return { data: null };
     }
