@@ -125,7 +125,7 @@ test('Real Route Acceptance: POST /ask equivalent request traverses full handler
   
   // Set up the mocked Deno environment
   global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ envelope: global.mockMemoryEnvelope !== undefined ? global.mockMemoryEnvelope : { schemaVersion: '1.0.0', status: 'available', source: 'pandora-memory', namespace: 'real_life', retrievedAt: new Date().toISOString() } }) });
+  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -227,7 +227,7 @@ test('Real Route Acceptance: POST /ask with dangerous intent pauses for approval
   }).outputText;
   
   global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ envelope: global.mockMemoryEnvelope !== undefined ? global.mockMemoryEnvelope : { schemaVersion: '1.0.0', status: 'available', source: 'pandora-memory', namespace: 'real_life', retrievedAt: new Date().toISOString() } }) });
+  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -317,7 +317,7 @@ test('Real Route Acceptance: POST /actions/:id/run with approved intent succeeds
   }).outputText;
   
   global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ envelope: global.mockMemoryEnvelope !== undefined ? global.mockMemoryEnvelope : { schemaVersion: '1.0.0', status: 'available', source: 'pandora-memory', namespace: 'real_life', retrievedAt: new Date().toISOString() } }) });
+  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -411,7 +411,7 @@ test('Real Route Acceptance: POST /actions/:id/run without approval fails closed
   }).outputText;
   
   global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ envelope: global.mockMemoryEnvelope !== undefined ? global.mockMemoryEnvelope : { schemaVersion: '1.0.0', status: 'available', source: 'pandora-memory', namespace: 'real_life', retrievedAt: new Date().toISOString() } }) });
+  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -498,7 +498,7 @@ test('Real Route Acceptance: POST /ask with forged client approval field does NO
   }).outputText;
   
   global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ envelope: global.mockMemoryEnvelope !== undefined ? global.mockMemoryEnvelope : { schemaVersion: '1.0.0', status: 'available', source: 'pandora-memory', namespace: 'real_life', retrievedAt: new Date().toISOString() } }) });
+  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -584,7 +584,7 @@ test('Real Route Acceptance: POST /actions/:id/run with payload mismatch fails c
   }).outputText;
   
   global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ envelope: global.mockMemoryEnvelope !== undefined ? global.mockMemoryEnvelope : { schemaVersion: '1.0.0', status: 'available', source: 'pandora-memory', namespace: 'real_life', retrievedAt: new Date().toISOString() } }) });
+  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -680,7 +680,7 @@ test('Real Route Acceptance: Concurrent same-key requests trigger inFlightDuplic
   let providerRunnerExecuteCount = 0;
   
   global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ envelope: global.mockMemoryEnvelope !== undefined ? global.mockMemoryEnvelope : { schemaVersion: '1.0.0', status: 'available', source: 'pandora-memory', namespace: 'real_life', retrievedAt: new Date().toISOString() } }) });
+  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -774,7 +774,7 @@ test('Real Route Acceptance: POST /ask with unavailable memory fails closed', as
   }).outputText;
   
   global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ envelope: global.mockMemoryEnvelope !== undefined ? global.mockMemoryEnvelope : { schemaVersion: '1.0.0', status: 'available', source: 'pandora-memory', namespace: 'real_life', retrievedAt: new Date().toISOString() } }) });
+  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -850,7 +850,7 @@ test('Real Route Acceptance: POST /ask with stale memory fails closed', async ()
   }).outputText;
   
   global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ envelope: global.mockMemoryEnvelope !== undefined ? global.mockMemoryEnvelope : { schemaVersion: '1.0.0', status: 'available', source: 'pandora-memory', namespace: 'real_life', retrievedAt: new Date().toISOString() } }) });
+  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -926,7 +926,7 @@ test('Real Route Acceptance: POST /ask with wrong namespace memory fails closed'
   }).outputText;
   
   global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ envelope: global.mockMemoryEnvelope !== undefined ? global.mockMemoryEnvelope : { schemaVersion: '1.0.0', status: 'available', source: 'pandora-memory', namespace: 'real_life', retrievedAt: new Date().toISOString() } }) });
+  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,
@@ -1002,7 +1002,7 @@ test('Real Route Acceptance: POST /ask with unapproved memory status fails close
   }).outputText;
   
   global.Deno = { env: { get: () => 'mock' } };
-  global.fetch = async (url) => ({ ok: true, json: async () => ({ envelope: global.mockMemoryEnvelope !== undefined ? global.mockMemoryEnvelope : { schemaVersion: '1.0.0', status: 'available', source: 'pandora-memory', namespace: 'real_life', retrievedAt: new Date().toISOString() } }) });
+  global.fetch = async (url) => ({ ok: true, json: async () => ({ contextHash: 'fake-context-hash-that-satisfies-the-broker' }) });
   global.mockCreateClient = () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'mock-user-1' } } }) },
     from: global.createTableMock,

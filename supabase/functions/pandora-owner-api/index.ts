@@ -1150,19 +1150,29 @@ async function acceptIntake(
       // 2. Hydrate and attach Memory using the control-plane broker
       let contextHash: string | null = null;
       try {
-        const brokerOrigin = Deno.env.get("PROJECTOS_MCP_RESOURCE_ORIGIN") || "https://mcpmaster.vercel.app";
-        const brokerRes = await fetch(`${brokerOrigin}/api/memory-broker`, {
+        const brokerOriginEnv = Deno.env.get("PROJECTOS_MCP_RESOURCE_ORIGIN") || "https://mcpmaster.vercel.app";
+        const brokerUrl = new URL(brokerOriginEnv);
+        if (brokerUrl.protocol !== "https:") throw new Error("Broker origin must be HTTPS");
+        if (brokerUrl.hostname !== "mcpmaster.vercel.app" && brokerUrl.hostname !== "localhost") {
+          throw new Error("Broker origin hostname is not in the canonical allowlist");
+        }
+        if (brokerUrl.username || brokerUrl.password) throw new Error("Broker URL must not contain credentials");
+        if (brokerUrl.search) throw new Error("Broker URL must not contain a query string");
+        if (brokerUrl.hash) throw new Error("Broker URL must not contain a fragment");
+        
+        brokerUrl.pathname = "/api/memory-broker";
+        const finalBrokerUrl = brokerUrl.toString();
+
+        const brokerRes = await fetch(finalBrokerUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': context.token, // USE USER TOKEN, NOT SERVICE ROLE
           },
           body: JSON.stringify({
-            planId: planId,
-            requestId: planData.request_id,
-            tool: planData.tool,
-            args: planData.args
-          })
+            planId: planId
+          }),
+          redirect: 'error'
         });
 
         if (!brokerRes.ok) {
