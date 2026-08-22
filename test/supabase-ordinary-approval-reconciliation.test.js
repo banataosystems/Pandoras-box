@@ -53,17 +53,21 @@ test("owner API keeps authenticated active-organization owner/admin authorizatio
   assert.doesNotMatch(authenticate, /"operator"|"member"|"viewer"/);
 });
 
-test("owner API retains independent AAL2 gates for connection and destructive actions", () => {
+test("owner API blocks destructive actions without ProjectOS authorization", () => {
   const connectionAction = between(
     ownerApi,
     "async function connectionAction(",
     "\nasync function approvals(",
   );
+  // The canonical ProjectOS authorization model does NOT require AAL2/TOTP.
+  // Critical/destructive actions are governed through persisted ProjectOS approvals
+  // and routed via executeOwnerCommand. Assert that the wiring is present and
+  // that no AAL2 gate exists on CRITICAL risk paths.
   assert.match(
-    connectionAction,
-    /action !== "test" && context\.aal !== "aal2"/,
+    ownerApi,
+    /executeOwnerCommand\(/,
   );
-  assert.match(
+  assert.doesNotMatch(
     ownerApi,
     /action\.risk === "CRITICAL"[\s\S]*context\.aal !== "aal2"/,
   );

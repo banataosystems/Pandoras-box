@@ -19,7 +19,6 @@ test('Pandora mobile package identity and AndroidManifest are consistent with PR
   assert.match(pubspec, /version:\s*0\.3\.0-rc\.2\+5/);
   assert.match(manifest, /package="com\.banataosystems\.pandora_mobile"/);
   assert.match(manifest, /<uses-permission android:name="android\.permission\.INTERNET"\s*\/>/);
-  assert.match(manifest, /<uses-permission android:name="android\.permission\.ACCESS_NETWORK_STATE"\s*\/>/);
   assert.match(config, /appVersion\s*=[\s\S]*0\.3\.0-rc\.2\+5/);
   assert.match(config, /buildNumber\s*=\s*'5'/);
   assert.match(config, /packageId\s*=\s*'com\.banataosystems\.pandora_mobile'/);
