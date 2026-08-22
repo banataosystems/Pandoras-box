@@ -1,0 +1,28 @@
+name: Pandora Windows Worker contract
+
+on:
+  pull_request:
+    paths:
+      - 'workers/windows/**'
+      - 'docs/integrations/PANDORA_WINDOWS_WORKER_V1.md'
+      - '.github/workflows/windows-worker-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4.3.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run worker contract tests
+        run: node --test workers/windows/test/*.test.mjs
+      - name: Prove no provider credentials are embedded
+        shell: bash
+        run: |
+          ! grep -RniE 'SUPABASE_SERVICE_ROLE_KEY\s*=|github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{20,}|VERCEL_TOKEN\s*=' workers/windows docs/integrations/PANDORA_WINDOWS_WORKER_V1.md
